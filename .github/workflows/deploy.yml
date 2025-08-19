@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      MAGE_NAME: hiufungleung/healermy
+      IMAGE_NAME: hiufungleung/healermy
       # Tag strategy: push "latest" and the commit SHA for rollback
       IMAGE_TAG: latest
       GIT_SHA: ${{ github.sha }}
