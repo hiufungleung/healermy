@@ -76,6 +76,9 @@ jobs:
             IMAGE_TAG="${{ needs.build.outputs.image_tag }}"
             DIGEST="${{ needs.build.outputs.digest }}"  # multi-arch manifest digest
             IMAGE_BY_DIGEST="${IMAGE_NAME}@${DIGEST}"
+            echo "IMAGE_NAME=$IMAGE_NAME"
+            echo "DIGEST=[$DIGEST]"
+            echo "IMAGE_BY_DIGEST=$IMAGE_BY_DIGEST"
 
             # Login to Docker Hub
             echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
