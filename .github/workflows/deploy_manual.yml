@@ -1,10 +1,9 @@
-name: Build & Deploy (amd64)
+name: Build & Deploy (multi-arch)
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
 
+# Shared environment variables
 env:
   IMAGE_NAME: hiufungleung/healermy
   IMAGE_TAG: latest
@@ -17,11 +16,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      digest:     ${{ steps.build.outputs.digest }}     # image digest（單架構也會有）
+      digest:     ${{ steps.build.outputs.digest }}     # multi-arch manifest digest
       image_ref:  ${{ steps.meta.outputs.image_ref }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Multiple architecture build requires QEMU and Buildx
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -36,13 +39,15 @@ jobs:
         id: meta
         run: echo "image_ref=${IMAGE_NAME}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
 
-      - name: Build & Push (amd64) to Docker Hub
+      # Build and push the Docker image for multiple architectures
+      - name: Build & Push (multi-arch) to Docker Hub
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
+          # Push the image with a tag and digest
           tags: |
             ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
@@ -64,37 +69,34 @@ jobs:
             PORT=3000
 
             IMAGE_NAME="${{ env.IMAGE_NAME }}"
-            RAW_DIGEST="${{ needs.build.outputs.digest }}"
-            DIGEST="$(printf '%s' "$RAW_DIGEST" | tr -d '\r\n')"
-
-            if [ -n "$DIGEST" ]; then
-              IMAGE_REF="${IMAGE_NAME}@${DIGEST}"
-            else
-              IMAGE_REF="${IMAGE_NAME}:${{ github.sha }}"
-            fi
-            echo "Using image: $IMAGE_REF"
-
-            # Login on EC2 (needed if repo is private)
+            IMAGE_TAG="${{ env.IMAGE_TAG }}"
+            DIGEST="${{ needs.build.outputs.digest }}"  # multi-arch manifest digest
+            IMAGE_BY_DIGEST="${IMAGE_NAME}@${DIGEST}"
+            
+            # Login to Docker Hub
             echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-            # Ensure the app network exists (shared with Nginx)
+            # Ensure the web network exists
             docker network inspect web >/dev/null 2>&1 || docker network create web
 
-            # Replace old container
+            # Remove existing container if it exists
             docker rm -f "$CONTAINER" 2>/dev/null || true
-            docker pull "$IMAGE_REF"
 
+            # Pull the image by digest
+            docker pull "$IMAGE_BY_DIGEST"
+
+            # Run the container
             docker run -d --name "$CONTAINER" \
               --network web \
               -e HOSTNAME=0.0.0.0 \
               -e PORT=$PORT \
               --restart unless-stopped \
-              "$IMAGE_REF"
+              "$IMAGE_BY_DIGEST"
 
             # Health check: wait for app to be ready
             for i in {1..30}; do
               if docker run --rm --network web curlimages/curl:8.8.0 \
-                   -fsS "http://$CONTAINER:$PORT/" >/dev/null; then
+                  -fsS "http://$CONTAINER:$PORT/" >/dev/null; then
                 echo "UP"; break
               fi
               sleep 2
