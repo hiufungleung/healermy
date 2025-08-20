@@ -1,11 +1,10 @@
-name: Build Docker Image & Deploy to EC2
+name: Build & Deploy (Multi-Arch • Cached • Parallel)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
-# Shared environment variables
 env:
   IMAGE_NAME: hiufungleung/healermy
   IMAGE_TAG: latest
@@ -15,48 +14,89 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Build each arch in parallel with GHA cache
   build:
     runs-on: ubuntu-latest
-    outputs:
-      digest:     ${{ steps.build.outputs.digest }}     # multi-arch manifest digest
-      image_ref:  ${{ steps.meta.outputs.image_ref }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Multiple architecture build requires QEMU and Buildx
+      # QEMU only needed when host ≠ target arch (safe to enable always)
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
+      # Login to Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Compose image ref
-        id: meta
-        run: echo "image_ref=${IMAGE_NAME}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      # Build and push the Docker image for multiple architectures
-      - name: Build & Push (multi-arch) to Docker Hub
+      # GHA cache for Buildx layers (per-arch caches maintained by Buildx)
+      - name: Build & Push (${{ matrix.arch }}) with cache
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/${{ matrix.arch }}
           push: true
-          # Push the image with a tag and digest
+          # Two per-arch tags: immutable commit tag, and rolling arch tag
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}-${{ matrix.arch }}
+            ${{ env.IMAGE_NAME }}:${{ matrix.arch }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Stitch both arches into multi-arch manifests (latest & commit SHA)
+  manifest:
+    runs-on: ubuntu-latest
+    needs: build
+    outputs:
+      digest: ${{ steps.out.outputs.digest }}
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Create & Push multi-arch manifests
+        run: |
+          set -eux
+          IMAGE="${{ env.IMAGE_NAME }}"
+          SHA="${{ github.sha }}"
+
+          # Create commit-specific manifest (immutable)
+          docker manifest create "${IMAGE}:${SHA}" \
+            --amend "${IMAGE}:${SHA}-amd64" \
+            --amend "${IMAGE}:${SHA}-arm64"
+          docker manifest push "${IMAGE}:${SHA}"
+
+          # Create/refresh 'latest' manifest (rolls forward)
+          docker manifest create "${IMAGE}:${{ env.IMAGE_TAG }}" \
+            --amend "${IMAGE}:${SHA}-amd64" \
+            --amend "${IMAGE}:${SHA}-arm64"
+          docker manifest push "${IMAGE}:${{ env.IMAGE_TAG }}"
+
+      - name: Output manifest digest (commit tag)
+        id: out
+        run: |
+          set -e
+          IMAGE="${{ env.IMAGE_NAME }}"
+          SHA="${{ github.sha }}"
+          DIGEST="$(docker buildx imagetools inspect "${IMAGE}:${SHA}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
 
   deploy:
     runs-on: ubuntu-latest
-    needs: build
+    needs: manifest
     steps:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -71,31 +111,34 @@ jobs:
             PORT=3000
 
             IMAGE_NAME="${{ env.IMAGE_NAME }}"
-            IMAGE_TAG="${{ env.IMAGE_TAG }}"
-            DIGEST="${{ needs.build.outputs.digest }}"  # multi-arch manifest digest
-            IMAGE_BY_DIGEST="${IMAGE_NAME}@${DIGEST}"
-            
-            # Login to Docker Hub
+            RAW_DIGEST="${{ needs.manifest.outputs.digest }}"
+            DIGEST="$(printf '%s' "$RAW_DIGEST" | tr -d '\r\n')"
+
+            # Prefer immutable digest; fallback to commit SHA tag if missing
+            if [ -n "$DIGEST" ]; then
+              IMAGE_REF="${IMAGE_NAME}@${DIGEST}"
+            else
+              IMAGE_REF="${IMAGE_NAME}:${{ github.sha }}"
+            fi
+            echo "Using image: $IMAGE_REF"
+
+            # Login on EC2 (needed if repo is private)
             echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-            # Ensure the web network exists
+            # Ensure the app network exists
             docker network inspect web >/dev/null 2>&1 || docker network create web
 
-            # Remove existing container if it exists
+            # Replace old container
             docker rm -f "$CONTAINER" 2>/dev/null || true
+            docker pull "$IMAGE_REF"
 
-            # Pull the image by digest
-            docker pull "$IMAGE_BY_DIGEST"
-
-            # Run the container
             docker run -d --name "$CONTAINER" \
               --network web \
               -e HOSTNAME=0.0.0.0 \
               -e PORT=$PORT \
               --restart unless-stopped \
-              -p $PORT:$PORT \
-              "$IMAGE_BY_DIGEST"
+              "$IMAGE_REF"
 
-            # Health check
+            # Simple health check
             sleep 5
             curl -fsS "http://localhost:$PORT/" >/dev/null && echo "UP"
