@@ -14,8 +14,25 @@ export default function CallbackPage() {
         console.log('🎯 Starting callback');
         console.log('🔍 Current URL:', window.location.href);
         
-        // Manual token exchange for SMART v1
+        // Check for OAuth errors first
         const urlParams = new URLSearchParams(window.location.search);
+        const error = urlParams.get('error');
+        const errorUri = urlParams.get('error_uri');
+        const errorDescription = urlParams.get('error_description');
+        
+        if (error) {
+          console.error('❌ OAuth error received:', error);
+          console.error('❌ Error URI:', errorUri);
+          console.error('❌ Error description:', errorDescription);
+          
+          // Use error description if available, otherwise show the error code
+          const errorMessage = errorDescription || error;
+          
+          setError(errorMessage + (errorUri ? ` For more detailed information, please visit: ${decodeURIComponent(errorUri)}` : ''));
+          return;
+        }
+        
+        // Manual token exchange for SMART v1
         const code = urlParams.get('code');
         const receivedState = urlParams.get('state');
         
@@ -158,17 +175,45 @@ export default function CallbackPage() {
   }, [router]);
 
   if (error) {
+    // Extract error_uri from the error message if it exists
+    const errorUriMatch = error.match(/For more detailed information, please visit: (.+)$/);
+    const errorUri = errorUriMatch ? errorUriMatch[1] : null;
+    const mainErrorMessage = errorUri ? error.replace(/For more detailed information, please visit: .+$/, '').trim() : error;
+    
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="card max-w-md w-full">
+        <div className="card max-w-lg w-full">
           <h1 className="text-2xl font-bold text-danger mb-4">Authentication Error</h1>
-          <p className="text-text-secondary mb-4">{error}</p>
-          <button
-            onClick={() => router.push('/')}
-            className="btn-primary w-full"
-          >
-            Return to Home
-          </button>
+          <p className="text-text-secondary mb-4">{mainErrorMessage}</p>
+          {errorUri && (
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800 mb-2">
+                For more detailed information about this error:
+              </p>
+              <a 
+                href={errorUri} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 underline text-sm break-all"
+              >
+                View detailed error information →
+              </a>
+            </div>
+          )}
+          <div className="flex space-x-3">
+            <button
+              onClick={() => router.push('/')}
+              className="btn-outline flex-1"
+            >
+              Return to Home
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="btn-primary flex-1"
+            >
+              Try Again
+            </button>
+          </div>
         </div>
       </div>
     );
