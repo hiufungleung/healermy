@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AuthSession } from '@/types/auth';
 import { decrypt, encrypt } from '@/library/auth/encryption';
+import { refreshAccessToken } from '@/library/auth/tokenRefresh';
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -57,57 +58,40 @@ export async function middleware(request: NextRequest) {
         try {
           console.log('🔄 [MIDDLEWARE] Attempting to refresh access token...');
           
-          // Prepare refresh token request
-          const tokenParams = new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: sessionData.refreshToken,
-          });
-
-          // Use Basic Authentication (Edge Runtime compatible)
-          const credentials = btoa(`${sessionData.clientId}:${sessionData.clientSecret}`);
+          // Use library function for token refresh
+          const tokenData = await refreshAccessToken(
+            sessionData.refreshToken,
+            sessionData.tokenUrl,
+            sessionData.clientId,
+            sessionData.clientSecret
+          );
           
-          const tokenResponse = await fetch(sessionData.tokenUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'Authorization': `Basic ${credentials}`,
-              'Accept': 'application/json',
-            },
-            body: tokenParams.toString(),
+          console.log('✅ [MIDDLEWARE] Token refresh successful');
+          
+          // Update session with new tokens
+          const refreshedSession = {
+            ...sessionData,
+            accessToken: tokenData.access_token,
+            refreshToken: tokenData.refresh_token || sessionData.refreshToken, // Use new refresh token if provided
+            expiresAt: Date.now() + (tokenData.expires_in || 3600) * 1000,
+          };
+          
+          // Re-encrypt the refreshed session
+          const encryptedRefreshedSession = await encrypt(JSON.stringify(refreshedSession));
+          
+          // Continue with the request but update the cookie
+          const response = NextResponse.next();
+          response.cookies.set('healermy_session', encryptedRefreshedSession, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: Math.floor((refreshedSession.expiresAt - Date.now()) / 1000),
+            path: '/',
           });
-
-          if (tokenResponse.ok) {
-            const tokenData = await tokenResponse.json();
-            console.log('✅ [MIDDLEWARE] Token refresh successful');
-            
-            // Update session with new tokens
-            const refreshedSession = {
-              ...sessionData,
-              accessToken: tokenData.access_token,
-              refreshToken: tokenData.refresh_token || sessionData.refreshToken, // Use new refresh token if provided
-              expiresAt: Date.now() + (tokenData.expires_in || 3600) * 1000,
-            };
-            
-            // Re-encrypt the refreshed session
-            const encryptedRefreshedSession = await encrypt(JSON.stringify(refreshedSession));
-            
-            // Continue with the request but update the cookie
-            const response = NextResponse.next();
-            response.cookies.set('healermy_session', encryptedRefreshedSession, {
-              httpOnly: true,
-              secure: process.env.NODE_ENV === 'production',
-              sameSite: 'strict',
-              maxAge: Math.floor((refreshedSession.expiresAt - Date.now()) / 1000),
-              path: '/',
-            });
-            response.headers.set('x-session-data', JSON.stringify(refreshedSession));
-            
-            console.log(`✅ [MIDDLEWARE] Session refreshed for ${refreshedSession.role}, allowing: ${pathname}`);
-            return response;
-            
-          } else {
-            console.log('❌ [MIDDLEWARE] Token refresh failed, redirecting to home');
-          }
+          response.headers.set('x-session-data', JSON.stringify(refreshedSession));
+          
+          console.log(`✅ [MIDDLEWARE] Session refreshed for ${refreshedSession.role}, allowing: ${pathname}`);
+          return response;
         } catch (refreshError) {
           console.error('❌ [MIDDLEWARE] Token refresh error:', refreshError);
         }

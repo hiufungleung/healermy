@@ -15,8 +15,6 @@ interface TokenResponse {
 }
 
 export async function refreshAccessToken(refreshToken: string, tokenUrl: string, clientId: string, clientSecret: string): Promise<TokenResponse> {
-  console.log('🔄 Refreshing token with:', { tokenUrl, hasRefreshToken: !!refreshToken, clientId });
-  
   const tokenParams = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
@@ -31,17 +29,6 @@ export async function refreshAccessToken(refreshToken: string, tokenUrl: string,
     'Authorization': `Basic ${credentials}`,
   };
 
-  console.log("Token refresh request details:");
-  console.log("URL:", tokenUrl);
-  console.log("Client ID:", clientId);
-  console.log("Client Secret:", clientSecret);
-  console.log("Credentials (Base64 Encoded):", credentials);
-  console.log("Using Basic Auth with client credentials");
-  console.log("Request Headers:");
-  console.log("Headers:", headers);
-  console.log("Body:", tokenParams.toString());
-
-  console.log('🚀 Making refresh request to:', tokenUrl, 'with client:', clientId);
   const response = await fetch(tokenUrl, {
     method: 'POST',
     headers,
@@ -54,12 +41,6 @@ export async function refreshAccessToken(refreshToken: string, tokenUrl: string,
   }
 
   const tokenData: TokenResponse = await response.json();
-  console.log('🔄 Token refreshed successfully:', {
-    hasAccessToken: !!tokenData.access_token,
-    expiresIn: tokenData.expires_in,
-    tokenType: tokenData.token_type
-  });
-
   return tokenData;
 }
 
