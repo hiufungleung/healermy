@@ -99,3 +99,6 @@ jobs:
               fi
               sleep 2
             done
+
+            # Delete old images to save space
+            docker image prune -f

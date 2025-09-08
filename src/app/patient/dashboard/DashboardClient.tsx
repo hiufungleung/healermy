@@ -1,0 +1,352 @@
+'use client';
+
+import React from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/common/Button';
+import { Badge } from '@/components/common/Badge';
+import type { Patient, Appointment } from '@/types/fhir';
+
+interface DashboardClientProps {
+  patient: Patient | null;
+  appointments: Appointment[];
+  patientName: string;
+  greeting: string;
+}
+
+export default function DashboardClient({ 
+  patient, 
+  appointments, 
+  patientName, 
+  greeting 
+}: DashboardClientProps) {
+  const router = useRouter();
+
+  // Extract patient information
+  const patientGender = patient?.gender;
+  const patientBirthDate = patient?.birthDate;
+  const patientAge = patientBirthDate ? 
+    Math.floor((Date.now() - new Date(patientBirthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null;
+  
+  const patientPhone = patient?.telecom?.find(t => t.system === 'phone')?.value;
+  const patientEmail = patient?.telecom?.find(t => t.system === 'email')?.value;
+  
+  const patientAddress = patient?.address?.[0];
+  const formattedAddress = patientAddress ? 
+    `${patientAddress.line?.join(', ') || ''} ${patientAddress.city || ''} ${patientAddress.state || ''} ${patientAddress.postalCode || ''}`.trim() : null;
+  
+  // Use only real FHIR appointments data - no mock data
+  const displayAppointments = appointments;
+  
+  const todayStatus = {
+    nextAppointment: '10:30 AM',
+    queuePosition: null,
+    waitTime: null
+  };
+
+  return (
+    <>
+      {/* Welcome Section */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-text-primary mb-2">
+          Good {greeting}, {patientName}
+        </h1>
+        <p className="text-text-secondary">
+          Manage your appointments and health information
+        </p>
+      </div>
+
+      {/* Patient Information Card */}
+      {patient && (
+        <div className="bg-white rounded-lg border border-border p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4">Patient Information</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <p className="text-sm text-text-secondary mb-1">Full Name</p>
+              <p className="font-medium">{patientName}</p>
+            </div>
+            
+            {patientAge && (
+              <div>
+                <p className="text-sm text-text-secondary mb-1">Age</p>
+                <p className="font-medium">{patientAge} years old</p>
+              </div>
+            )}
+            
+            {patientGender && (
+              <div>
+                <p className="text-sm text-text-secondary mb-1">Gender</p>
+                <p className="font-medium capitalize">{patientGender}</p>
+              </div>
+            )}
+            
+            {patientBirthDate && (
+              <div>
+                <p className="text-sm text-text-secondary mb-1">Date of Birth</p>
+                <p className="font-medium">{new Date(patientBirthDate).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: '2-digit', 
+                  day: '2-digit'
+                })}</p>
+              </div>
+            )}
+            
+            {patientPhone && (
+              <div>
+                <p className="text-sm text-text-secondary mb-1">Phone</p>
+                <p className="font-medium">{patientPhone}</p>
+              </div>
+            )}
+            
+            {patientEmail && (
+              <div>
+                <p className="text-sm text-text-secondary mb-1">Email</p>
+                <p className="font-medium">{patientEmail}</p>
+              </div>
+            )}
+            
+            {formattedAddress && (
+              <div className="md:col-span-2">
+                <p className="text-sm text-text-secondary mb-1">Address</p>
+                <p className="font-medium">{formattedAddress}</p>
+              </div>
+            )}
+            
+            <div>
+              <p className="text-sm text-text-secondary mb-1">Patient ID</p>
+              <p className="font-medium font-mono text-sm">{patient.id}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="grid md:grid-cols-3 gap-4 mb-8">
+        <div className="bg-white rounded-lg border border-border p-4 cursor-pointer hover:shadow-md transition-shadow">
+          <button
+            onClick={() => router.push('/patient/book-appointment')}
+            className="w-full flex items-center space-x-4"
+          >
+            <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <div className="text-left">
+              <p className="font-semibold">Add Appointment</p>
+              <p className="text-sm text-text-secondary">Book a new appointment</p>
+            </div>
+          </button>
+        </div>
+
+        <div className="bg-white rounded-lg border border-border p-4 cursor-pointer hover:shadow-md transition-shadow">
+          <button
+            onClick={() => router.push('/patient/notifications')}
+            className="w-full flex items-center space-x-4"
+          >
+            <div className="w-12 h-12 bg-yellow-50 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+            </div>
+            <div className="text-left">
+              <p className="font-semibold">View Notifications</p>
+              <p className="text-sm text-text-secondary">Check your messages</p>
+            </div>
+          </button>
+        </div>
+
+        <div className="bg-white rounded-lg border border-border p-4 cursor-pointer hover:shadow-md transition-shadow">
+          <button
+            onClick={() => router.push('/patient/profile')}
+            className="w-full flex items-center space-x-4"
+          >
+            <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <div className="text-left">
+              <p className="font-semibold">Edit Profile</p>
+              <p className="text-sm text-text-secondary">Update your information</p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-8">
+        {/* Upcoming Appointments */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-lg border border-border p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold">Upcoming Appointments</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/patient/appointments')}
+              >
+                View All
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              {displayAppointments.map((appointment) => {
+                // Extract FHIR appointment data
+                const appointmentStatus = appointment.status;
+                const doctorName = appointment.participant?.find(p => p.actor?.reference?.startsWith('Practitioner/'))?.actor?.display || 'Provider';
+                const appointmentDate = appointment.start;
+                const appointmentTime = appointmentDate ? 
+                  new Date(appointmentDate).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'TBD';
+                const specialty = appointment.serviceType?.[0]?.text || appointment.serviceType?.[0]?.coding?.[0]?.display || 'General';
+                const location = appointment.participant?.find(p => p.actor?.reference?.startsWith('Location/'))?.actor?.display || 'TBD';
+
+                return (
+                  <div
+                    key={appointment.id}
+                    className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="font-semibold text-lg">{doctorName}</h3>
+                        <p className="text-text-secondary">{specialty}</p>
+                      </div>
+                      <Badge 
+                        variant={appointmentStatus === 'booked' || appointmentStatus === 'fulfilled' ? "success" : 
+                                appointmentStatus === 'cancelled' ? "danger" : "info"} 
+                        size="sm"
+                      >
+                        {appointmentStatus}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                      <div className="flex items-center space-x-2">
+                        <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span>{appointmentDate ? 
+                          new Date(appointmentDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) :
+                          'TBD'
+                        }</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>{appointmentTime}</span>
+                      </div>
+                      <div className="flex items-center space-x-2 col-span-2">
+                        <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span>{location}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/patient/appointments/${appointment.id}/reschedule`)}
+                      >
+                        Reschedule
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => console.log('Cancel appointment', appointment.id)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {displayAppointments.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="mb-4">
+                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No appointments scheduled</h3>
+                  <p className="text-text-secondary mb-6">You don't have any upcoming appointments at the moment.</p>
+                  <Button
+                    variant="primary"
+                    onClick={() => router.push('/patient/book-appointment')}
+                  >
+                    Schedule an Appointment
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Today's Status */}
+        <div>
+          <div className="bg-white rounded-lg border border-border p-6">
+            <h2 className="text-xl font-semibold mb-6">Today's Status</h2>
+            
+            <div className="space-y-4">
+              {todayStatus.nextAppointment ? (
+                <>
+                  <div>
+                    <p className="text-sm text-text-secondary mb-1">Next Appointment</p>
+                    <p className="text-2xl font-bold text-primary">{todayStatus.nextAppointment}</p>
+                  </div>
+
+                  {todayStatus.queuePosition && (
+                    <div>
+                      <p className="text-sm text-text-secondary mb-1">Queue Position</p>
+                      <p className="text-xl font-semibold">#{todayStatus.queuePosition}</p>
+                    </div>
+                  )}
+
+                  {todayStatus.waitTime && (
+                    <div>
+                      <p className="text-sm text-text-secondary mb-1">Estimated Wait Time</p>
+                      <p className="text-xl font-semibold">{todayStatus.waitTime} mins</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-4">
+                  <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-text-secondary">No appointments today</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 pt-6 border-t">
+              <h3 className="font-semibold mb-3">Quick Links</h3>
+              <div className="space-y-2">
+                <button
+                  onClick={() => router.push('/patient/medical-history')}
+                  className="w-full text-left text-sm text-primary hover:underline"
+                >
+                  View Medical History →
+                </button>
+                <button
+                  onClick={() => router.push('/patient/prescriptions')}
+                  className="w-full text-left text-sm text-primary hover:underline"
+                >
+                  Active Prescriptions →
+                </button>
+                <button
+                  onClick={() => router.push('/patient/test-results')}
+                  className="w-full text-left text-sm text-primary hover:underline"
+                >
+                  Recent Test Results →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

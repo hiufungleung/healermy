@@ -44,3 +44,11 @@ next-env.d.ts
 .idea/
 .vscode/
 *.code-workspace
+
+.claude
+.claude/
+
+assets
+assets/
+
+CLAUDE.md

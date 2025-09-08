@@ -23,3 +23,11 @@ coverage
 .DS_Store
 .vscode
 .idea
+
+.claude
+.claude/
+
+assets
+assets/
+
+CLAUDE.md
