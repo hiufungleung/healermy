@@ -2,7 +2,7 @@ name: Build & Deploy (amd64)
 
 on:
   push:
-    branches: [ "main" ]
+    # branches: [ "main" ]
   workflow_dispatch:
 
 env:
@@ -17,8 +17,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      digest:     ${{ steps.build.outputs.digest }}     # image digest（單架構也會有）
-      image_ref:  ${{ steps.meta.outputs.image_ref }}
+      digest: ${{ steps.build.outputs.digest }} # image digest（單架構也會有）
+      image_ref: ${{ steps.meta.outputs.image_ref }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,12 +36,12 @@ jobs:
         id: meta
         run: echo "image_ref=${IMAGE_NAME}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
 
-      - name: Build & Push (amd64) to Docker Hub
+      - name: Build & Push to Docker Hub
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/amd64, linux/arm64
           push: true
           tags: |
             ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
