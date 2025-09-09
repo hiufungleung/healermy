@@ -83,3 +83,4 @@ if (!process.env.NEXT_PUBLIC_CERNER_AUTH_BASE_URL) {
 
 export const FHIR_BASE_URL = process.env.NEXT_PUBLIC_CERNER_BASE_URL;
 export const AUTH_BASE_URL = process.env.NEXT_PUBLIC_CERNER_AUTH_BASE_URL;
+export const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'healermy_session';

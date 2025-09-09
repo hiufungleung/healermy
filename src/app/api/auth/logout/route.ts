@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { decrypt } from '@/library/auth/encryption';
 import { AuthSession } from '@/types/auth';
+import { SESSION_COOKIE_NAME } from '@/library/auth/config';
 
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('healermy_session');
+    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
     
     let sessionData: AuthSession | null = null;
     
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
     // Always clear the session cookie
     const response = NextResponse.json({ success: true, message: 'Logged out successfully' });
     
-    response.cookies.set('healermy_session', '', {
+    response.cookies.set(SESSION_COOKIE_NAME, '', {
       path: '/',
       maxAge: 0,
       sameSite: 'strict',
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
     
-    response.cookies.set('healermy_session', '', {
+    response.cookies.set(SESSION_COOKIE_NAME, '', {
       path: '/',
       maxAge: 0,
       sameSite: 'strict',

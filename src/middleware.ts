@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AuthSession } from '@/types/auth';
 import { decrypt, encrypt } from '@/library/auth/encryption';
 import { refreshAccessToken } from '@/library/auth/tokenRefresh';
+import { SESSION_COOKIE_NAME } from '@/library/auth/config';
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -24,7 +25,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Check for valid session on protected routes
-  const sessionCookie = request.cookies.get('healermy_session');
+  const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME);
   
   if (!sessionCookie) {
     console.log(`❌ [MIDDLEWARE] No session cookie, redirecting to home: ${pathname}`);
@@ -81,7 +82,7 @@ export async function middleware(request: NextRequest) {
           
           // Continue with the request but update the cookie
           const response = NextResponse.next();
-          response.cookies.set('healermy_session', encryptedRefreshedSession, {
+          response.cookies.set(SESSION_COOKIE_NAME, encryptedRefreshedSession, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
@@ -100,7 +101,7 @@ export async function middleware(request: NextRequest) {
       // If refresh failed or no refresh token, redirect to home
       console.log(`❌ [MIDDLEWARE] Session expired and refresh failed, redirecting to home: ${pathname}`);
       const response = NextResponse.redirect(new URL('/', request.url));
-      response.cookies.delete('healermy_session');
+      response.cookies.delete(SESSION_COOKIE_NAME);
       return response;
     }
 
@@ -128,7 +129,7 @@ export async function middleware(request: NextRequest) {
   } catch (error) {
     console.error('❌ [MIDDLEWARE] Session decryption failed:', error);
     const response = NextResponse.redirect(new URL('/', request.url));
-    response.cookies.delete('healermy_session');
+    response.cookies.delete(SESSION_COOKIE_NAME);
     return response;
   }
 }
@@ -137,6 +138,7 @@ export const config = {
   matcher: [
     '/patient/:path*',
     '/provider/:path*',
-    '/test/:path*'
+    '/test/:path*',
+    '/api/fhir/:path*'
   ],
 };

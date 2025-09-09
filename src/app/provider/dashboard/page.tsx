@@ -37,13 +37,47 @@ export default function ProviderDashboard() {
     pending: 3
   });
   const [loading, setLoading] = useState(false);
+  const [providerName, setProviderName] = useState<string>('Dr. Johnson');
   
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Morning' : currentHour < 18 ? 'Afternoon' : 'Evening';
 
   useEffect(() => {
+    debugger;
     fetchBookingRequests();
+    fetchProviderName();
   }, []);
+
+  const fetchProviderName = async () => {
+    if (!session?.fhirUser) return;
+    
+    try {
+      // Extract practitioner ID from fhirUser URL
+      const practitionerMatch = session.fhirUser.match(/\/Practitioner\/(.+)$/);
+      if (!practitionerMatch) return;
+      
+      const practitionerId = practitionerMatch[1];
+      
+      // Fetch practitioner details from FHIR
+      const response = await fetch(`/api/fhir/practitioner/${practitionerId}`, {
+        headers: {
+          'Authorization': `Bearer ${session.accessToken}`,
+        },
+      });
+      
+      if (response.ok) {
+        const practitioner = await response.json();
+        if (practitioner.name && practitioner.name.length > 0) {
+          const name = practitioner.name[0];
+          const fullName = `${name.prefix ? name.prefix.join(' ') + ' ' : ''}${name.given ? name.given.join(' ') : ''} ${name.family || ''}`.trim();
+          setProviderName(fullName || 'Dr. Johnson');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching provider name:', error);
+      // Keep default name on error
+    }
+  };
 
   const fetchBookingRequests = async () => {
     setLoading(true);
@@ -176,12 +210,12 @@ export default function ProviderDashboard() {
   };
 
   return (
-    <Layout>
+    <Layout providerName={providerName}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-text-primary mb-2">
-            Good {greeting}, Dr. Johnson
+            Good {greeting}, {providerName}
           </h1>
           <p className="text-text-secondary">
             Here's what's happening in your practice today

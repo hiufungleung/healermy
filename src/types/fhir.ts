@@ -24,14 +24,65 @@ export interface Patient {
 export interface Practitioner {
   resourceType: 'Practitioner';
   id: string;
+  active?: boolean;
+  gender?: string;
+  identifier?: Array<{
+    use?: string;
+    type?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    };
+    system?: string;
+    value?: string;
+    period?: {
+      start?: string;
+      end?: string;
+    };
+  }>;
   name?: Array<{
+    use?: string;
     given?: string[];
     family?: string;
+    text?: string;
+    prefix?: string[];
+    suffix?: string[];
+    period?: {
+      start?: string;
+      end?: string;
+    };
+  }>;
+  telecom?: Array<{
+    system?: string;
+    value?: string;
+    use?: string;
+  }>;
+  address?: Array<{
+    use?: string;
+    line?: string[];
+    city?: string;
+    district?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
     text?: string;
   }>;
   qualification?: Array<{
     code?: {
       text?: string;
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+        userSelected?: boolean;
+      }>;
+    };
+    period?: {
+      start?: string;
+      end?: string;
     };
   }>;
 }
@@ -95,7 +146,12 @@ export interface Bundle<T = any> {
   resourceType: 'Bundle';
   type: string;
   total?: number;
+  link?: Array<{
+    relation: string;
+    url: string;
+  }>;
   entry?: Array<{
+    fullUrl?: string;
     resource: T;
   }>;
 }

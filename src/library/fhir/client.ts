@@ -28,6 +28,7 @@ export class FHIRService {
     });
 
     if (!response.ok) {
+      console.error(`FHIR API error: ${response.status} ${response.statusText}`);
       throw new Error(`FHIR API error: ${response.status} ${response.statusText}`);
     }
 
@@ -35,18 +36,63 @@ export class FHIRService {
   }
 
   /**
-   * Search for practitioners
+   * Search for practitioners with pagination support
+   * Based on Cerner FHIR R4 API: Must use at least one parameter
    */
-  static async searchPractitioners(token: string, baseUrl: string, name?: string): Promise<Practitioner[]> {
-    let url = `${baseUrl}/Practitioner`;
-    if (name) {
-      url += `?name=${encodeURIComponent(name)}`;
+  static async searchPractitioners(
+    token: string, 
+    baseUrl: string, 
+    options?: {
+      name?: string;
+      family?: string;
+      given?: string;
+      _count?: number;
+      _getpages?: string; // For pagination
     }
-
+  ): Promise<{ practitioners: Practitioner[], total?: number, nextUrl?: string }> {
+    const params = new URLSearchParams();
+    
+    // Always search for active practitioners
+    params.append('active', 'true');
+    
+    // Add search parameters
+    if (options?.name) {
+      params.append('name', options.name);
+    }
+    if (options?.family) {
+      params.append('family', options.family);
+    }
+    if (options?.given) {
+      params.append('given', options.given);
+    }
+    
+    // Set page size (default 30)
+    const count = options?._count || 30;
+    params.append('_count', count.toString());
+    
+    // Handle pagination
+    if (options?._getpages) {
+      params.append('_getpages', options._getpages);
+    }
+    
+    const url = `${baseUrl}/Practitioner?${params.toString()}`;
+    console.log('🔍 [DEBUG] Practitioner search URL:', url);
+    
     const response = await this.fetchWithAuth(url, token);
     const bundle: Bundle<Practitioner> = await response.json();
     
-    return bundle.entry?.map(e => e.resource) || [];
+    console.log('🔍 [DEBUG] Practitioner bundle response:', JSON.stringify(bundle, null, 2));
+    
+    const practitioners = bundle.entry?.map(e => e.resource).filter(Boolean) || [];
+    
+    // Find next page URL from bundle links
+    const nextLink = bundle.link?.find(link => link.relation === 'next');
+    
+    return {
+      practitioners,
+      total: bundle.total,
+      nextUrl: nextLink?.url
+    };
   }
 
   /**
@@ -237,25 +283,31 @@ export class FHIRService {
 }
 
 // Export individual functions for convenience
-export const searchPractitioners = (token: string, baseUrl: string, name?: string) => 
-  FHIRService.searchPractitioners(token, baseUrl, name);
+export const searchPractitioners = (token: string, baseUrl: string, options?: { 
+  name?: string;
+  family?: string;
+  given?: string;
+  _count?: number;
+  _getpages?: string;
+}) => 
+  FHIRService.searchPractitioners(token, baseUrl, options);
 export const searchSlots = (token: string, baseUrl: string, practitionerId?: string, start?: string, end?: string) => 
   FHIRService.searchSlots(token, baseUrl, practitionerId, start, end);
 export const getPatient = (token: string, baseUrl: string, id: string) => 
   FHIRService.getPatient(token, baseUrl, id);
 export const searchAppointments = (token: string, baseUrl: string, patientId?: string, practitionerId?: string, status?: string) => 
   FHIRService.searchAppointments(token, baseUrl, patientId, practitionerId, status);
-export const createAppointment = (token: string, baseUrl: string, appointment: any) => 
-  FHIRService.createAppointment.call(FHIRService, token, appointment);
-export const updateAppointment = (token: string, baseUrl: string, id: string, appointment: any) => 
-  FHIRService.updateAppointment.call(FHIRService, token, id, appointment);
-export const getPractitioner = (token: string, baseUrl: string, id: string) => 
-  FHIRService.getPractitioner.call(FHIRService, token, id);
-export const updateSlot = (token: string, baseUrl: string, id: string, status: any) => 
-  FHIRService.updateSlot.call(FHIRService, token, id, status);
+export const createAppointment = (token: string, appointment: any) => 
+  FHIRService.createAppointment(token, appointment);
+export const updateAppointment = (token: string, id: string, appointment: any) => 
+  FHIRService.updateAppointment(token, id, appointment);
+export const getPractitioner = (token: string, id: string) => 
+  FHIRService.getPractitioner(token, id);
+export const updateSlot = (token: string, id: string, status: any) => 
+  FHIRService.updateSlot(token, id, status);
 export const getPatientConditions = (token: string, baseUrl: string, patientId: string) => 
-  FHIRService.getPatientConditions.call(FHIRService, token, patientId);
-export const getPatientObservations = (token: string, baseUrl: string, patientId: string) => 
-  FHIRService.getPatientObservations.call(FHIRService, token, patientId);
-export const getPatientMedications = (token: string, baseUrl: string, patientId: string) => 
-  FHIRService.getPatientMedications.call(FHIRService, token, patientId);
+  FHIRService.getPatientConditions(token, baseUrl, patientId);
+export const getPatientObservations = (token: string, patientId: string) => 
+  FHIRService.getPatientObservations(token, patientId);
+export const getPatientMedications = (token: string, patientId: string) => 
+  FHIRService.getPatientMedications(token, patientId);

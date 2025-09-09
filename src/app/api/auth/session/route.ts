@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { AuthSession } from '@/types/auth';
 import { decrypt } from '@/library/auth/encryption';
+import { SESSION_COOKIE_NAME } from '@/library/auth/config';
 
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies();
     
     // Check for our custom session cookie
-    const sessionCookie = cookieStore.get('healermy_session');
+    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
     
     if (!sessionCookie) {
       return NextResponse.json({ authenticated: false }, { status: 401 });
@@ -56,7 +57,7 @@ export async function DELETE() {
   const response = NextResponse.json({ success: true });
   
   // Clear our session cookie
-  response.cookies.set('healermy_session', '', {
+  response.cookies.set(SESSION_COOKIE_NAME, '', {
     path: '/',
     maxAge: 0,
     sameSite: 'strict',

@@ -9,6 +9,7 @@ export default function CallbackPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    debugger;
     const completeAuth = async () => {
       try {
         console.log('🎯 Starting callback');
@@ -97,14 +98,22 @@ export default function CallbackPage() {
         const tokenData = await tokenResponse.json();
         console.log('✅ Token exchange successful:', tokenData);
         
-        // Determine role from token response
+        // Determine role from token response attributes
         let role: UserRole;
-        if (tokenData.patient) {
-          role = 'patient';
-          console.log('🏥 Detected patient role from token response, patient ID:', tokenData.patient);
-        } else {
+        if (tokenData.user) {
           role = 'provider';
-          console.log('👨‍⚕️ Detected provider role from token response (no patient context found)');
+          console.log('👨‍⚕️ Detected provider role, user ID:', tokenData.user);
+          if (tokenData.patient) {
+            console.log('👨‍⚕️ Provider has patient context, patient ID:', tokenData.patient);
+          } else {
+            console.log('👨‍⚕️ Provider without patient context');
+          }
+        } else {
+          role = 'patient';
+          console.log('🏥 Detected patient role');
+          if (tokenData.patient) {
+            console.log('🏥 Patient ID:', tokenData.patient);
+          }
         }
         
         // Create session data

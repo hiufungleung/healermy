@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AuthSession } from '@/types/auth';
 import { encrypt } from '@/library/auth/encryption';
+import { SESSION_COOKIE_NAME } from '@/library/auth/config';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
     // Create secure HTTP-only cookie with fully encrypted data
     const response = NextResponse.json({ success: true });
     
-    response.cookies.set('healermy_session', encryptedSessionString, {
+    response.cookies.set(SESSION_COOKIE_NAME, encryptedSessionString, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',

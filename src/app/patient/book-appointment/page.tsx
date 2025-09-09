@@ -6,45 +6,90 @@ import { Layout } from '@/components/common/Layout';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { searchPractitioners, searchSlots } from '@/library/fhir/client';
-import type { Practitioner, Slot } from '@/types/fhir';
+import type { Practitioner } from '@/types/fhir';
 
 export default function BookAppointment() {
   const router = useRouter();
-  const { session } = useAuth();
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [location, setLocation] = useState('');
-  const [selectedSpecialty, setSelectedSpecialty] = useState('General Practitioner');
   const [practitioners, setPractitioners] = useState<Practitioner[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedFilters, setSelectedFilters] = useState({
-    vaccine: false,
-    availability: 'all',
-    telehealth: 'all',
-    gender: 'all',
-    openingHours: 'all',
-    bulkBilling: 'all'
-  });
+  const [loading, setLoading] = useState(true);
+  const [totalPractitioners, setTotalPractitioners] = useState<number | undefined>();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
+  // Load all active practitioners on mount
   useEffect(() => {
-    fetchPractitioners();
-  }, [selectedSpecialty, searchQuery, location]);
+    fetchPractitioners(1, false); // page 1, not a search
+  }, []);
 
-  const fetchPractitioners = async () => {
-    if (!session?.accessToken || !session?.fhirBaseUrl) return;
+  // Debounced search when user types
+  useEffect(() => {
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    const timeout = setTimeout(() => {
+      if (searchQuery.length >= 2 || searchQuery.length === 0) {
+        fetchPractitioners(1, true); // page 1, is a search
+      }
+    }, 500); // 500ms delay
+
+    setSearchTimeout(timeout);
+
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [searchQuery]);
+
+  const fetchPractitioners = async (page = 1, isSearch = false) => {
+    if (isSearch || page === 1) {
+      setLoading(true);
+    }
     
-    setLoading(true);
     try {
-      const results = await searchPractitioners(
-        session.accessToken,
-        session.fhirBaseUrl,
-        searchQuery || undefined
-      );
-      setPractitioners(results);
+      const params = new URLSearchParams();
+      
+      // Add search query if exists and is long enough
+      if (searchQuery && searchQuery.length >= 2) {
+        params.append('name', searchQuery);
+      }
+      
+      // Add pagination - 30 practitioners per page
+      params.append('count', '30');
+      if (page > 1) {
+        params.append('page', page.toString());
+      }
+      
+      const response = await fetch(`/api/fhir/practitioners?${params.toString()}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch practitioners: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (page === 1) {
+        // First page or new search - replace practitioners
+        setPractitioners(result.practitioners || []);
+      } else {
+        // Next page - append practitioners  
+        setPractitioners(prev => [...prev, ...(result.practitioners || [])]);
+      }
+      
+      setTotalPractitioners(result.total);
+      setHasNextPage(!!result.nextUrl);
+      setCurrentPage(page);
+      
     } catch (error) {
       console.error('Error fetching practitioners:', error);
+      if (page === 1) {
+        setPractitioners([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -54,62 +99,17 @@ export default function BookAppointment() {
     router.push(`/patient/book-appointment/${practitioner.id}`);
   };
 
-  const specialties = [
-    'General Practitioner',
-    'Vaccine',
-    'Family Medicine',
-    'Internal Medicine',
-    'Pediatrics',
-    'Cardiology',
-    'Dermatology'
-  ];
-
-  const mockPractitioners: Practitioner[] = [
-    {
-      id: '1',
-      resourceType: 'Practitioner' as const,
-      name: [{ 
-        given: ['Sarah'], 
-        family: 'Johnson',
-        text: 'Dr. Sarah Johnson'
-      }],
-      qualification: [{
-        code: {
-          text: 'General Practice'
-        }
-      }]
-    },
-    {
-      id: '2',
-      resourceType: 'Practitioner' as const,
-      name: [{
-        given: ['Michael'],
-        family: 'Chen',
-        text: 'Dr. Michael Chen'
-      }],
-      qualification: [{
-        code: {
-          text: 'Family Medicine'
-        }
-      }]
-    },
-    {
-      id: '3',
-      resourceType: 'Practitioner' as const,
-      name: [{
-        given: ['Emily'],
-        family: 'Rodriguez',
-        text: 'Dr. Emily Rodriguez'
-      }],
-      qualification: [{
-        code: {
-          text: 'General Practice'
-        }
-      }]
+  const handleNextPage = () => {
+    if (hasNextPage && !loading) {
+      fetchPractitioners(currentPage + 1, false);
     }
-  ];
+  };
 
-  const displayPractitioners = practitioners.length > 0 ? practitioners : mockPractitioners;
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setCurrentPage(1);
+    fetchPractitioners(1, false);
+  };
 
   return (
     <Layout>
@@ -123,108 +123,41 @@ export default function BookAppointment() {
           </p>
         </div>
 
-        {/* Search and Filters */}
-        <div className="mb-6 space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Service, practice or practitioner"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-              <svg className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Location (e.g., Toowong, QLD 4066)"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-              <svg className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-          </div>
-
-          {/* Filter Pills */}
-          <div className="flex flex-wrap gap-2">
-            {specialties.map((specialty) => (
+        {/* Search */}
+        <div className="mb-6">
+          <div className="max-w-md relative">
+            <input
+              type="text"
+              placeholder="Search by practitioner name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-10 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <svg className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            {searchQuery && (
               <button
-                key={specialty}
-                onClick={() => setSelectedSpecialty(specialty)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  selectedSpecialty === specialty
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-100 text-text-secondary hover:bg-gray-200'
-                }`}
+                onClick={handleClearSearch}
+                className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600"
               >
-                {specialty}
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
-            ))}
+            )}
           </div>
-
-          {/* Additional Filters */}
-          <div className="flex flex-wrap gap-2">
-            <select
-              value={selectedFilters.availability}
-              onChange={(e) => setSelectedFilters({...selectedFilters, availability: e.target.value})}
-              className="px-4 py-2 border rounded-lg text-sm"
-            >
-              <option value="all">Availability</option>
-              <option value="today">Today</option>
-              <option value="tomorrow">Tomorrow</option>
-              <option value="week">This Week</option>
-            </select>
-
-            <select
-              value={selectedFilters.telehealth}
-              onChange={(e) => setSelectedFilters({...selectedFilters, telehealth: e.target.value})}
-              className="px-4 py-2 border rounded-lg text-sm"
-            >
-              <option value="all">Telehealth</option>
-              <option value="available">Telehealth Available</option>
-              <option value="only">Telehealth Only</option>
-            </select>
-
-            <select
-              value={selectedFilters.gender}
-              onChange={(e) => setSelectedFilters({...selectedFilters, gender: e.target.value})}
-              className="px-4 py-2 border rounded-lg text-sm"
-            >
-              <option value="all">Gender</option>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-            </select>
-
-            <select
-              value={selectedFilters.openingHours}
-              onChange={(e) => setSelectedFilters({...selectedFilters, openingHours: e.target.value})}
-              className="px-4 py-2 border rounded-lg text-sm"
-            >
-              <option value="all">Opening Hours</option>
-              <option value="now">Open Now</option>
-              <option value="weekends">Open Weekends</option>
-              <option value="evenings">Open Evenings</option>
-            </select>
-
-            <select
-              value={selectedFilters.bulkBilling}
-              onChange={(e) => setSelectedFilters({...selectedFilters, bulkBilling: e.target.value})}
-              className="px-4 py-2 border rounded-lg text-sm"
-            >
-              <option value="all">Bulk Billing</option>
-              <option value="yes">Bulk Billing Available</option>
-              <option value="no">Private Billing Only</option>
-            </select>
-          </div>
+          
+          {/* Results summary */}
+          {!loading && (
+            <div className="mt-3 text-sm text-text-secondary">
+              {searchQuery ? (
+                <span>Showing {practitioners.length} results for "{searchQuery}"</span>
+              ) : (
+                <span>Showing {practitioners.length} active practitioners{totalPractitioners ? ` (${totalPractitioners} total)` : ''}</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Practitioner List */}
@@ -233,81 +166,176 @@ export default function BookAppointment() {
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             <p className="mt-2 text-text-secondary">Loading practitioners...</p>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {displayPractitioners.map((practitioner) => {
+        ) : practitioners.length > 0 ? (
+          <>
+            <div className="space-y-4">
+              {practitioners.map((practitioner) => {
               const name = practitioner.name?.[0];
-              const displayName = name?.text || `${name?.given?.join(' ')} ${name?.family}`;
-              const specialty = 'General Practice'; // Mock specialty
-              const rating = 4.5; // Mock rating
-              const reviews = 100; // Mock reviews
-              const bulkBilling = true; // Mock bulk billing
-              const telehealthAvailable = false; // Mock telehealth
+              const displayName = name?.text || 
+                `${name?.prefix?.join(' ') || ''} ${name?.given?.join(' ') || ''} ${name?.family || ''}`.trim() ||
+                'Unknown Practitioner';
+              
+              // Extract qualifications - show all degrees/certifications
+              const qualifications = practitioner.qualification?.map(q => 
+                q.code?.text || q.code?.coding?.[0]?.display
+              ).filter(Boolean) || [];
+              
+              // Extract primary address
+              const address = practitioner.address?.[0];
+              const addressString = address ? [
+                address.line?.join(', '),
+                address.city,
+                address.state,
+                address.postalCode
+              ].filter(Boolean).join(', ') : null;
+              
+              // Extract contact info
+              const phone = practitioner.telecom?.find(t => t.system === 'phone')?.value;
+              const email = practitioner.telecom?.find(t => t.system === 'email')?.value;
+              
+              // Extract identifiers for display (NPI, etc.)
+              const npi = practitioner.identifier?.find(id => 
+                id.type?.coding?.[0]?.code === 'NPI'
+              )?.value;
 
               return (
                 <Card key={practitioner.id} className="hover:shadow-md transition-shadow">
                   <div className="flex justify-between items-start">
                     <div className="flex space-x-4">
-                      <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center">
+                      <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
                         <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                       </div>
                       
-                      <div className="flex-1">
-                        <h3 className="text-xl font-semibold mb-1">{displayName}</h3>
-                        <p className="text-text-secondary mb-2">{specialty}</p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <h3 className="text-xl font-semibold text-text-primary">{displayName}</h3>
+                            {qualifications.length > 0 && (
+                              <p className="text-sm text-primary font-medium">{qualifications.join(', ')}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center ml-4">
+                            {practitioner.active ? (
+                              <Badge variant="success" size="sm">Active</Badge>
+                            ) : (
+                              <Badge variant="danger" size="sm">Inactive</Badge>
+                            )}
+                          </div>
+                        </div>
                         
-                        <p className="text-sm text-text-secondary mb-2">
-                          123 Healthcare Ave, Brisbane QLD 4000
-                        </p>
-                        
-                        <div className="flex items-center space-x-4 mb-3">
-                          <div className="flex items-center">
-                            <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        {/* Location */}
+                        {addressString && (
+                          <div className="flex items-start mb-2">
+                            <svg className="w-4 h-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
-                            <span className="ml-1 text-sm font-semibold">{rating}</span>
-                            <span className="ml-1 text-sm text-text-secondary">({reviews} reviews)</span>
+                            <p className="text-sm text-text-secondary">{addressString}</p>
                           </div>
+                        )}
+                        
+                        {/* Contact Information */}
+                        <div className="flex flex-wrap items-center gap-4 mb-3">
+                          {phone && (
+                            <div className="flex items-center">
+                              <svg className="w-4 h-4 text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                              </svg>
+                              <span className="text-sm text-text-secondary">{phone}</span>
+                            </div>
+                          )}
+                          {email && (
+                            <div className="flex items-center">
+                              <svg className="w-4 h-4 text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                              <span className="text-sm text-text-secondary">{email}</span>
+                            </div>
+                          )}
                         </div>
                         
-                        <div className="flex flex-wrap gap-2">
-                          {bulkBilling && (
-                            <Badge variant="success" size="sm">Bulk Billing</Badge>
-                          )}
-                          {telehealthAvailable && (
-                            <Badge variant="info" size="sm">Telehealth Available</Badge>
-                          )}
-                        </div>
-                        
-                        <div className="mt-4">
-                          <p className="text-sm text-text-secondary mb-2">Next available appointments:</p>
-                          <div className="flex space-x-2">
-                            <button className="px-3 py-1 bg-gray-100 rounded text-sm hover:bg-gray-200">
-                              9:00 AM
-                            </button>
-                            <button className="px-3 py-1 bg-gray-100 rounded text-sm hover:bg-gray-200">
-                              10:30 AM
-                            </button>
-                            <button className="px-3 py-1 bg-gray-100 rounded text-sm hover:bg-gray-200">
-                              2:15 PM
-                            </button>
+                        {/* Professional Info */}
+                        {npi && (
+                          <div className="mb-3">
+                            <p className="text-xs text-text-secondary">NPI: {npi}</p>
                           </div>
+                        )}
+                        
+                        {/* Gender */}
+                        {practitioner.gender && (
+                          <div className="mb-3">
+                            <span className="inline-flex items-center px-2 py-1 bg-gray-100 rounded text-xs text-text-secondary capitalize">
+                              {practitioner.gender}
+                            </span>
+                          </div>
+                        )}
+                        
+                        <div className="mt-4 pt-3 border-t border-gray-100">
+                          <p className="text-sm text-text-secondary mb-2">Book an appointment:</p>
+                          <p className="text-xs text-text-secondary">
+                            {practitioner.active 
+                              ? 'Click "Book Now" to view available appointment times'
+                              : 'This practitioner is currently not accepting new appointments'
+                            }
+                          </p>
                         </div>
                       </div>
                     </div>
                     
-                    <Button
-                      variant="primary"
-                      onClick={() => handleBookNow(practitioner)}
-                    >
-                      Book Now
-                    </Button>
+                    <div className="ml-4 flex-shrink-0">
+                      <Button
+                        variant={practitioner.active ? "primary" : "outline"}
+                        onClick={() => handleBookNow(practitioner)}
+                        disabled={!practitioner.active}
+                      >
+                        {practitioner.active ? 'Book Now' : 'Unavailable'}
+                      </Button>
+                    </div>
                   </div>
                 </Card>
               );
-            })}
+              })}
+            </div>
+            
+            {/* Pagination */}
+            {hasNextPage && (
+              <div className="mt-8 text-center">
+                <Button
+                  variant="outline"
+                  onClick={handleNextPage}
+                  disabled={loading}
+                >
+                  {loading ? 'Loading...' : `Load More (${practitioners.length} of ${totalPractitioners || '???'})`}
+                </Button>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-12">
+            <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <h3 className="text-lg font-medium text-text-primary mb-2">
+              {loading ? 'Loading Practitioners...' : 'No Practitioners Found'}
+            </h3>
+            <p className="text-text-secondary mb-4">
+              {loading ? (
+                'Please wait while we load practitioners...'
+              ) : searchQuery.length > 0 && searchQuery.length < 2 ? (
+                'Please enter at least 2 characters to search'
+              ) : searchQuery.length >= 2 ? (
+                'No practitioners found. Try a different search term.'
+              ) : (
+                'No active practitioners found in the system.'
+              )}
+            </p>
+            {!loading && searchQuery.length === 0 && (
+              <p className="text-sm text-text-secondary">
+                Try searching for "Dr" or a specific practitioner name
+              </p>
+            )}
           </div>
         )}
       </div>
