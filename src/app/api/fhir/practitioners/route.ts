@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getValidatedSession } from '@/library/auth/session';
+import { headers } from 'next/headers';
 import { FHIRService } from '@/library/fhir/client';
+import type { AuthSession } from '@/types/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get session data from middleware headers (now that /api/fhir/* goes through middleware)
-    const { session, error } = await getValidatedSession();
+    // Get session directly from middleware headers (already decrypted and validated)
+    const headersList = await headers();
+    const sessionHeader = headersList.get('x-session-data');
     
-    if (error || !session) {
-      return NextResponse.json({ error: error || 'No session found' }, { status: 401 });
+    if (!sessionHeader) {
+      return NextResponse.json({ error: 'No session found' }, { status: 401 });
+    }
+
+    const session: AuthSession = JSON.parse(sessionHeader);
+    
+    if (!session.accessToken || !session.fhirBaseUrl) {
+      return NextResponse.json({ error: 'Incomplete session data' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -46,8 +54,8 @@ export async function GET(request: NextRequest) {
     }
 
     const result = await FHIRService.searchPractitioners(
-      cleanToken!,
-      session.fhirBaseUrl!,
+      cleanToken,
+      session.fhirBaseUrl,
       Object.keys(searchOptions).length > 0 ? searchOptions : undefined
     );
 

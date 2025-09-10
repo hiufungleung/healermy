@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserRole } from '@/types/auth';
+import { localStorageAuth } from '@/library/auth/localStorage';
 
 export default function CallbackPage() {
   const router = useRouter();
@@ -116,19 +117,26 @@ export default function CallbackPage() {
           }
         }
         
-        // Create session data
+        // Create complete session data - URLs now stored in session cookie (not localStorage)
         const sessionData = {
           role,
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token,
           tokenUrl: tokenUrl,
-          revokeUrl: revokeUrl || undefined, // Store revoke URL if available
+          revokeUrl: revokeUrl || undefined,
           clientId: clientId,
           clientSecret: clientSecret,
           patient: tokenData.patient,
+          user: tokenData.user, // Store user field from token response
+          username: tokenData.username, // Store username from token response
           fhirUser: tokenData.fhirUser,
           fhirBaseUrl: iss,
           expiresAt: Date.now() + (tokenData.expires_in || 3600) * 1000,
+          // Store additional token response fields
+          scope: tokenData.scope,
+          need_patient_banner: tokenData.need_patient_banner,
+          encounter: tokenData.encounter,
+          tenant: tokenData.tenant,
         };
         
         console.log('📝 Storing session data');
@@ -160,8 +168,8 @@ export default function CallbackPage() {
         
         console.log('🚀 Authentication successful, redirecting...');
         
-        // Trigger session update for AuthProvider
-        localStorage.setItem('healermy_session_updated', Date.now().toString());
+        // Trigger session update for AuthProvider (only remaining localStorage usage)
+        localStorageAuth.setSessionUpdated();
         
         // Small delay to ensure session is fully created before redirect
         await new Promise(resolve => setTimeout(resolve, 100));

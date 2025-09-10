@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { AuthSession } from '@/types/auth';
+import { localStorageAuth } from '@/library/auth/localStorage';
 
 interface AuthContextType {
   session: AuthSession | null;
@@ -51,10 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for session updates (e.g., after successful login)
     const handleStorageChange = async (e: StorageEvent) => {
-      if (e.key === 'healermy_session_updated') {
+      if (e.key === localStorageAuth.getSessionUpdatedKey()) {
         console.log('🔄 Session update detected, refreshing...');
         await checkSession();
-        localStorage.removeItem('healermy_session_updated'); // Clean up trigger
+        localStorageAuth.removeSessionUpdated(); // Clean up trigger
       }
     };
 
@@ -77,6 +78,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
+      // Handle token revocation client-side using session data
+      if (session?.refreshToken && session?.clientId && session?.clientSecret && session?.revokeUrl) {
+        try {
+          const revokeParams = new URLSearchParams({
+            token: session.refreshToken,
+            token_type_hint: 'refresh_token'
+          });
+          
+          const credentials = btoa(`${session.clientId}:${session.clientSecret}`);
+          
+          const revokeResponse = await fetch(session.revokeUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Authorization': `Basic ${credentials}`,
+              'Accept': 'application/json',
+            },
+            body: revokeParams.toString(),
+          });
+          
+          if (!revokeResponse.ok) {
+            console.warn(`Token revocation failed: ${revokeResponse.status}`);
+          }
+        } catch (revokeError) {
+          console.error('Token revocation error:', revokeError);
+        }
+      }
+      
+      // Clear localStorage session trigger
+      localStorageAuth.clearAll();
+      
+      // Call server logout to clear session cookie
       const response = await fetch('/api/auth/logout', { method: 'POST' });
       
       if (response.ok) {
@@ -90,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error during logout:', error);
       // Always clear session and redirect even if logout API fails
+      localStorageAuth.clearAll();
       setSession(null);
       router.push('/');
     }

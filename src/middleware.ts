@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AuthSession } from '@/types/auth';
+import { AuthSession, TokenData, SessionData } from '@/types/auth';
 import { decrypt, encrypt } from '@/library/auth/encryption';
 import { refreshAccessToken } from '@/library/auth/tokenRefresh';
-import { SESSION_COOKIE_NAME } from '@/library/auth/config';
+import { SESSION_COOKIE_NAME, TOKEN_COOKIE_NAME } from '@/library/auth/config';
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -24,34 +24,45 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for valid session on protected routes
+  // Check for valid session on protected routes - need both cookies
+  const tokenCookie = request.cookies.get(TOKEN_COOKIE_NAME);
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME);
 
-  console.log("Cookies present:", request.cookies);
-  console.log(`Looking for session cookie named "${SESSION_COOKIE_NAME}"`);
-  console.log("sessionCookie:", sessionCookie);
-  
-  if (!sessionCookie) {
-    console.log(`❌ [MIDDLEWARE] No session cookie, redirecting to home: ${pathname}`);
+  if (!tokenCookie || !sessionCookie) {
+    console.log(`❌ [MIDDLEWARE] Missing required cookies (token: ${!!tokenCookie}, session: ${!!sessionCookie}), redirecting to home: ${pathname}`);
     return NextResponse.redirect(new URL('/', request.url));
   }
 
-  // DEBUG: Log encrypted cookie (DELETE BEFORE PRODUCTION)
+  // DEBUG: Log encrypted cookies (DELETE BEFORE PRODUCTION)
+  console.log(`🍪 [DEBUG] Encrypted token cookie:`, tokenCookie.value.substring(0, 50) + '...');
   console.log(`🍪 [DEBUG] Encrypted session cookie:`, sessionCookie.value.substring(0, 50) + '...');
 
   try {
-    // Decrypt entire session object
+    // Decrypt both cookie parts
+    const decryptedTokenString = await decrypt(tokenCookie.value);
     const decryptedSessionString = await decrypt(sessionCookie.value);
-    const sessionData: AuthSession = JSON.parse(decryptedSessionString);
+    
+    const tokenData: TokenData = JSON.parse(decryptedTokenString);
+    const sessionMetadata: SessionData = JSON.parse(decryptedSessionString);
+    
+    // Combine into a single session object for backward compatibility
+    const sessionData: AuthSession = {
+      ...tokenData,
+      ...sessionMetadata
+    };
     
     // DEBUG: Log decrypted session structure (DELETE BEFORE PRODUCTION)
     console.log(`🔓 [DEBUG] Decrypted session data:`, {
       role: sessionData.role,
       accessToken: sessionData.accessToken ? `${sessionData.accessToken.substring(0, 20)}...` : 'undefined',
-      fhirBaseUrl: sessionData.fhirBaseUrl,
       patient: sessionData.patient,
+      user: sessionData.user, // Show user field for provider detection
+      username: sessionData.username, // Show username field
+      need_patient_banner: sessionData.need_patient_banner,
       expiresAt: sessionData.expiresAt
     });
+
+    console.log(`Access Token: ${sessionData.accessToken}`);
     
     // Check if session is expired or expiring soon (within 5 minutes) and attempt refresh if possible
     const fiveMinutesFromNow = Date.now() + (5 * 60 * 1000);
@@ -63,8 +74,8 @@ export async function middleware(request: NextRequest) {
         try {
           console.log('🔄 [MIDDLEWARE] Attempting to refresh access token...');
           
-          // Use library function for token refresh
-          const tokenData = await refreshAccessToken(
+          // Use library function for token refresh with tokenUrl from session cookie
+          const newTokenData = await refreshAccessToken(
             sessionData.refreshToken,
             sessionData.tokenUrl,
             sessionData.clientId,
@@ -73,26 +84,57 @@ export async function middleware(request: NextRequest) {
           
           console.log('✅ [MIDDLEWARE] Token refresh successful');
           
-          // Update session with new tokens
-          const refreshedSession = {
-            ...sessionData,
-            accessToken: tokenData.access_token,
-            refreshToken: tokenData.refresh_token || sessionData.refreshToken, // Use new refresh token if provided
-            expiresAt: Date.now() + (tokenData.expires_in || 3600) * 1000,
+          // Update token data with new tokens
+          const refreshedTokenData: TokenData = {
+            ...tokenData,
+            accessToken: newTokenData.access_token,
+            refreshToken: newTokenData.refresh_token || sessionData.refreshToken, // Use new refresh token if provided
+            expiresAt: Date.now() + (newTokenData.expires_in || 3600) * 1000,
           };
           
-          // Re-encrypt the refreshed session
-          const encryptedRefreshedSession = await encrypt(JSON.stringify(refreshedSession));
+          // Session metadata remains the same
+          const refreshedSessionData: SessionData = sessionMetadata;
           
-          // Continue with the request but update the cookie
+          // Re-encrypt both parts
+          const encryptedRefreshedTokenData = await encrypt(JSON.stringify(refreshedTokenData));
+          const encryptedRefreshedSessionData = await encrypt(JSON.stringify(refreshedSessionData));
+          
+          // Combine for backward compatibility in response headers
+          const refreshedSession: AuthSession = {
+            ...refreshedTokenData,
+            ...refreshedSessionData
+          };
+          
+          // Parse SESSION_EXPIRY environment variable (e.g., "7d", "30m", "2h")
+          function parseSessionExpiry(expiry: string = '7d'): number {
+            const match = expiry.match(/^(\d+)([smhdy])$/);
+            if (!match) return 7 * 24 * 60 * 60; // Default to 7 days
+            
+            const [, value, unit] = match;
+            const num = parseInt(value);
+            
+            switch (unit) {
+              case 's': return num;
+              case 'm': return num * 60;
+              case 'h': return num * 60 * 60;
+              case 'd': return num * 24 * 60 * 60;
+              case 'y': return num * 365 * 24 * 60 * 60;
+              default: return 7 * 24 * 60 * 60;
+            }
+          }
+          
+          // Continue with the request but update both cookies
           const response = NextResponse.next();
-          response.cookies.set(SESSION_COOKIE_NAME, encryptedRefreshedSession, {
+          const cookieOptions = {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: Math.floor((refreshedSession.expiresAt - Date.now()) / 1000),
+            sameSite: 'strict' as const,
+            maxAge: parseSessionExpiry(process.env.SESSION_EXPIRY), // Use SESSION_EXPIRY instead of access token expiry
             path: '/',
-          });
+          };
+          
+          response.cookies.set(TOKEN_COOKIE_NAME, encryptedRefreshedTokenData, cookieOptions);
+          response.cookies.set(SESSION_COOKIE_NAME, encryptedRefreshedSessionData, cookieOptions);
           response.headers.set('x-session-data', JSON.stringify(refreshedSession));
           
           console.log(`✅ [MIDDLEWARE] Session refreshed for ${refreshedSession.role}, allowing: ${pathname}`);
@@ -105,6 +147,7 @@ export async function middleware(request: NextRequest) {
       // If refresh failed or no refresh token, redirect to home
       console.log(`❌ [MIDDLEWARE] Session expired and refresh failed, redirecting to home: ${pathname}`);
       const response = NextResponse.redirect(new URL('/', request.url));
+      response.cookies.delete(TOKEN_COOKIE_NAME);
       response.cookies.delete(SESSION_COOKIE_NAME);
       return response;
     }
@@ -133,6 +176,7 @@ export async function middleware(request: NextRequest) {
   } catch (error) {
     console.error('❌ [MIDDLEWARE] Session decryption failed:', error);
     const response = NextResponse.redirect(new URL('/', request.url));
+    response.cookies.delete(TOKEN_COOKIE_NAME);
     response.cookies.delete(SESSION_COOKIE_NAME);
     return response;
   }

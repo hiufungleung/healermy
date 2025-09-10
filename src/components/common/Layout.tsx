@@ -70,7 +70,7 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
                   <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center text-white font-bold mr-2">
                     H
                   </div>
-                  <span className="text-xl font-semibold">HealthCare Clinic</span>
+                  <span className="text-xl font-semibold">healerMy</span>
                 </Link>
               </div>
               

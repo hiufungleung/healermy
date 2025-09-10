@@ -9,21 +9,32 @@ export interface AuthConfig {
   launchUri: string;
 }
 
-export interface AuthSession {
+export interface TokenData {
   accessToken: string;
   refreshToken?: string;
-  tokenUrl?: string;
-  revokeUrl?: string; // Token revocation endpoint
   clientId?: string;
   clientSecret?: string;
-  patient?: string;
-  user?: string;
-  encounter?: string;
   expiresAt: number;
+}
+
+export interface SessionData {
   role: UserRole;
+  patient?: string;
+  user?: string; // User ID from token response (provider)
+  username?: string; // Username from token response  
+  encounter?: string;
   needPatientBanner?: boolean;
+  need_patient_banner?: boolean; // Keep both snake_case and camelCase for compatibility
   fhirUser?: string;
-  fhirBaseUrl?: string;
+  tokenUrl: string;
+  revokeUrl?: string;
+  fhirBaseUrl: string;
+  scope?: string;
+  tenant?: string;
+}
+
+export interface AuthSession extends TokenData, SessionData {
+  // Combined interface for backward compatibility
 }
 
 export interface LaunchContext {

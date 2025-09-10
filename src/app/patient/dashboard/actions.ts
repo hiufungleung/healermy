@@ -1,35 +1,39 @@
 'use server';
 
-import { getValidatedSession } from '@/library/auth/session';
+import { headers } from 'next/headers';
 import { getPatient, searchAppointments } from '@/library/fhir/client';
 import type { Patient, Appointment } from '@/types/fhir';
+import type { AuthSession } from '@/types/auth';
 
 export async function getDashboardData(): Promise<{
   patient: Patient | null;
   appointments: Appointment[];
-  session: import('@/types/auth').AuthSession | null;
+  session: AuthSession | null;
   error?: string;
 }> {
   try {
-    // Get session data from middleware (already decrypted and validated)
-    const { session, error } = await getValidatedSession();
+    // Get session directly from middleware headers (already decrypted and validated)
+    const headersList = await headers();
+    const sessionHeader = headersList.get('x-session-data');
     
-    if (error || !session) {
+    if (!sessionHeader) {
       return {
         patient: null,
         appointments: [],
-        session,
-        error: error || 'No session found'
+        session: null,
+        error: 'No session found'
       };
     }
 
-    // Additional validation for patient-specific data
-    if (!session.patient) {
+    const session: AuthSession = JSON.parse(sessionHeader);
+
+    // Additional validation for required fields
+    if (!session.patient || !session.accessToken || !session.fhirBaseUrl) {
       return {
         patient: null,
         appointments: [],
         session,
-        error: 'No patient ID in session'
+        error: 'Incomplete session data'
       };
     }
 
@@ -38,8 +42,8 @@ export async function getDashboardData(): Promise<{
     let appointmentData: Appointment[] = [];
     
     try {
-      // Use decrypted tokens from middleware - session.accessToken is guaranteed to exist from validation
-      patientData = await getPatient(session.accessToken!, session.fhirBaseUrl, session.patient!);
+      // Use decrypted tokens from middleware - all fields validated above
+      patientData = await getPatient(session.accessToken, session.fhirBaseUrl, session.patient);
     } catch (error) {
       console.error('Error fetching patient data:', error);
       return {
@@ -52,7 +56,7 @@ export async function getDashboardData(): Promise<{
 
     // Try to fetch appointments, but don't fail if this doesn't work
     try {
-      appointmentData = await searchAppointments(session.accessToken!, session.fhirBaseUrl, session.patient!);
+      appointmentData = await searchAppointments(session.accessToken, session.fhirBaseUrl, session.patient);
     } catch (error) {
       console.error('Error fetching appointments (will use mock data):', error);
       // Don't return error here - just use empty appointments array
