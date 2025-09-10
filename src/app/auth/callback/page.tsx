@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserRole } from '@/types/auth';
-import { localStorageAuth } from '@/library/auth/localStorage';
 
 export default function CallbackPage() {
   const router = useRouter();
@@ -117,7 +116,7 @@ export default function CallbackPage() {
           }
         }
         
-        // Create complete session data - URLs now stored in session cookie (not localStorage)
+        // Create complete session data - URLs stored in session cookie
         const sessionData = {
           role,
           accessToken: tokenData.access_token,
@@ -168,8 +167,8 @@ export default function CallbackPage() {
         
         console.log('🚀 Authentication successful, redirecting...');
         
-        // Trigger session update for AuthProvider (only remaining localStorage usage)
-        localStorageAuth.setSessionUpdated();
+        // Trigger session update for AuthProvider
+        window.dispatchEvent(new CustomEvent('sessionUpdated'));
         
         // Small delay to ensure session is fully created before redirect
         await new Promise(resolve => setTimeout(resolve, 100));

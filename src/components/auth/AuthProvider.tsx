@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { AuthSession } from '@/types/auth';
-import { localStorageAuth } from '@/library/auth/localStorage';
 
 interface AuthContextType {
   session: AuthSession | null;
@@ -51,18 +50,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializeAuth();
 
     // Listen for session updates (e.g., after successful login)
-    const handleStorageChange = async (e: StorageEvent) => {
-      if (e.key === localStorageAuth.getSessionUpdatedKey()) {
-        console.log('🔄 Session update detected, refreshing...');
-        await checkSession();
-        localStorageAuth.removeSessionUpdated(); // Clean up trigger
-      }
+    const handleSessionUpdate = async () => {
+      console.log('🔄 Session update detected, refreshing...');
+      await checkSession();
     };
 
-    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('sessionUpdated', handleSessionUpdate);
     
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('sessionUpdated', handleSessionUpdate);
     };
   }, []);
 
@@ -106,8 +102,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
       
-      // Clear localStorage session trigger
-      localStorageAuth.clearAll();
       
       // Call server logout to clear session cookie
       const response = await fetch('/api/auth/logout', { method: 'POST' });
@@ -123,7 +117,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error during logout:', error);
       // Always clear session and redirect even if logout API fails
-      localStorageAuth.clearAll();
       setSession(null);
       router.push('/');
     }

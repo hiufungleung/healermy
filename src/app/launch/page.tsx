@@ -2,7 +2,6 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { localStorageAuth } from '@/library/auth/localStorage';
 
 function LaunchContent() {
   const searchParams = useSearchParams();
@@ -94,8 +93,8 @@ function LaunchContent() {
       try {
         setIsAuthorizing(true);
         
-        // Clear FHIR client storage to prevent conflicts
-        localStorageAuth.clearEntireStorage();
+        // Clear all localStorage to prevent conflicts
+        localStorage.clear();
         
         // Clear FHIR-related session storage
         const keysToRemove = [];
