@@ -26,6 +26,10 @@ export async function middleware(request: NextRequest) {
 
   // Check for valid session on protected routes
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME);
+
+  console.log("Cookies present:", request.cookies);
+  console.log(`Looking for session cookie named "${SESSION_COOKIE_NAME}"`);
+  console.log("sessionCookie:", sessionCookie);
   
   if (!sessionCookie) {
     console.log(`❌ [MIDDLEWARE] No session cookie, redirecting to home: ${pathname}`);
