@@ -7,7 +7,7 @@ import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { searchAppointments, updateAppointment } from '@/library/fhir/client';
+import { searchAppointments, updateAppointment } from '@/app/api/fhir/appointments/operations';
 import type { Appointment } from '@/types/fhir';
 
 interface AppointmentWithPatient extends Appointment {
@@ -48,9 +48,11 @@ export default function ProviderAppointments() {
       const fetchedAppointments = await searchAppointments(
         session.accessToken,
         session.fhirBaseUrl,
-        session.practitionerId,
-        startDate.toISOString(),
-        endDate.toISOString()
+        undefined, // patientId
+        session.practitionerId, // practitionerId
+        undefined, // status
+        startDate.toISOString().split('T')[0], // dateFrom (date only)
+        endDate.toISOString().split('T')[0]    // dateTo (date only)
       );
       
       setAppointments(fetchedAppointments);

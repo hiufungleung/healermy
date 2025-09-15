@@ -7,7 +7,7 @@ import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { getPatient, getPatientConditions, getPatientMedications, getPatientObservations } from '@/library/fhir/client';
+import { getPatient, getPatientConditions, getPatientMedications, getPatientObservations } from '@/app/api/fhir/patients/operations';
 import type { Patient, Condition, MedicationRequest, Observation, Appointment } from '@/types/fhir';
 
 export default function PreVisitSummary() {

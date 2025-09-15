@@ -7,7 +7,8 @@ import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { receiveBookingRequests, deleteBookingRequest } from '@/library/sqs/client';
-import { createAppointment, getPatient } from '@/library/fhir/client';
+import { createAppointment } from '@/app/api/fhir/appointments/operations';
+import { getPatient } from '@/app/api/fhir/patients/operations';
 import type { BookingRequest } from '@/types/sqs';
 import type { Patient, Appointment } from '@/types/fhir';
 

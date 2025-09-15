@@ -9,7 +9,6 @@ export default function CallbackPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    debugger;
     const completeAuth = async () => {
       try {
         console.log('🎯 Starting callback');
@@ -61,59 +60,56 @@ export default function CallbackPage() {
           throw new Error('Missing OAuth configuration from session storage');
         }
         
-        console.log('🔄 Manual SMART v1 token exchange:', {
+        console.log('🔄 Server-side token exchange:', {
           tokenUrl,
           clientId,
           iss
         });
         
-        // Manual token exchange request
-        const tokenParams = new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: code,
-          redirect_uri: redirectUri,
-        });
-        
-        // Use Basic Authentication with client credentials
-        const credentials = btoa(`${clientId}:${clientSecret}`);
-        
-        const headers: HeadersInit = {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json',
-          'Authorization': `Basic ${credentials}`,
-          'Connection': 'close'
-        };
-        
-        const tokenResponse = await fetch(tokenUrl, {
+        // Use server-side token exchange to avoid CORS issues
+        const tokenExchangeResponse = await fetch('/api/auth/token-exchange', {
           method: 'POST',
-          headers,
-          body: tokenParams.toString(),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            code,
+            tokenUrl,
+            clientId,
+            clientSecret,
+            redirectUri
+          })
         });
         
-        if (!tokenResponse.ok) {
-          const errorText = await tokenResponse.text();
-          throw new Error(`Token exchange failed: ${tokenResponse.status} - ${errorText}`);
+        if (!tokenExchangeResponse.ok) {
+          const errorData = await tokenExchangeResponse.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(`Token exchange failed: ${errorData.error || 'Server error'}`);
         }
         
-        const tokenData = await tokenResponse.json();
+        const tokenData = await tokenExchangeResponse.json();
         console.log('✅ Token exchange successful:', tokenData);
         
-        // Determine role from token response attributes
-        let role: UserRole;
+        // Get role from stored session (user selection from launch page)
+        const storedRole = sessionStorage.getItem('auth_role') as UserRole;
+        if (!storedRole || !['patient', 'provider'].includes(storedRole)) {
+          throw new Error('Invalid or missing role selection from launch');
+        }
+        
+        const role = storedRole;
+        console.log(`🎯 Using selected role: ${role}`);
+        
+        // Validate role selection against token data
+        if (role === 'patient' && !tokenData.patient) {
+          setError('You selected "Patient" role but no patient context was provided. This may happen when launching without patient context. Please try selecting "Healthcare Provider" instead.');
+          return;
+        }
+        
+        // Log context information
         if (tokenData.user) {
-          role = 'provider';
-          console.log('👨‍⚕️ Detected provider role, user ID:', tokenData.user);
-          if (tokenData.patient) {
-            console.log('👨‍⚕️ Provider has patient context, patient ID:', tokenData.patient);
-          } else {
-            console.log('👨‍⚕️ Provider without patient context');
-          }
-        } else {
-          role = 'patient';
-          console.log('🏥 Detected patient role');
-          if (tokenData.patient) {
-            console.log('🏥 Patient ID:', tokenData.patient);
-          }
+          console.log('👨‍⚕️ User context available, user ID:', tokenData.user);
+        }
+        if (tokenData.patient) {
+          console.log('🏥 Patient context available, patient ID:', tokenData.patient);
         }
         
         // Create complete session data - URLs stored in session cookie
@@ -164,6 +160,7 @@ export default function CallbackPage() {
         }
         sessionStorage.removeItem('auth_iss');
         sessionStorage.removeItem('auth_launch');
+        sessionStorage.removeItem('auth_role');
         
         console.log('🚀 Authentication successful, redirecting...');
         

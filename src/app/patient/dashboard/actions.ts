@@ -1,7 +1,8 @@
 'use server';
 
 import { headers } from 'next/headers';
-import { getPatient, searchAppointments } from '@/library/fhir/client';
+import { getPatient } from '@/app/api/fhir/patients/operations';
+import { searchAppointments } from '@/app/api/fhir/appointments/operations';
 import type { Patient, Appointment } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
 
@@ -56,7 +57,15 @@ export async function getDashboardData(): Promise<{
 
     // Try to fetch appointments, but don't fail if this doesn't work
     try {
-      appointmentData = await searchAppointments(session.accessToken, session.fhirBaseUrl, session.patient);
+      appointmentData = await searchAppointments(
+        session.accessToken, 
+        session.fhirBaseUrl, 
+        session.patient,
+        undefined, // practitionerId
+        undefined, // status
+        undefined, // dateFrom (will use default)
+        undefined  // dateTo (will use default)
+      );
     } catch (error) {
       console.error('Error fetching appointments (will use mock data):', error);
       // Don't return error here - just use empty appointments array

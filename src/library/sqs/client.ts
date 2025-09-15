@@ -23,6 +23,7 @@ const mockQueue: Map<string, BookingRequest> = new Map();
 export class SQSService {
   /**
    * Send a booking request to the SQS queue
+   * This should be called after preparing the booking request data
    */
   static async sendBookingRequest(request: Omit<BookingRequest, 'requestId' | 'timestamp'>): Promise<string> {
     const bookingRequest: BookingRequest = {
@@ -115,6 +116,7 @@ export class SQSService {
       throw new Error('Failed to retrieve booking requests');
     }
   }
+
 
   /**
    * Delete a booking request from the queue (after processing)

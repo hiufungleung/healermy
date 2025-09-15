@@ -6,20 +6,14 @@ import { Layout } from '@/components/common/Layout';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { getPractitioner, searchSlots } from '@/library/fhir/client';
+import { SlotSelectionGrid } from '@/components/common/SlotDisplay';
+import { formatTimeForDisplay, getDayBoundsInUTC } from '@/lib/timezone';
 import type { Practitioner, Slot } from '@/types/fhir';
 
-interface TimeSlot {
-  time: string;
-  available: boolean;
-  slotId?: string;
-}
 
 export default function SelectAppointment() {
   const router = useRouter();
   const params = useParams();
-  const { session } = useAuth();
   const practitionerId = params.practitionerId as string;
   
   const [currentStep, setCurrentStep] = useState(2);
@@ -44,15 +38,17 @@ export default function SelectAppointment() {
   }, [selectedDate, practitioner]);
 
   const fetchPractitionerDetails = async () => {
-    if (!session?.accessToken || !session?.fhirBaseUrl) return;
-    
     try {
-      const result = await getPractitioner(
-        session.accessToken,
-        session.fhirBaseUrl,
-        practitionerId
-      );
-      setPractitioner(result);
+      const response = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        setPractitioner(result);
+      } else {
+        throw new Error('Failed to fetch practitioner');
+      }
     } catch (error) {
       console.error('Error fetching practitioner:', error);
       // Use mock data for demo
@@ -61,8 +57,6 @@ export default function SelectAppointment() {
   };
 
   const fetchAvailableSlots = async () => {
-    if (!session?.accessToken || !session?.fhirBaseUrl) return;
-    
     setLoading(true);
     try {
       const startDate = new Date(selectedDate);
@@ -70,26 +64,97 @@ export default function SelectAppointment() {
       const endDate = new Date(selectedDate);
       endDate.setHours(23, 59, 59, 999);
       
-      const slots = await searchSlots(
-        session.accessToken,
-        session.fhirBaseUrl,
-        practitionerId,
-        startDate.toISOString(),
-        endDate.toISOString()
+      console.log('Fetching schedules for practitioner:', practitionerId);
+      
+      // First get schedules for this practitioner
+      const schedulesResponse = await fetch(`/api/fhir/schedules?actor=Practitioner/${practitionerId}`, {
+        credentials: 'include',
+      });
+      
+      if (!schedulesResponse.ok) {
+        console.error('Schedules API failed with status:', schedulesResponse.status, schedulesResponse.statusText);
+        const error = await schedulesResponse.json().catch(() => ({ 
+          error: 'Unknown error',
+          status: schedulesResponse.status,
+          statusText: schedulesResponse.statusText 
+        }));
+        console.error('Failed to fetch schedules:', error);
+        setAvailableSlots([]);
+        return;
+      }
+      
+      const schedulesData = await schedulesResponse.json();
+      console.log('Schedules data:', schedulesData);
+      
+      if (!schedulesData.schedules || schedulesData.schedules.length === 0) {
+        console.log('No schedules found for practitioner');
+        setAvailableSlots([]);
+        return;
+      }
+      
+      const scheduleIds = schedulesData.schedules.map((s: any) => s.id);
+      console.log('Schedule IDs:', scheduleIds);
+      
+      // Use the same simple approach as provider page
+      // Fetch all slots and filter client-side (same as provider implementation)
+      console.log('Fetching slots using provider approach: simple API call with client-side filtering');
+      
+      const response = await fetch(`/api/fhir/slots?_count=100`, {
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        console.error('Slots API failed with status:', response.status, response.statusText);
+        const error = await response.json().catch(() => ({ 
+          error: 'Unknown error',
+          status: response.status,
+          statusText: response.statusText 
+        }));
+        console.error('Failed to fetch slots:', error);
+        setAvailableSlots([]);
+        return;
+      }
+      
+      const result = await response.json();
+      console.log('All slots data:', result);
+      
+      // Filter slots client-side (same as provider page approach)
+      const allSlots = result.slots || [];
+      console.log('Total slots from API:', allSlots.length);
+      
+      // Filter slots that belong to this practitioner's schedules
+      const practitionerSlots = allSlots.filter((slot: Slot) =>
+        schedulesData.schedules.some(schedule => slot.schedule?.reference === `Schedule/${schedule.id}`)
       );
-      setAvailableSlots(slots);
+      
+      console.log('Filtered practitioner slots:', practitionerSlots.length);
+      
+      // Further filter by selected date and free status using Brisbane timezone
+      const dayBounds = getDayBoundsInUTC(selectedDate);
+      const startOfDay = new Date(dayBounds.start);
+      const endOfDay = new Date(dayBounds.end);
+      
+      const dateAndStatusFilteredSlots = practitionerSlots.filter((slot: Slot) => {
+        const slotStart = new Date(slot.start);
+        return slot.status === 'free' && 
+               slotStart >= startOfDay && 
+               slotStart <= endOfDay;
+      });
+      
+      console.log('Final filtered slots for selected date:', dateAndStatusFilteredSlots.length);
+      setAvailableSlots(dateAndStatusFilteredSlots);
+      
     } catch (error) {
       console.error('Error fetching slots:', error);
-      // Use mock data for demo
-      setAvailableSlots(mockSlots);
+      setAvailableSlots([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleTimeSelect = (time: string, slotId: string) => {
-    setSelectedTime(time);
-    setSelectedSlotId(slotId);
+  const handleSlotSelect = (slot: Slot) => {
+    setSelectedTime(formatTimeForDisplay(slot.start));
+    setSelectedSlotId(slot.id);
   };
 
   const handleNext = () => {
@@ -118,55 +183,23 @@ export default function SelectAppointment() {
     }]
   };
 
-  const mockSlots: Slot[] = [
-    { id: '1', resourceType: 'Slot', status: 'free', start: `${selectedDate}T09:00:00`, end: `${selectedDate}T09:30:00` },
-    { id: '2', resourceType: 'Slot', status: 'free', start: `${selectedDate}T09:30:00`, end: `${selectedDate}T10:00:00` },
-    { id: '3', resourceType: 'Slot', status: 'busy', start: `${selectedDate}T10:00:00`, end: `${selectedDate}T10:30:00` },
-    { id: '4', resourceType: 'Slot', status: 'free', start: `${selectedDate}T10:30:00`, end: `${selectedDate}T11:00:00` },
-    { id: '5', resourceType: 'Slot', status: 'free', start: `${selectedDate}T11:00:00`, end: `${selectedDate}T11:30:00` },
-    { id: '6', resourceType: 'Slot', status: 'busy', start: `${selectedDate}T11:30:00`, end: `${selectedDate}T12:00:00` },
-    { id: '7', resourceType: 'Slot', status: 'free', start: `${selectedDate}T14:00:00`, end: `${selectedDate}T14:30:00` },
-    { id: '8', resourceType: 'Slot', status: 'free', start: `${selectedDate}T14:30:00`, end: `${selectedDate}T15:00:00` },
-  ];
 
-  const generateTimeSlots = (): TimeSlot[] => {
-    const slots: TimeSlot[] = [];
-    const slotsToUse = availableSlots.length > 0 ? availableSlots : mockSlots;
-    
-    // Generate time slots from 9 AM to 5 PM
-    for (let hour = 9; hour < 17; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        const displayTime = new Date(`2000-01-01T${timeString}`).toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        });
-        
-        // Check if this time slot exists and is available
-        const slot = slotsToUse.find(s => {
-          const slotTime = new Date(s.start).toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          });
-          return slotTime === displayTime;
-        });
-        
-        slots.push({
-          time: displayTime,
-          available: slot?.status === 'free',
-          slotId: slot?.id
-        });
-      }
-    }
-    
-    return slots;
-  };
-
-  const timeSlots = generateTimeSlots();
+  // Debug practitioner data structure
+  console.log('Step 2 - Practitioner data:', practitioner);
+  
   const name = practitioner?.name?.[0];
-  const displayName = name?.text || `${name?.given?.join(' ')} ${name?.family}` || 'Dr. Emily Rodriguez';
+  console.log('Step 2 - Name data:', name);
+  
+  // Gracefully handle name construction with optional prefix
+  const displayName = name?.text || (() => {
+    const prefix = name?.prefix?.join(' ') || '';
+    const given = name?.given?.join(' ') || '';
+    const family = name?.family || '';
+    
+    const nameParts = [prefix, given, family].filter(Boolean);
+    return nameParts.length > 0 ? nameParts.join(' ') : 'Dr. Emily Rodriguez';
+  })();
+  
   const specialty = practitioner?.qualification?.[0]?.code?.text || 'Family Medicine';
   const rating = 4.9; // Mock rating
   const reviews = 125; // Mock reviews
@@ -294,29 +327,17 @@ export default function SelectAppointment() {
                 <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                 <p className="mt-2 text-text-secondary">Loading available times...</p>
               </div>
-            ) : (
-              <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
-                {timeSlots.map((slot) => {
-                  const isSelected = selectedTime === slot.time;
-                  
-                  return (
-                    <button
-                      key={slot.time}
-                      onClick={() => slot.available && slot.slotId && handleTimeSelect(slot.time, slot.slotId)}
-                      disabled={!slot.available}
-                      className={`py-3 px-4 rounded-lg border transition-colors ${
-                        isSelected
-                          ? 'bg-primary text-white border-primary'
-                          : slot.available
-                          ? 'bg-white hover:bg-gray-50 border-gray-200'
-                          : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                      }`}
-                    >
-                      {slot.time}
-                    </button>
-                  );
-                })}
+            ) : availableSlots.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-text-secondary">No available time slots for this date.</p>
+                <p className="text-sm text-text-secondary mt-2">Please try a different date or check back later.</p>
               </div>
+            ) : (
+              <SlotSelectionGrid
+                slots={availableSlots}
+                selectedSlotId={selectedSlotId}
+                onSlotSelect={handleSlotSelect}
+              />
             )}
           </div>
 

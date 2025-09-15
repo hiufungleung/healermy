@@ -7,11 +7,12 @@ import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { PractitionerSearch } from '@/components/common/PractitionerSearch';
+import { CreatePractitionerForm } from '@/components/provider/CreatePractitionerForm';
+import { ViewPractitionerDetails } from '@/components/provider/ViewPractitionerDetails';
 import type { Practitioner } from '@/types/fhir';
 
-export default function BookAppointment() {
+export default function PractitionerManagement() {
   const router = useRouter();
-  
   const [searchFilters, setSearchFilters] = useState({
     givenName: '',
     familyName: '',
@@ -27,6 +28,10 @@ export default function BookAppointment() {
   const [totalPractitioners, setTotalPractitioners] = useState<number | undefined>();
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedPractitioner, setSelectedPractitioner] = useState<Practitioner | null>(null);
+  const [showViewDetails, setShowViewDetails] = useState(false);
+  const [isInitialMount, setIsInitialMount] = useState(true);
 
   const fetchPractitioners = useCallback(async (page = 1, isSearch = false) => {
     if (isSearch || page === 1) {
@@ -83,6 +88,7 @@ export default function BookAppointment() {
       }
       
       const result = await response.json();
+      console.log('Fetched practitioners:', result);
       
       if (page === 1) {
         // First page or new search - replace practitioners
@@ -106,6 +112,16 @@ export default function BookAppointment() {
     }
   }, [searchFilters.givenName, searchFilters.familyName, searchFilters.phone, searchFilters.addressCity, searchFilters.addressState, searchFilters.addressPostalCode, searchFilters.addressCountry, searchFilters.practitionerId]);
 
+  // Prevent search filter useEffect from running on initial mount
+  useEffect(() => {
+    if (isInitialMount) {
+      return; // Skip the search filter effect on initial mount
+    }
+    
+    // This will run when search filters change (not on initial mount)
+    fetchPractitioners(1, true);
+  }, [searchFilters.givenName, searchFilters.familyName, searchFilters.phone, searchFilters.addressCity, searchFilters.addressState, searchFilters.addressPostalCode, searchFilters.addressCountry, searchFilters.practitionerId, isInitialMount]);
+
   // Handle search filter changes
   const handleFiltersChange = useCallback((filters: {
     givenName: string;
@@ -119,17 +135,51 @@ export default function BookAppointment() {
   }) => {
     setSearchFilters(filters);
     setCurrentPage(1);
-    fetchPractitioners(1, true);
-  }, [fetchPractitioners]);
+    // Don't call fetchPractitioners here - let the useEffect handle it
+  }, []);
 
-  // Load all active practitioners on mount
+
+  // Load all practitioners on mount - runs only once
   useEffect(() => {
-    fetchPractitioners(1, false); // page 1, not a search
-  }, [fetchPractitioners]);
-
-  const handleBookNow = (practitioner: Practitioner) => {
-    router.push(`/patient/book-appointment/${practitioner.id}`);
-  };
+    const loadInitialPractitioners = async () => {
+      setLoading(true);
+      
+      try {
+        const params = new URLSearchParams();
+        params.append('count', '30');
+        
+        const response = await fetch(`/api/fhir/practitioners?${params.toString()}`, {
+          method: 'GET',
+          credentials: 'include',
+        });
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            console.log('Authentication required, middleware will redirect');
+            return;
+          }
+          throw new Error(`Failed to fetch practitioners: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('Initial practitioners loaded:', result);
+        
+        setPractitioners(result.practitioners || []);
+        setTotalPractitioners(result.total);
+        setHasNextPage(!!result.nextUrl);
+        setCurrentPage(1);
+        
+      } catch (error) {
+        console.error('Error loading initial practitioners:', error);
+        setPractitioners([]);
+      } finally {
+        setLoading(false);
+        setIsInitialMount(false); // Mark that initial mount is complete
+      }
+    };
+    
+    loadInitialPractitioners();
+  }, []); // Empty dependency array - runs only once on mount
 
   const handleNextPage = () => {
     if (hasNextPage && !loading) {
@@ -138,19 +188,54 @@ export default function BookAppointment() {
   };
 
 
+  const handleCreateNew = () => {
+    setShowCreateForm(true);
+  };
+
+  const handleCreateSuccess = () => {
+    // Refresh the practitioner list after successful creation
+    fetchPractitioners(1, false);
+  };
+
+
+  const handleViewDetails = (practitioner: Practitioner) => {
+    setSelectedPractitioner(practitioner);
+    setShowViewDetails(true);
+  };
+
+  const handleManageSchedule = (practitioner: Practitioner) => {
+    router.push(`/provider/practitioner/${practitioner.id}`);
+  };
+
+
+
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-text-primary mb-2">
-            Book New Appointment
-          </h1>
-          <p className="text-text-secondary">
-            Find and book with the right clinic for you
-          </p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold text-text-primary mb-2">
+                Practitioner Management
+              </h1>
+              <p className="text-text-secondary">
+                Create and manage healthcare practitioners in the system
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              onClick={handleCreateNew}
+              className="flex items-center"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Create New Practitioner
+            </Button>
+          </div>
         </div>
 
-        {/* Practitioner Search */}
+        {/* Practitioner Search Component */}
         <PractitionerSearch
           onFiltersChange={handleFiltersChange}
           loading={loading}
@@ -180,7 +265,7 @@ export default function BookAppointment() {
                 q.code?.text || q.code?.coding?.[0]?.display
               ).filter(Boolean) || [];
               
-              // Extract primary address
+              // Extract primary address with Australian format
               const address = practitioner.address?.[0];
               const addressString = address ? [
                 address.line?.join(', '),
@@ -193,10 +278,20 @@ export default function BookAppointment() {
               const phone = practitioner.telecom?.find(t => t.system === 'phone')?.value;
               const email = practitioner.telecom?.find(t => t.system === 'email')?.value;
               
-              // Extract identifiers for display (NPI, etc.)
+              // Extract identifiers for display (NPI, Provider Number, etc.)
               const npi = practitioner.identifier?.find(id => 
                 id.type?.coding?.[0]?.code === 'NPI'
               )?.value;
+              
+              const providerNumber = practitioner.identifier?.find(id => 
+                id.type?.coding?.[0]?.code === 'PRN'
+              )?.value;
+
+              // Check if this is an app-created practitioner (has our custom identifier system)
+              const isAppCreated = practitioner.identifier?.some(id => 
+                id.system === process.env.NEXT_PUBLIC_PRACTITIONER_IDENTIFIER_SYSTEM || 
+                id.system?.includes('healermy.com')
+              );
 
               return (
                 <Card key={practitioner.id} className="hover:shadow-md transition-shadow">
@@ -216,11 +311,14 @@ export default function BookAppointment() {
                               <p className="text-sm text-primary font-medium">{qualifications.join(', ')}</p>
                             )}
                           </div>
-                          <div className="flex items-center ml-4">
+                          <div className="flex items-center space-x-2 ml-4">
                             {practitioner.active ? (
                               <Badge variant="success" size="sm">Active</Badge>
                             ) : (
                               <Badge variant="danger" size="sm">Inactive</Badge>
+                            )}
+                            {isAppCreated && (
+                              <Badge variant="info" size="sm">App Created</Badge>
                             )}
                           </div>
                         </div>
@@ -257,11 +355,18 @@ export default function BookAppointment() {
                         </div>
                         
                         {/* Professional Info */}
-                        {npi && (
-                          <div className="mb-3">
-                            <p className="text-xs text-text-secondary">NPI: {npi}</p>
-                          </div>
-                        )}
+                        <div className="flex flex-wrap items-center gap-4 mb-3">
+                          {npi && (
+                            <div>
+                              <p className="text-xs text-text-secondary">NPI: {npi}</p>
+                            </div>
+                          )}
+                          {providerNumber && (
+                            <div>
+                              <p className="text-xs text-text-secondary">Provider #: {providerNumber}</p>
+                            </div>
+                          )}
+                        </div>
                         
                         {/* Gender */}
                         {practitioner.gender && (
@@ -272,25 +377,34 @@ export default function BookAppointment() {
                           </div>
                         )}
                         
+                        {/* Resource Information */}
                         <div className="mt-4 pt-3 border-t border-gray-100">
-                          <p className="text-sm text-text-secondary mb-2">Book an appointment:</p>
-                          <p className="text-xs text-text-secondary">
-                            {practitioner.active 
-                              ? 'Click "Book Now" to view available appointment times'
-                              : 'This practitioner is currently not accepting new appointments'
-                            }
-                          </p>
+                          <div className="flex items-center justify-between text-xs text-text-secondary">
+                            <span>ID: {practitioner.id}</span>
+                            <span>Resource: Practitioner</span>
+                          </div>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="ml-4 flex-shrink-0">
+                    <div className="ml-4 flex-shrink-0 flex flex-col space-y-2">
                       <Button
-                        variant={practitioner.active ? "primary" : "outline"}
-                        onClick={() => handleBookNow(practitioner)}
-                        disabled={!practitioner.active}
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleViewDetails(practitioner)}
                       >
-                        {practitioner.active ? 'Book Now' : 'Unavailable'}
+                        View Details
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleManageSchedule(practitioner)}
+                        className="flex items-center"
+                      >
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Manage Schedule
                       </Button>
                     </div>
                   </div>
@@ -328,16 +442,44 @@ export default function BookAppointment() {
               ) : searchFilters.givenName.length >= 2 || searchFilters.familyName.length >= 2 || searchFilters.phone || searchFilters.addressCity || searchFilters.addressState || searchFilters.addressPostalCode || searchFilters.addressCountry || searchFilters.practitionerId ? (
                 'No practitioners found. Try different search criteria.'
               ) : (
-                'No active practitioners found in the system.'
+                'No practitioners found in the system.'
               )}
             </p>
             {!loading && !searchFilters.givenName && !searchFilters.familyName && !searchFilters.phone && !searchFilters.addressCity && !searchFilters.addressState && !searchFilters.addressPostalCode && !searchFilters.addressCountry && !searchFilters.practitionerId && (
-              <p className="text-sm text-text-secondary">
-                Try searching by practitioner name, phone number, or location
-              </p>
+              <div className="space-y-2">
+                <p className="text-sm text-text-secondary">
+                  Try searching for "Dr" or a specific practitioner name
+                </p>
+                <Button
+                  variant="primary"
+                  onClick={handleCreateNew}
+                  className="mt-4"
+                >
+                  Create Your First Practitioner
+                </Button>
+              </div>
             )}
           </div>
         )}
+
+        {/* Create Form Modal */}
+        <CreatePractitionerForm
+          isOpen={showCreateForm}
+          onClose={() => setShowCreateForm(false)}
+          onSuccess={handleCreateSuccess}
+        />
+
+
+        {/* View Details Modal */}
+        <ViewPractitionerDetails
+          practitioner={selectedPractitioner}
+          isOpen={showViewDetails}
+          onClose={() => {
+            setShowViewDetails(false);
+            setSelectedPractitioner(null);
+          }}
+          onEdit={() => {}}
+        />
       </div>
     </Layout>
   );

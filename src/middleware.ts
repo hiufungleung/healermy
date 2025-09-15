@@ -29,7 +29,16 @@ export async function middleware(request: NextRequest) {
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME);
 
   if (!tokenCookie || !sessionCookie) {
-    console.log(`❌ [MIDDLEWARE] Missing required cookies (token: ${!!tokenCookie}, session: ${!!sessionCookie}), redirecting to home: ${pathname}`);
+    console.log(`❌ [MIDDLEWARE] Missing required cookies (token: ${!!tokenCookie}, session: ${!!sessionCookie}) for: ${pathname}`);
+    
+    // For API routes, return 401 Unauthorized instead of redirect
+    if (pathname.startsWith('/api/')) {
+      console.log(`🔐 [MIDDLEWARE] API route authentication required, returning 401: ${pathname}`);
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+    
+    // For page routes, redirect to home
+    console.log(`🏠 [MIDDLEWARE] Page route redirecting to home: ${pathname}`);
     return NextResponse.redirect(new URL('/', request.url));
   }
 
@@ -63,11 +72,14 @@ export async function middleware(request: NextRequest) {
     });
 
     console.log(`Access Token: ${sessionData.accessToken}`);
+    console.log(`Refresh Token: ${sessionData.refreshToken}`);
+    console.log(`Token URL: ${sessionData.tokenUrl}`);
     
-    // Check if session is expired or expiring soon (within 5 minutes) and attempt refresh if possible
-    const fiveMinutesFromNow = Date.now() + (5 * 60 * 1000);
-    if (sessionData.expiresAt && sessionData.expiresAt <= fiveMinutesFromNow) {
-      console.log(`⏰ [MIDDLEWARE] Session expired, attempting token refresh: ${pathname}`);
+    // Check if session is expired or expiring soon and attempt refresh if possible
+    const refreshBufferSeconds = parseInt(process.env.TOKEN_REFRESH_BUFFER_SECONDS || '30');
+    const refreshThreshold = Date.now() + (refreshBufferSeconds * 1000);
+    if (sessionData.expiresAt && sessionData.expiresAt <= refreshThreshold) {
+      console.log(`⏰ [MIDDLEWARE] Session expires in ${Math.round((sessionData.expiresAt - Date.now()) / 1000)}s (buffer: ${refreshBufferSeconds}s), attempting token refresh: ${pathname}`);
       
       // If we have a refresh token, try to refresh the access token
       if (sessionData.refreshToken && sessionData.tokenUrl && sessionData.clientId && sessionData.clientSecret) {

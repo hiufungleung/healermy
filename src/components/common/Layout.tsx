@@ -51,7 +51,8 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
     : isProvider
     ? [
         { href: '/provider/dashboard', label: 'Dashboard' },
-        { href: '/provider/appointments', label: 'Book Appointment' },
+        { href: '/provider/practitioner', label: 'Manage Practitioners' },
+        { href: '/provider/appointments', label: 'Appointments' },
         { href: '/provider/notifications', label: 'Notifications' },
         { href: '/provider/profile', label: 'Profile' },
       ]

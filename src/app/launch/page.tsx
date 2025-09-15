@@ -1,15 +1,19 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 function LaunchContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { logout } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [showRoleSelection, setShowRoleSelection] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<'patient' | 'provider' | null>(null);
 
   useEffect(() => {
-    debugger;
     const launch = async () => {
       if (isAuthorizing) return;
       
@@ -38,17 +42,16 @@ function LaunchContent() {
         return;
       }
 
-      // Discover SMART endpoints first
-      const effectiveIss = launchToken.includes('test') ? (() => {
-        if (!process.env.NEXT_PUBLIC_BASE_URL) {
-          throw new Error('Missing required environment variable: NEXT_PUBLIC_BASE_URL');
-        }
-        return `${process.env.NEXT_PUBLIC_BASE_URL}/api/fhir`;
-      })() : iss;
+      // Show role selection for MELD sandbox
+      if (!selectedRole) {
+        setShowRoleSelection(true);
+        return;
+      }
+
+      // Discover SMART endpoints from the provided ISS
+      console.log('🔍 Discovering SMART endpoints for:', iss);
       
-      console.log('🔍 Discovering SMART endpoints for:', effectiveIss);
-      
-      const wellKnownUrl = `${effectiveIss}/.well-known/smart-configuration`;
+      const wellKnownUrl = `${iss}/.well-known/smart-configuration`;
       console.log('🔍 Fetching well-known config from:', wellKnownUrl);
       
       const response = await fetch(wellKnownUrl);
@@ -67,17 +70,8 @@ function LaunchContent() {
         throw new Error('Missing authorization_endpoint or token_endpoint in SMART configuration');
       }
       
-      // Get role-specific config from server-side API
-      let role: 'patient' | 'provider';
-      if (authorizeUrl.includes('/personas/patient/')) {
-        role = 'patient';
-      } else if (authorizeUrl.includes('/personas/provider/')) {
-        role = 'provider';
-      } else {
-        throw new Error('Cannot determine role from authorization endpoint');
-      }
-      
-      const configResponse = await fetch(`/api/auth/config?iss=${encodeURIComponent(iss)}&role=${role}`);
+      // Get auth config from server-side API using selected role
+      const configResponse = await fetch(`/api/auth/config?iss=${encodeURIComponent(iss)}&role=${selectedRole}`);
       if (!configResponse.ok) {
         const errorData = await configResponse.json().catch(() => ({ error: 'Unknown error' }));
         setError(`Failed to get auth configuration: ${errorData.error || 'Unknown error'}`);
@@ -85,6 +79,7 @@ function LaunchContent() {
       }
 
       const config = await configResponse.json();
+      console.log(`Smart config for role ${selectedRole}:`, config);
       if (!config) {
         setError('Invalid auth configuration received.');
         return;
@@ -108,11 +103,12 @@ function LaunchContent() {
         }
         keysToRemove.forEach(key => sessionStorage.removeItem(key));
         
-        // Store launch context for callback (role will be determined later)
+        // Store launch context for callback including selected role
         sessionStorage.setItem('auth_iss', iss);
         sessionStorage.setItem('auth_launch', launchToken);
+        sessionStorage.setItem('auth_role', selectedRole);
         
-        console.log(`🚀 Starting ${role} SMART authorization with:`, {
+        console.log('🚀 Starting SMART authorization with:', {
           clientId: config.clientId,
           scope: config.scope,
           redirectUri: config.redirectUri,
@@ -150,7 +146,7 @@ function LaunchContent() {
           scope: config.scope,
           state: state,
           launch: launchToken,
-          aud: effectiveIss,
+          aud: iss,
         });
         
         const fullAuthorizeUrl = `${authorizeUrl}?${params.toString()}`;
@@ -181,14 +177,86 @@ function LaunchContent() {
     };
 
     launch();
-  }, [searchParams, isAuthorizing]);
+  }, [searchParams, isAuthorizing, selectedRole]);
+
+  const handleRoleSelection = (role: 'patient' | 'provider') => {
+    setSelectedRole(role);
+    setShowRoleSelection(false);
+  };
+
+  const handleLogoutAndHome = async () => {
+    try {
+      // Use existing logout function from AuthProvider
+      await logout();
+    } catch (error) {
+      console.warn('Logout failed:', error);
+    } finally {
+      // Navigate to home regardless of logout result
+      router.push('/');
+    }
+  };
 
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="card max-w-md w-full">
           <h1 className="text-2xl font-bold text-danger mb-4">Authorization Error</h1>
-          <p className="text-text-secondary">{error}</p>
+          <p className="text-text-secondary mb-4">{error}</p>
+          <div className="flex space-x-3">
+            <button
+              onClick={handleLogoutAndHome}
+              className="btn-outline flex-1"
+            >
+              Return to Home
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="btn-primary flex-1"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (showRoleSelection) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="card max-w-md w-full">
+          <h1 className="text-2xl font-bold mb-4">Select Your Role</h1>
+          <p className="text-text-secondary mb-6">
+            Please select how you want to access the system:
+          </p>
+          
+          <div className="space-y-3">
+            <button
+              onClick={() => handleRoleSelection('patient')}
+              className="w-full p-4 text-left border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-colors"
+            >
+              <div className="font-semibold text-lg">🏥 Patient</div>
+              <div className="text-sm text-text-secondary mt-1">
+                Access your personal health records and book appointments
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleRoleSelection('provider')}
+              className="w-full p-4 text-left border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-colors"
+            >
+              <div className="font-semibold text-lg">👨‍⚕️ Healthcare Provider</div>
+              <div className="text-sm text-text-secondary mt-1">
+                Manage patient care and appointment scheduling
+              </div>
+            </button>
+          </div>
+          
+          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-800">
+              <strong>Note:</strong> If launching without patient context, select "Healthcare Provider" to avoid authentication errors.
+            </p>
+          </div>
         </div>
       </div>
     );

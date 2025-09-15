@@ -34,8 +34,8 @@ export default function DashboardClient({
   const formattedAddress = patientAddress ? 
     `${patientAddress.line?.join(', ') || ''} ${patientAddress.city || ''} ${patientAddress.state || ''} ${patientAddress.postalCode || ''}`.trim() : null;
   
-  // Use only real FHIR appointments data - no mock data
-  const displayAppointments = appointments;
+  // Use only real FHIR appointments data - ensure it's always an array
+  const displayAppointments = Array.isArray(appointments) ? appointments : [];
   
   const todayStatus = {
     nextAppointment: '10:30 AM',
