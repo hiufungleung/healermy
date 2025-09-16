@@ -13,15 +13,18 @@ interface DashboardClientProps {
   patientName: string;
   greeting: string;
   session: AuthSession;
+  onPatientNameUpdate?: (name: string) => void;
 }
 
 export default function DashboardClient({
-  patientName,
+  patientName: initialPatientName,
   greeting,
-  session
+  session,
+  onPatientNameUpdate
 }: DashboardClientProps) {
   const router = useRouter();
   const [patient, setPatient] = useState<Patient | null>(null);
+  const [patientName, setPatientName] = useState(initialPatientName);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loadingPatient, setLoadingPatient] = useState(true);
   const [loadingAppointments, setLoadingAppointments] = useState(true);
@@ -38,6 +41,18 @@ export default function DashboardClient({
         if (response.ok) {
           const patientData = await response.json();
           setPatient(patientData);
+
+          // Extract real patient name from FHIR data
+          if (patientData?.name?.[0]) {
+            const given = patientData.name[0]?.given?.join(' ') || '';
+            const family = patientData.name[0]?.family || '';
+            const fullName = `${given} ${family}`.trim();
+            if (fullName) {
+              setPatientName(fullName);
+              // Update the parent component (Layout) with the real patient name
+              onPatientNameUpdate?.(fullName);
+            }
+          }
         }
       } catch (error) {
         console.error('Error fetching patient data:', error);
