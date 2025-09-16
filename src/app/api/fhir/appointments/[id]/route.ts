@@ -68,11 +68,37 @@ export async function PATCH(
     // Extract session from middleware headers
     const session = await getSessionFromHeaders();
     
-    // Check authorization (only providers can update appointments)
-    validateRole(session, 'provider');
-    
     const token = prepareToken(session.accessToken);
     const patchOperations = await request.json();
+    
+    // Validate patch operations based on user role
+    if (session.role === 'patient') {
+      // Patients can only reschedule or cancel their own appointments
+      const allowedPatientOperations = ['cancelled', 'proposed'];
+      
+      for (const op of patchOperations) {
+        if (op.path === '/status' && !allowedPatientOperations.includes(op.value)) {
+          return NextResponse.json(
+            { error: `Patients can only cancel appointments or propose reschedules. Status '${op.value}' not allowed.` },
+            { status: 403 }
+          );
+        }
+        // Patients can also modify start/end times for rescheduling
+        if (!['/status', '/start', '/end', '/reasonCode'].includes(op.path)) {
+          return NextResponse.json(
+            { error: `Patients can only modify status, start/end times, or reason. Path '${op.path}' not allowed.` },
+            { status: 403 }
+          );
+        }
+      }
+    } else if (session.role === 'provider') {
+      // Providers can perform any appointment operations (existing behavior)
+    } else {
+      return NextResponse.json(
+        { error: 'Invalid user role for appointment updates' },
+        { status: 403 }
+      );
+    }
     
     // Get current appointment to track status change
     const currentAppointmentResponse = await FHIRClient.fetchWithAuth(
@@ -86,6 +112,29 @@ export async function PATCH(
     if (currentAppointmentResponse.ok) {
       currentAppointment = await currentAppointmentResponse.json();
       oldStatus = currentAppointment.status;
+      
+      // Additional validation for patients - they can only modify their own appointments
+      if (session.role === 'patient') {
+        const patientParticipant = currentAppointment.participant?.find((p: any) => 
+          p.actor?.reference?.startsWith('Patient/')
+        );
+        
+        // Extract patient ID from session (assuming it's stored in session.patient)
+        const sessionPatientId = session.patient; // e.g., "claim-8d9670e3"
+        const appointmentPatientId = patientParticipant?.actor?.reference?.replace('Patient/', '');
+        
+        if (!patientParticipant || appointmentPatientId !== sessionPatientId) {
+          return NextResponse.json(
+            { error: 'Patients can only modify their own appointments' },
+            { status: 403 }
+          );
+        }
+      }
+    } else {
+      return NextResponse.json(
+        { error: 'Appointment not found' },
+        { status: 404 }
+      );
     }
     
     // Apply patch operations to FHIR
@@ -126,6 +175,88 @@ export async function PATCH(
       } catch (slotError) {
         console.warn('Failed to update slot status after appointment patch:', slotError);
         // Don't fail the appointment update if slot update fails
+      }
+    }
+
+    // Send notification message for status changes
+    if (currentAppointment) {
+      try {
+        const statusPatch = patchOperations.find((op: any) => op.path === '/status');
+        
+        if (statusPatch) {
+          const newStatus = statusPatch.value;
+          const patientParticipant = currentAppointment.participant?.find((p: any) => 
+            p.actor?.reference?.startsWith('Patient/')
+          );
+          const practitionerParticipant = currentAppointment.participant?.find((p: any) => 
+            p.actor?.reference?.startsWith('Practitioner/')
+          );
+          
+          if (patientParticipant && practitionerParticipant) {
+            let statusMessage = '';
+            let sender = session.role === 'patient' ? 'patient' : 'practitioner';
+            
+            // Different messages based on who initiated the change
+            if (session.role === 'patient') {
+              switch (newStatus) {
+                case 'cancelled':
+                  statusMessage = 'The patient has cancelled their appointment.';
+                  break;
+                case 'proposed':
+                  statusMessage = 'The patient has requested to reschedule their appointment. Please review the proposed time.';
+                  break;
+                default:
+                  statusMessage = `The patient has updated their appointment status to ${newStatus}.`;
+              }
+            } else {
+              // Provider messages (existing logic)
+              switch (newStatus) {
+                case 'booked':
+                  statusMessage = 'Your appointment request has been approved and confirmed.';
+                  break;
+                case 'cancelled':
+                  statusMessage = 'Your appointment has been cancelled. Please contact us if you have questions.';
+                  break;
+                case 'arrived':
+                  statusMessage = 'Thank you for arriving. Please check in at the front desk.';
+                  break;
+                case 'checked-in':
+                  statusMessage = 'You have been checked in. Please wait to be called.';
+                  break;
+                case 'fulfilled':
+                  statusMessage = 'Your appointment has been completed. Thank you for your visit.';
+                  break;
+                case 'noshow':
+                  statusMessage = 'You were marked as a no-show for your appointment. Please contact us to reschedule.';
+                  break;
+                case 'waitlist':
+                  statusMessage = 'You have been added to the waitlist. We will notify you if a slot becomes available.';
+                  break;
+                case 'proposed':
+                  statusMessage = 'A new appointment time has been proposed. Please confirm if this works for you.';
+                  break;
+                case 'entered-in-error':
+                  statusMessage = 'This appointment was entered in error and has been removed.';
+                  break;
+                default:
+                  statusMessage = `Your appointment status has been updated to ${newStatus}.`;
+              }
+            }
+            
+            await createStatusUpdateMessage(
+              token,
+              session.fhirBaseUrl,
+              id,
+              patientParticipant.actor.reference,
+              practitionerParticipant.actor.reference,
+              statusMessage,
+              sender
+            );
+          }
+        }
+      } catch (messageError) {
+        console.warn('Failed to send appointment status notification:', messageError);
+        // Don't fail the appointment update if messaging fails
       }
     }
     

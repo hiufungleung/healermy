@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
@@ -20,6 +20,100 @@ export default function DashboardClient({
   greeting 
 }: DashboardClientProps) {
   const router = useRouter();
+  const [cancellingAppointments, setCancellingAppointments] = useState<Set<string>>(new Set());
+  const [reschedulingAppointments, setReschedulingAppointments] = useState<Set<string>>(new Set());
+
+  // Cancel appointment functionality
+  const handleCancelAppointment = async (appointmentId: string) => {
+    if (!appointmentId) return;
+    
+    const confirmCancel = window.confirm('Are you sure you want to cancel this appointment?');
+    if (!confirmCancel) return;
+    
+    setCancellingAppointments(prev => new Set([...prev, appointmentId]));
+    
+    try {
+      const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify([
+          {
+            op: 'replace',
+            path: '/status',
+            value: 'cancelled'
+          }
+        ]),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to cancel appointment');
+      }
+      
+      // Show success message and refresh the page
+      alert('Appointment cancelled successfully. The provider has been notified.');
+      window.location.reload();
+      
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+      alert(error instanceof Error ? error.message : 'Failed to cancel appointment. Please try again.');
+    } finally {
+      setCancellingAppointments(prev => {
+        const updated = new Set(prev);
+        updated.delete(appointmentId);
+        return updated;
+      });
+    }
+  };
+
+  // Reschedule appointment functionality
+  const handleRescheduleAppointment = async (appointmentId: string) => {
+    if (!appointmentId) return;
+    
+    const confirmReschedule = window.confirm('Do you want to request a reschedule for this appointment? The provider will review your request.');
+    if (!confirmReschedule) return;
+    
+    setReschedulingAppointments(prev => new Set([...prev, appointmentId]));
+    
+    try {
+      const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify([
+          {
+            op: 'replace',
+            path: '/status',
+            value: 'proposed'
+          }
+        ]),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to request reschedule');
+      }
+      
+      // Show success message and refresh the page
+      alert('Reschedule request sent successfully. The provider will review and contact you with available times.');
+      window.location.reload();
+      
+    } catch (error) {
+      console.error('Error requesting reschedule:', error);
+      alert(error instanceof Error ? error.message : 'Failed to request reschedule. Please try again.');
+    } finally {
+      setReschedulingAppointments(prev => {
+        const updated = new Set(prev);
+        updated.delete(appointmentId);
+        return updated;
+      });
+    }
+  };
 
   // Extract patient information
   const patientGender = patient?.gender;
@@ -140,7 +234,7 @@ export default function DashboardClient({
 
         <div className="bg-white rounded-lg border border-border p-4 cursor-pointer hover:shadow-md transition-shadow">
           <button
-            onClick={() => router.push('/patient/notifications')}
+            onClick={() => router.push('/patient/messages')}
             className="w-full flex items-center space-x-4"
           >
             <div className="w-12 h-12 bg-yellow-50 rounded-lg flex items-center justify-center">
@@ -247,16 +341,18 @@ export default function DashboardClient({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => router.push(`/patient/appointments/${appointment.id}/reschedule`)}
+                        onClick={() => handleRescheduleAppointment(appointment.id || '')}
+                        disabled={reschedulingAppointments.has(appointment.id || '') || appointmentStatus === 'cancelled' || appointmentStatus === 'fulfilled'}
                       >
-                        Reschedule
+                        {reschedulingAppointments.has(appointment.id || '') ? 'Requesting...' : 'Reschedule'}
                       </Button>
                       <Button
                         variant="danger"
                         size="sm"
-                        onClick={() => console.log('Cancel appointment', appointment.id)}
+                        onClick={() => handleCancelAppointment(appointment.id || '')}
+                        disabled={cancellingAppointments.has(appointment.id || '') || appointmentStatus === 'cancelled' || appointmentStatus === 'fulfilled'}
                       >
-                        Cancel
+                        {cancellingAppointments.has(appointment.id || '') ? 'Cancelling...' : 'Cancel'}
                       </Button>
                     </div>
                   </div>

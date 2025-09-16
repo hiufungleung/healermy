@@ -16,16 +16,23 @@ export class FHIRClient {
     options: RequestInit = {}
   ): Promise<Response> {
     // Set appropriate headers based on request method
-    const isPost = options.method?.toUpperCase() === 'POST';
+    const method = options.method?.toUpperCase();
+    const isPost = method === 'POST';
+    const isPut = method === 'PUT';
+    const isPatch = method === 'PATCH';
+    
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
       'Authorization': `Bearer ${token}`,
       'Accept': 'application/fhir+json',
     };
     
-    // Only add Content-Type for POST requests with body
-    if (isPost && options.body) {
+    // Set Content-Type based on request method and body
+    if ((isPost || isPut) && options.body) {
       headers['Content-Type'] = 'application/fhir+json';
+    } else if (isPatch && options.body) {
+      // Oracle FHIR requires application/json-patch+json for PATCH operations
+      headers['Content-Type'] = 'application/json-patch+json';
     }
 
     const response = await fetch(url, {
