@@ -1,0 +1,427 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/common/Button';
+import { Badge } from '@/components/common/Badge';
+import { AppointmentSkeleton } from '@/components/common/LoadingSpinner';
+import { formatDateForDisplay, formatTimeForDisplay } from '@/lib/timezone';
+import type { Appointment } from '@/types/fhir';
+import type { AuthSession } from '@/types/auth';
+
+interface AppointmentsClientProps {
+  session: AuthSession;
+}
+
+type FilterStatus = 'all' | 'upcoming' | 'pending' | 'completed' | 'cancelled';
+
+export default function AppointmentsClient({ session }: AppointmentsClientProps) {
+  const router = useRouter();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [cancellingAppointments, setCancellingAppointments] = useState<Set<string>>(new Set());
+  const [reschedulingAppointments, setReschedulingAppointments] = useState<Set<string>>(new Set());
+
+  // Fetch appointments
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        const response = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Appointments API response:', data);
+
+          // Handle different possible response structures
+          if (Array.isArray(data)) {
+            setAppointments(data);
+          } else if (data.appointments && Array.isArray(data.appointments)) {
+            setAppointments(data.appointments);
+          } else if (data.entry && Array.isArray(data.entry)) {
+            // Handle FHIR Bundle format
+            setAppointments(data.entry.map((entry: any) => entry.resource).filter(Boolean));
+          } else {
+            console.warn('Unexpected appointments API response format:', data);
+            setAppointments([]);
+          }
+        } else {
+          console.error('Failed to fetch appointments:', response.status, response.statusText);
+          setAppointments([]);
+        }
+      } catch (error) {
+        console.error('Error fetching appointments:', error);
+        setAppointments([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAppointments();
+  }, [session.patient]);
+
+  // Filter and search appointments
+  const filteredAppointments = (Array.isArray(appointments) ? appointments : []).filter((appointment) => {
+    const now = new Date();
+    const appointmentDate = appointment.start ? new Date(appointment.start) : null;
+
+    // Status filter
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'upcoming') {
+        if (!appointmentDate || appointmentDate < now ||
+            appointment.status === 'cancelled' || appointment.status === 'fulfilled') {
+          return false;
+        }
+      } else if (appointment.status !== filterStatus) {
+        return false;
+      }
+    }
+
+    // Search filter
+    if (searchTerm) {
+      const doctorName = appointment.participant?.find(p =>
+        p.actor?.reference?.startsWith('Practitioner/'))?.actor?.display || '';
+      const specialty = appointment.serviceType?.[0]?.text ||
+                      appointment.serviceType?.[0]?.coding?.[0]?.display || '';
+
+      const searchableText = `${doctorName} ${specialty}`.toLowerCase();
+      if (!searchableText.includes(searchTerm.toLowerCase())) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  // Cancel appointment
+  const handleCancelAppointment = async (appointmentId: string) => {
+    if (!appointmentId) return;
+
+    const confirmCancel = window.confirm('Are you sure you want to cancel this appointment?');
+    if (!confirmCancel) return;
+
+    setCancellingAppointments(prev => new Set([...prev, appointmentId]));
+
+    try {
+      const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify([
+          {
+            op: 'replace',
+            path: '/status',
+            value: 'cancelled'
+          }
+        ]),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to cancel appointment');
+      }
+
+      // Refresh appointments
+      const refreshResponse = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
+        credentials: 'include'
+      });
+      if (refreshResponse.ok) {
+        const data = await refreshResponse.json();
+
+        // Handle different possible response structures
+        if (Array.isArray(data)) {
+          setAppointments(data);
+        } else if (data.appointments && Array.isArray(data.appointments)) {
+          setAppointments(data.appointments);
+        } else if (data.entry && Array.isArray(data.entry)) {
+          setAppointments(data.entry.map((entry: any) => entry.resource).filter(Boolean));
+        } else {
+          setAppointments([]);
+        }
+      }
+
+      alert('Appointment cancelled successfully.');
+
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+      alert('Failed to cancel appointment. Please try again.');
+    } finally {
+      setCancellingAppointments(prev => {
+        const updated = new Set(prev);
+        updated.delete(appointmentId);
+        return updated;
+      });
+    }
+  };
+
+  // Reschedule appointment
+  const handleRescheduleAppointment = async (appointmentId: string) => {
+    if (!appointmentId) return;
+
+    const confirmReschedule = window.confirm('Do you want to request a reschedule for this appointment?');
+    if (!confirmReschedule) return;
+
+    setReschedulingAppointments(prev => new Set([...prev, appointmentId]));
+
+    try {
+      const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify([
+          {
+            op: 'replace',
+            path: '/status',
+            value: 'proposed'
+          }
+        ]),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to request reschedule');
+      }
+
+      // Refresh appointments
+      const refreshResponse = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
+        credentials: 'include'
+      });
+      if (refreshResponse.ok) {
+        const data = await refreshResponse.json();
+
+        // Handle different possible response structures
+        if (Array.isArray(data)) {
+          setAppointments(data);
+        } else if (data.appointments && Array.isArray(data.appointments)) {
+          setAppointments(data.appointments);
+        } else if (data.entry && Array.isArray(data.entry)) {
+          setAppointments(data.entry.map((entry: any) => entry.resource).filter(Boolean));
+        } else {
+          setAppointments([]);
+        }
+      }
+
+      alert('Reschedule request sent successfully.');
+
+    } catch (error) {
+      console.error('Error requesting reschedule:', error);
+      alert('Failed to request reschedule. Please try again.');
+    } finally {
+      setReschedulingAppointments(prev => {
+        const updated = new Set(prev);
+        updated.delete(appointmentId);
+        return updated;
+      });
+    }
+  };
+
+  return (
+    <>
+      {/* Page Header */}
+      <div className="mb-8">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-text-primary">My Appointments</h1>
+            <p className="text-text-secondary mt-1">Manage your appointments and schedule new ones</p>
+          </div>
+          <Button
+            variant="primary"
+            onClick={() => router.push('/patient/book-appointment')}
+            className="flex items-center space-x-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Add New Appointment</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Filters and Search */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          {/* Search */}
+          <div className="flex-1">
+            <div className="relative">
+              <svg className="absolute left-3 top-3 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search by doctor name or specialty..."
+                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-transparent"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Status Filter */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: 'all', label: 'All' },
+              { key: 'upcoming', label: 'Upcoming' },
+              { key: 'pending', label: 'Pending' },
+              { key: 'completed', label: 'Completed' },
+              { key: 'cancelled', label: 'Cancelled' }
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setFilterStatus(key as FilterStatus)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  filterStatus === key
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Appointments List */}
+      {loading ? (
+        <AppointmentSkeleton count={4} />
+      ) : (
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold">
+              {filterStatus === 'all' ? 'All Appointments' :
+               filterStatus === 'upcoming' ? 'Upcoming Appointments' :
+               `${filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)} Appointments`}
+            </h2>
+            <div className="text-sm text-gray-500">
+              {filteredAppointments.length} appointment{filteredAppointments.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+
+          {filteredAppointments.length === 0 ? (
+            <div className="text-center py-12">
+              <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {searchTerm || filterStatus !== 'all' ? 'No matching appointments' : 'No appointments found'}
+              </h3>
+              <p className="text-gray-500 mb-6">
+                {searchTerm || filterStatus !== 'all'
+                  ? 'Try adjusting your search or filter criteria.'
+                  : 'You don\'t have any appointments scheduled yet.'
+                }
+              </p>
+              {(!searchTerm && filterStatus === 'all') && (
+                <Button
+                  variant="primary"
+                  onClick={() => router.push('/patient/book-appointment')}
+                >
+                  Schedule Your First Appointment
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredAppointments.map((appointment) => {
+                const appointmentStatus = appointment.status;
+                const doctorName = appointment.participant?.find(p =>
+                  p.actor?.reference?.startsWith('Practitioner/'))?.actor?.display || 'Provider';
+                const appointmentDate = appointment.start;
+                const appointmentTime = appointmentDate ? formatTimeForDisplay(appointmentDate) : 'TBD';
+                const appointmentDateDisplay = appointmentDate ? formatDateForDisplay(appointmentDate) : 'TBD';
+                const specialty = appointment.serviceType?.[0]?.text ||
+                                appointment.serviceType?.[0]?.coding?.[0]?.display || 'General';
+                const location = appointment.participant?.find(p =>
+                  p.actor?.reference?.startsWith('Location/'))?.actor?.display || 'TBD';
+
+                const canCancel = appointmentStatus !== 'cancelled' && appointmentStatus !== 'fulfilled';
+                const canReschedule = appointmentStatus !== 'cancelled' && appointmentStatus !== 'fulfilled';
+
+                return (
+                  <div key={appointment.id} className="border rounded-lg p-6 hover:bg-gray-50 transition-colors">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="font-semibold text-lg text-gray-900">{doctorName}</h3>
+                        <p className="text-gray-600">{specialty}</p>
+                      </div>
+                      <Badge
+                        variant={
+                          appointmentStatus === 'booked' || appointmentStatus === 'fulfilled' ? "success" :
+                          appointmentStatus === 'cancelled' ? "danger" :
+                          appointmentStatus === 'pending' ? "warning" : "info"
+                        }
+                        size="sm"
+                      >
+                        {appointmentStatus}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm">
+                      <div className="flex items-center space-x-2">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="font-medium">{appointmentDateDisplay}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="font-medium">{appointmentTime}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span className="font-medium">{location}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {appointment.id && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/patient/appointments/${appointment.id}`)}
+                        >
+                          View Details
+                        </Button>
+                      )}
+
+                      {canReschedule && appointment.id && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRescheduleAppointment(appointment.id)}
+                          disabled={reschedulingAppointments.has(appointment.id)}
+                        >
+                          {reschedulingAppointments.has(appointment.id) ? 'Requesting...' : 'Reschedule'}
+                        </Button>
+                      )}
+
+                      {canCancel && appointment.id && (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleCancelAppointment(appointment.id)}
+                          disabled={cancellingAppointments.has(appointment.id)}
+                        >
+                          {cancellingAppointments.has(appointment.id) ? 'Cancelling...' : 'Cancel'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
