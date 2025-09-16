@@ -4,7 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
-import { LoadingSection, LoadingCard } from '@/components/common/LoadingSpinner';
+import {
+  PatientInfoSkeleton,
+  AppointmentSkeleton,
+  TodayStatusSkeleton
+} from '@/components/common/LoadingSpinner';
 import { formatForDisplay, formatDateForDisplay, formatTimeForDisplay, getNowInAppTimezone, isFutureTime } from '@/lib/timezone';
 import type { Patient, Appointment } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
@@ -223,9 +227,7 @@ export default function DashboardClient({
 
       {/* Patient Information Card */}
       {loadingPatient ? (
-        <LoadingSection className="mb-8">
-          Loading patient information...
-        </LoadingSection>
+        <PatientInfoSkeleton className="mb-8" />
       ) : patient ? (
         <div className="bg-white rounded-lg border border-border p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Patient Information</h2>
@@ -360,9 +362,7 @@ export default function DashboardClient({
 
             <div className="space-y-4">
               {loadingAppointments ? (
-                <LoadingSection>
-                  Loading your appointments...
-                </LoadingSection>
+                <AppointmentSkeleton count={2} />
               ) : displayAppointments.map((appointment) => {
                 // Extract FHIR appointment data
                 const appointmentStatus = appointment.status;
@@ -459,6 +459,10 @@ export default function DashboardClient({
 
         {/* Today's Status */}
         <div>
+          {/* TODO: Add loading state when implementing real today's status */}
+          {/* {loadingAppointments ? (
+            <TodayStatusSkeleton />
+          ) : ( */}
           <div className="bg-white rounded-lg border border-border p-6">
             <h2 className="text-xl font-semibold mb-6">Today's Status</h2>
             

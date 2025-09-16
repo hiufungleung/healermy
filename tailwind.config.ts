@@ -29,6 +29,15 @@ const config: Config = {
         'text-primary': '#1F2937',
         'text-secondary': '#6B7280',
       },
+      animation: {
+        shimmer: 'shimmer 2s infinite linear',
+      },
+      keyframes: {
+        shimmer: {
+          '0%': { backgroundPosition: '-1000px 0' },
+          '100%': { backgroundPosition: '1000px 0' },
+        },
+      },
     },
   },
   plugins: [
