@@ -1,27 +1,70 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
+import { LoadingSection, LoadingCard } from '@/components/common/LoadingSpinner';
+import { formatForDisplay, formatDateForDisplay, formatTimeForDisplay, getNowInAppTimezone, isFutureTime } from '@/lib/timezone';
 import type { Patient, Appointment } from '@/types/fhir';
+import type { AuthSession } from '@/types/auth';
 
 interface DashboardClientProps {
-  patient: Patient | null;
-  appointments: Appointment[];
   patientName: string;
   greeting: string;
+  session: AuthSession;
 }
 
-export default function DashboardClient({ 
-  patient, 
-  appointments, 
-  patientName, 
-  greeting 
+export default function DashboardClient({
+  patientName,
+  greeting,
+  session
 }: DashboardClientProps) {
   const router = useRouter();
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loadingPatient, setLoadingPatient] = useState(true);
+  const [loadingAppointments, setLoadingAppointments] = useState(true);
   const [cancellingAppointments, setCancellingAppointments] = useState<Set<string>>(new Set());
   const [reschedulingAppointments, setReschedulingAppointments] = useState<Set<string>>(new Set());
+
+  // Client-side data fetching
+  useEffect(() => {
+    const fetchPatientData = async () => {
+      try {
+        const response = await fetch(`/api/fhir/patients/${session.patient}`, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const patientData = await response.json();
+          setPatient(patientData);
+        }
+      } catch (error) {
+        console.error('Error fetching patient data:', error);
+      } finally {
+        setLoadingPatient(false);
+      }
+    };
+
+    const fetchAppointments = async () => {
+      try {
+        const response = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setAppointments(data.appointments || []);
+        }
+      } catch (error) {
+        console.error('Error fetching appointments:', error);
+      } finally {
+        setLoadingAppointments(false);
+      }
+    };
+
+    fetchPatientData();
+    fetchAppointments();
+  }, [session.patient]);
 
   // Cancel appointment functionality
   const handleCancelAppointment = async (appointmentId: string) => {
@@ -53,9 +96,16 @@ export default function DashboardClient({
         throw new Error(errorData.error || 'Failed to cancel appointment');
       }
       
-      // Show success message and refresh the page
+      // Show success message and refresh appointments
       alert('Appointment cancelled successfully. The provider has been notified.');
-      window.location.reload();
+      // Refresh appointments instead of full page reload
+      const refreshResponse = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
+        credentials: 'include'
+      });
+      if (refreshResponse.ok) {
+        const data = await refreshResponse.json();
+        setAppointments(data.appointments || []);
+      }
       
     } catch (error) {
       console.error('Error cancelling appointment:', error);
@@ -99,9 +149,16 @@ export default function DashboardClient({
         throw new Error(errorData.error || 'Failed to request reschedule');
       }
       
-      // Show success message and refresh the page
+      // Show success message and refresh appointments
       alert('Reschedule request sent successfully. The provider will review and contact you with available times.');
-      window.location.reload();
+      // Refresh appointments instead of full page reload
+      const refreshResponse = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
+        credentials: 'include'
+      });
+      if (refreshResponse.ok) {
+        const data = await refreshResponse.json();
+        setAppointments(data.appointments || []);
+      }
       
     } catch (error) {
       console.error('Error requesting reschedule:', error);
@@ -150,7 +207,11 @@ export default function DashboardClient({
       </div>
 
       {/* Patient Information Card */}
-      {patient && (
+      {loadingPatient ? (
+        <LoadingSection className="mb-8">
+          Loading patient information...
+        </LoadingSection>
+      ) : patient ? (
         <div className="bg-white rounded-lg border border-border p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Patient Information</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -211,7 +272,7 @@ export default function DashboardClient({
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Quick Actions */}
       <div className="grid md:grid-cols-3 gap-4 mb-8">
@@ -283,13 +344,17 @@ export default function DashboardClient({
             </div>
 
             <div className="space-y-4">
-              {displayAppointments.map((appointment) => {
+              {loadingAppointments ? (
+                <LoadingSection>
+                  Loading your appointments...
+                </LoadingSection>
+              ) : displayAppointments.map((appointment) => {
                 // Extract FHIR appointment data
                 const appointmentStatus = appointment.status;
                 const doctorName = appointment.participant?.find(p => p.actor?.reference?.startsWith('Practitioner/'))?.actor?.display || 'Provider';
                 const appointmentDate = appointment.start;
-                const appointmentTime = appointmentDate ? 
-                  new Date(appointmentDate).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'TBD';
+                const appointmentTime = appointmentDate ? formatTimeForDisplay(appointmentDate) : 'TBD';
+                const appointmentDateDisplay = appointmentDate ? formatDateForDisplay(appointmentDate) : 'TBD';
                 const specialty = appointment.serviceType?.[0]?.text || appointment.serviceType?.[0]?.coding?.[0]?.display || 'General';
                 const location = appointment.participant?.find(p => p.actor?.reference?.startsWith('Location/'))?.actor?.display || 'TBD';
 
@@ -317,10 +382,7 @@ export default function DashboardClient({
                         <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        <span>{appointmentDate ? 
-                          new Date(appointmentDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) :
-                          'TBD'
-                        }</span>
+                        <span>{appointmentDateDisplay}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -359,7 +421,7 @@ export default function DashboardClient({
                 );
               })}
 
-              {displayAppointments.length === 0 && (
+              {!loadingAppointments && displayAppointments.length === 0 && (
                 <div className="text-center py-12">
                   <div className="mb-4">
                     <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
