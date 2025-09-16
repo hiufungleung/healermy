@@ -17,6 +17,7 @@ const config: Config = {
           hover: '#60A5FA',
           active: '#1E40AF',
         },
+        brand: '#2E4EF4',
         danger: {
           DEFAULT: '#EF4444',
           hover: '#DC2626',

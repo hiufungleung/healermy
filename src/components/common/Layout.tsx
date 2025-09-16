@@ -70,10 +70,7 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
               {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
                 <Link href="/" className="flex items-center">
-                  <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center text-white font-bold mr-2">
-                    H
-                  </div>
-                  <span className="text-xl font-semibold">healerMy</span>
+                  <span className="text-2xl font-bold text-brand">HealerMy</span>
                 </Link>
               </div>
               

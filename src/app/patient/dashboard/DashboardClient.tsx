@@ -220,9 +220,6 @@ export default function DashboardClient({
         <h1 className="text-3xl font-bold text-text-primary mb-2">
           Good {greeting}, {patientName}
         </h1>
-        <p className="text-text-secondary">
-          Manage your appointments and health information
-        </p>
       </div>
 
       {/* Patient Information Card */}
