@@ -24,6 +24,16 @@ interface Communication {
   }>;
 }
 
+interface StaticNotification {
+  id: string;
+  type: 'appointment_confirmed' | 'appointment_reminder' | 'test_results' | 'message' | 'system';
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  actionRequired?: boolean;
+}
+
 interface NotificationsClientProps {
   patient: Patient | null;
   communications: Communication[];
@@ -40,6 +50,55 @@ export default function NotificationsClient({
   const [localCommunications, setLocalCommunications] = useState<Communication[]>(communications);
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
   const [selectedMessage, setSelectedMessage] = useState<Communication | null>(null);
+  
+  // Static notifications data
+  const [staticNotifications, setStaticNotifications] = useState<StaticNotification[]>([
+    {
+      id: 'static-1',
+      type: 'appointment_confirmed',
+      title: 'Appointment Confirmed',
+      message: 'Your appointment with Dr. Sarah Johnson on Jan 15, 2025 at 10:30 AM has been confirmed.',
+      timestamp: '2025-01-12T14:30:00Z',
+      read: false,
+      actionRequired: false
+    },
+    {
+      id: 'static-2',
+      type: 'appointment_reminder',
+      title: 'Appointment Reminder',
+      message: 'You have an upcoming appointment with Dr. Michael Chen tomorrow at 2:15 PM.',
+      timestamp: '2025-01-11T09:00:00Z',
+      read: false,
+      actionRequired: false
+    },
+    {
+      id: 'static-3',
+      type: 'test_results',
+      title: 'New Test Results Available',
+      message: 'Your blood test results from your visit on Jan 8 are now available.',
+      timestamp: '2025-01-10T16:45:00Z',
+      read: true,
+      actionRequired: true
+    },
+    {
+      id: 'static-4',
+      type: 'message',
+      title: 'Message from Dr. Rodriguez',
+      message: 'Please schedule a follow-up appointment to discuss your recent test results.',
+      timestamp: '2025-01-09T11:20:00Z',
+      read: false,
+      actionRequired: true
+    },
+    {
+      id: 'static-5',
+      type: 'system',
+      title: 'System Maintenance',
+      message: 'Scheduled maintenance on Jan 15 from 2:00 AM - 4:00 AM. Some features may be temporarily unavailable.',
+      timestamp: '2025-01-08T10:00:00Z',
+      read: true,
+      actionRequired: false
+    }
+  ]);
 
   // Function to check if message is read
   const isMessageRead = (comm: Communication): boolean => {
@@ -93,6 +152,13 @@ export default function NotificationsClient({
     }
   };
 
+  // Function to mark static notification as read
+  const markStaticAsRead = (id: string) => {
+    setStaticNotifications(prev => 
+      prev.map(n => n.id === id ? { ...n, read: true } : n)
+    );
+  };
+
   const markAllAsRead = () => {
     const unreadMessages = localCommunications.filter(comm => !isMessageRead(comm));
     
@@ -108,6 +174,9 @@ export default function NotificationsClient({
         ]
       }))
     );
+
+    // Mark all static notifications as read
+    setStaticNotifications(prev => prev.map(n => ({ ...n, read: true })));
 
     // Mark all as read on server
     unreadMessages.forEach(comm => {
@@ -146,6 +215,52 @@ export default function NotificationsClient({
     setLocalCommunications(localCommunications.filter(n => n.id !== id));
     if (selectedMessage?.id === id) {
       setSelectedMessage(null);
+    }
+  };
+
+  const deleteStaticNotification = (id: string) => {
+    setStaticNotifications(staticNotifications.filter(n => n.id !== id));
+  };
+
+  const getStaticNotificationIcon = (type: StaticNotification['type']) => {
+    switch (type) {
+      case 'appointment_confirmed':
+        return (
+          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        );
+      case 'appointment_reminder':
+        return (
+          <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+        );
+      case 'test_results':
+        return (
+          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        );
+      case 'message':
+        return (
+          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.959 8.959 0 01-2.4-.322C9.584 20.11 8.592 21 7.5 21c-1.162 0-2.5-.897-2.5-2.197 0-.972.826-1.8 1.819-1.8.191 0 .377.021.558.064A6.978 6.978 0 016 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
+          </svg>
+        );
+      case 'system':
+        return (
+          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        );
+      default:
+        return (
+          <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+        );
     }
   };
 
@@ -247,7 +362,7 @@ export default function NotificationsClient({
     }
   };
 
-  // Filter communications
+  // Filter and combine both communication types
   const filteredCommunications = localCommunications.filter(comm => {
     const patientRef = `Patient/${patient?.id}`;
     const isReceived = comm.recipient?.some(r => r.reference === patientRef);
@@ -270,11 +385,44 @@ export default function NotificationsClient({
     }
   });
 
-  const unreadCount = localCommunications.filter(comm => !isMessageRead(comm)).length;
+  const filteredStaticNotifications = staticNotifications.filter(notif => {
+    switch (activeFilter) {
+      case 'unread':
+        return !notif.read;
+      case 'sent':
+        return false; // Static notifications are not "sent" by patient
+      case 'received':
+        return true; // All static notifications are considered received
+      case 'appointments':
+        return notif.type === 'appointment_confirmed' || notif.type === 'appointment_reminder';
+      case 'system':
+        return notif.type === 'system';
+      default:
+        return true;
+    }
+  });
+
+  // Combine and sort all notifications by timestamp
+  const allFilteredItems = [
+    ...filteredCommunications.map(comm => ({ type: 'communication' as const, data: comm })),
+    ...filteredStaticNotifications.map(notif => ({ type: 'static' as const, data: notif }))
+  ].sort((a, b) => {
+    const timeA = a.type === 'communication' ? a.data.sent : a.data.timestamp;
+    const timeB = b.type === 'communication' ? b.data.sent : b.data.timestamp;
+    return new Date(timeB || 0).getTime() - new Date(timeA || 0).getTime();
+  });
+
+  // Combined counts for both dynamic and static data
+  const unreadCount = localCommunications.filter(comm => !isMessageRead(comm)).length + 
+                     staticNotifications.filter(notif => !notif.read).length;
   const sentCount = localCommunications.filter(comm => comm.sender?.reference === `Patient/${patient?.id}`).length;
-  const receivedCount = localCommunications.filter(comm => comm.recipient?.some(r => r.reference === `Patient/${patient?.id}`)).length;
-  const appointmentCount = localCommunications.filter(comm => comm.category?.[0]?.text === 'appointment-update').length;
-  const systemCount = localCommunications.filter(comm => comm.category?.[0]?.text === 'system-notification').length;
+  const receivedCount = localCommunications.filter(comm => comm.recipient?.some(r => r.reference === `Patient/${patient?.id}`)).length +
+                       staticNotifications.length; // Static notifications are considered "received"
+  const appointmentCount = localCommunications.filter(comm => comm.category?.[0]?.text === 'appointment-update').length +
+                          staticNotifications.filter(notif => notif.type === 'appointment_confirmed' || notif.type === 'appointment_reminder').length;
+  const systemCount = localCommunications.filter(comm => comm.category?.[0]?.text === 'system-notification').length +
+                     staticNotifications.filter(notif => notif.type === 'system').length;
+  const totalCount = localCommunications.length + staticNotifications.length;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -312,7 +460,7 @@ export default function NotificationsClient({
         
         <Card padding="sm">
           <div className="text-center">
-            <div className="text-2xl font-bold text-text-primary">{localCommunications.length}</div>
+            <div className="text-2xl font-bold text-text-primary">{totalCount}</div>
             <div className="text-sm text-text-secondary">Total Messages</div>
           </div>
         </Card>
@@ -322,7 +470,7 @@ export default function NotificationsClient({
       <Card className="mb-6">
         <div className="flex flex-wrap gap-2">
           {[
-            { key: 'all', label: 'All', count: localCommunications.length },
+            { key: 'all', label: 'All', count: totalCount },
             { key: 'unread', label: 'Unread', count: unreadCount },
             { key: 'received', label: 'Received', count: receivedCount },
             { key: 'sent', label: 'Sent', count: sentCount },
@@ -346,7 +494,7 @@ export default function NotificationsClient({
 
       {/* Notifications List */}
       <div className="space-y-4">
-        {filteredCommunications.length === 0 ? (
+        {allFilteredItems.length === 0 ? (
           <Card className="text-center py-12">
             <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -354,59 +502,61 @@ export default function NotificationsClient({
             <p className="text-text-secondary">No notifications found</p>
           </Card>
         ) : (
-          filteredCommunications.map((comm) => {
-            const appointmentInfo = getAppointmentInfo(comm);
-            const isExpanded = selectedMessage?.id === comm.id;
+          allFilteredItems.map((item) => {
+            if (item.type === 'communication') {
+              const comm = item.data;
+              const appointmentInfo = getAppointmentInfo(comm);
+              const isExpanded = selectedMessage?.id === comm.id;
             
-            return (
-              <Card 
-                key={comm.id}
-                className={`hover:shadow-md transition-shadow ${
-                  !isMessageRead(comm) ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
-                } ${isExpanded ? 'ring-2 ring-primary/20' : ''}`}
-              >
-                <div 
-                  className="flex items-start space-x-4 cursor-pointer"
-                  onClick={() => handleMessageClick(comm)}
+              return (
+                <Card 
+                  key={comm.id}
+                  className={`hover:shadow-md transition-shadow ${
+                    !isMessageRead(comm) ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
+                  } ${isExpanded ? 'ring-2 ring-primary/20' : ''}`}
                 >
-                  {/* Icon */}
-                  <div className="flex-shrink-0">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
-                      {getNotificationIcon(comm)}
-                    </div>
-                  </div>
-                  
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <h3 className={`font-semibold ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
-                            {getSenderDisplay(comm)}
-                          </h3>
-                          {!isMessageRead(comm) && (
-                            <div className="w-2 h-2 bg-primary rounded-full"></div>
-                          )}
-                          <Badge variant="info" size="sm">
-                            {getCategoryDisplay(comm.category)}
-                          </Badge>
-                          {appointmentInfo && (
-                            <Badge variant="info" size="sm">
-                              Appointment
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-text-secondary text-sm mb-2">
-                          {comm.payload?.[0]?.contentString?.substring(0, 100) || 'No content'}
-                          {(comm.payload?.[0]?.contentString?.length || 0) > 100 && '...'}
-                        </p>
-                        <p className="text-xs text-text-secondary">
-                          {formatDate(comm.sent)}
-                        </p>
+                  <div 
+                    className="flex items-start space-x-4 cursor-pointer"
+                    onClick={() => handleMessageClick(comm)}
+                  >
+                    {/* Icon */}
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
+                        {getNotificationIcon(comm)}
                       </div>
-                      
-                      {/* Actions */}
-                      <div className="flex items-center space-x-2 ml-4">
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <h3 className={`font-semibold ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
+                              {getSenderDisplay(comm)}
+                            </h3>
+                            {!isMessageRead(comm) && (
+                              <div className="w-2 h-2 bg-primary rounded-full"></div>
+                            )}
+                            <Badge variant="info" size="sm">
+                              {getCategoryDisplay(comm.category)}
+                            </Badge>
+                            {appointmentInfo && (
+                              <Badge variant="info" size="sm">
+                                Appointment
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-text-secondary text-sm mb-2">
+                            {comm.payload?.[0]?.contentString?.substring(0, 100) || 'No content'}
+                            {(comm.payload?.[0]?.contentString?.length || 0) > 100 && '...'}
+                          </p>
+                          <p className="text-xs text-text-secondary">
+                            {formatDate(comm.sent)}
+                          </p>
+                        </div>
+                        
+                        {/* Actions */}
+                        <div className="flex items-center space-x-2 ml-4">
                         {!isMessageRead(comm) && (
                           <button
                             onClick={(e) => {
@@ -489,13 +639,111 @@ export default function NotificationsClient({
                   </div>
                 </div>
               </Card>
-            );
+              );
+            } else {
+              // Static notification
+              const notif = item.data;
+              
+              return (
+                <Card 
+                  key={notif.id}
+                  className={`hover:shadow-md transition-shadow ${
+                    !notif.read ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
+                  }`}
+                >
+                  <div className="flex items-start space-x-4">
+                    {/* Icon */}
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
+                        {getStaticNotificationIcon(notif.type)}
+                      </div>
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <h3 className={`font-semibold ${!notif.read ? 'text-text-primary' : 'text-text-secondary'}`}>
+                              {notif.title}
+                            </h3>
+                            {!notif.read && (
+                              <div className="w-2 h-2 bg-primary rounded-full"></div>
+                            )}
+                            {notif.actionRequired && (
+                              <Badge variant="warning" size="sm">
+                                Action Required
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-text-secondary text-sm mb-2">
+                            {notif.message.substring(0, 100)}
+                            {notif.message.length > 100 && '...'}
+                          </p>
+                          <p className="text-xs text-text-secondary">
+                            {formatDate(notif.timestamp)}
+                          </p>
+                        </div>
+                        
+                        {/* Actions */}
+                        <div className="flex items-center space-x-2 ml-4">
+                          {!notif.read && (
+                            <button
+                              onClick={() => markStaticAsRead(notif.id)}
+                              className="text-sm text-primary hover:underline"
+                            >
+                              Mark as Read
+                            </button>
+                          )}
+                          <button
+                            onClick={() => deleteStaticNotification(notif.id)}
+                            className="text-sm text-text-secondary hover:text-red-600"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Full message content */}
+                      <div className="mt-3">
+                        <p className="text-text-primary text-sm leading-relaxed">
+                          {notif.message}
+                        </p>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      {notif.actionRequired && (
+                        <div className="pt-3 border-t border-gray-100 mt-3">
+                          <div className="flex flex-wrap gap-2">
+                            {notif.type === 'test_results' && (
+                              <Button variant="primary" size="sm">
+                                View Results
+                              </Button>
+                            )}
+                            {notif.type === 'message' && (
+                              <>
+                                <Button variant="primary" size="sm">
+                                  Book Follow-up
+                                </Button>
+                                <Button variant="outline" size="sm">
+                                  Reply
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              );
+            }
           })
         )}
       </div>
 
       {/* Load More */}
-      {filteredCommunications.length > 0 && (
+      {allFilteredItems.length > 0 && (
         <div className="text-center mt-8">
           <Button variant="outline">
             Load More Notifications
