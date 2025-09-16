@@ -310,6 +310,39 @@ export default function NotificationsClient({
     }
   };
 
+  const getMessageTitle = (comm: Communication) => {
+    const category = comm.category?.[0]?.text;
+    const content = comm.payload?.[0]?.contentString || '';
+    
+    // First check content for common patterns regardless of category
+    if (content.toLowerCase().includes('confirmed') || content.toLowerCase().includes('approved')) {
+      return 'Appointment Confirmed';
+    } else if (content.toLowerCase().includes('cancelled') || content.toLowerCase().includes('canceled')) {
+      return 'Appointment Cancelled';
+    } else if (content.toLowerCase().includes('reschedule') || content.toLowerCase().includes('rescheduled')) {
+      return 'Appointment Rescheduled';
+    } else if (content.toLowerCase().includes('reminder')) {
+      return 'Appointment Reminder';
+    } else if (content.toLowerCase().includes('test result') || content.toLowerCase().includes('lab result')) {
+      return 'Test Results Available';
+    } else if (content.toLowerCase().includes('prescription') || content.toLowerCase().includes('medication')) {
+      return 'Prescription Update';
+    }
+    
+    // Then check by category
+    switch (category) {
+      case 'appointment-update':
+        return 'Appointment Update';
+      case 'manual-message':
+        return 'Message from Provider';
+      case 'system-notification':
+        return 'System Notification';
+      default:
+        // If no specific content pattern and unknown category, return a generic title
+        return 'Healthcare Message';
+    }
+  };
+
   const getCategoryDisplay = (category?: Array<{ text?: string }>) => {
     if (!category?.[0]?.text) return 'Message';
     
@@ -530,21 +563,21 @@ export default function NotificationsClient({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <h3 className={`font-semibold ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
-                              {getSenderDisplay(comm)}
-                            </h3>
-                            {!isMessageRead(comm) && (
-                              <div className="w-2 h-2 bg-primary rounded-full"></div>
-                            )}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <h3 className={`font-semibold ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
+                                {getMessageTitle(comm)}
+                              </h3>
+                              {!isMessageRead(comm) && (
+                                <div className="w-2 h-2 bg-primary rounded-full"></div>
+                              )}
+                            </div>
                             <Badge variant="info" size="sm">
                               {getCategoryDisplay(comm.category)}
                             </Badge>
-                            {appointmentInfo && (
-                              <Badge variant="info" size="sm">
-                                Appointment
-                              </Badge>
-                            )}
+                          </div>
+                          <div className="text-sm text-text-secondary mb-2">
+                            From: {getSenderDisplay(comm)}
                           </div>
                           <p className="text-text-secondary text-sm mb-2">
                             {comm.payload?.[0]?.contentString?.substring(0, 100) || 'No content'}
