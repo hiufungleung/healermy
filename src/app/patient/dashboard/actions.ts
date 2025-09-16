@@ -6,7 +6,7 @@ import { searchAppointments } from '@/app/api/fhir/appointments/operations';
 import type { Patient, Appointment } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
 
-// Fast server action that only gets basic session data for immediate page render
+// Server action that gets session data and real patient name for immediate page render
 export async function getBasicSessionData(): Promise<{
   session: AuthSession | null;
   patientName: string;
@@ -36,14 +36,25 @@ export async function getBasicSessionData(): Promise<{
       };
     }
 
-    // Try to get patient name quickly from session if available
-    let patientName = 'Patient';
+    // Fetch real patient name from FHIR API for immediate display
+    let patientName = `Patient ${session.patient}`; // Fallback
 
-    // If session has cached patient name, use it for immediate display
-    if (session.user?.name) {
-      patientName = session.user.name;
-    } else if (session.patient) {
-      patientName = `Patient ${session.patient}`;
+    try {
+      console.log('Fetching patient name for immediate display...');
+      const patientData = await getPatient(session.accessToken, session.fhirBaseUrl, session.patient);
+
+      if (patientData?.name?.[0]) {
+        const given = patientData.name[0]?.given?.join(' ') || '';
+        const family = patientData.name[0]?.family || '';
+        const fullName = `${given} ${family}`.trim();
+        if (fullName) {
+          patientName = fullName;
+          console.log('✅ Got real patient name:', fullName);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching patient name (using fallback):', error);
+      // Keep fallback name, don't fail the entire request
     }
 
     return {
