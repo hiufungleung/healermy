@@ -5,10 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
-import { receiveBookingRequests } from '@/library/sqs/client';
-import type { BookingRequest } from '@/types/sqs';
 import type { AuthSession } from '@/types/auth';
-import type { Practitioner } from '@/types/fhir';
+import type { Practitioner, Appointment } from '@/types/fhir';
 
 interface AppointmentSummary {
   total: number;
@@ -40,98 +38,126 @@ export default function ProviderDashboardClient({
 }: ProviderDashboardClientProps) {
   const router = useRouter();
   
-  const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([]);
+  const [pendingAppointments, setPendingAppointments] = useState<Appointment[]>([]);
   const [appointments, setAppointments] = useState<AppointmentSummary>({
-    total: 12,
-    today: 8,
-    upcoming: 15,
-    pending: 3
+    total: 0,
+    today: 0,
+    upcoming: 0,
+    pending: 0
   });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchBookingRequests();
+    fetchAppointmentData();
   }, []);
 
-  const fetchBookingRequests = async () => {
+  const fetchAppointmentData = async () => {
     setLoading(true);
     try {
-      const requests = await receiveBookingRequests();
-      setBookingRequests(requests.slice(0, 3)); // Show first 3 for dashboard
+      // Fetch all appointments to get real statistics
+      const today = new Date().toISOString().split('T')[0];
+      const weekFromNow = new Date();
+      weekFromNow.setDate(weekFromNow.getDate() + 7);
+      const weekEnd = weekFromNow.toISOString().split('T')[0];
+
+      const [allAppointmentsResponse, pendingAppointmentsResponse, todayAppointmentsResponse] = await Promise.all([
+        fetch(`/api/fhir/appointments?date-from=${today}&date-to=${weekEnd}`, {
+          credentials: 'include',
+        }),
+        fetch(`/api/fhir/appointments?status=pending&_count=5`, {
+          credentials: 'include',
+        }),
+        fetch(`/api/fhir/appointments?date=${today}&_count=20`, {
+          credentials: 'include',
+        })
+      ]);
+
+      if (allAppointmentsResponse.ok) {
+        const allData = await allAppointmentsResponse.json();
+        const allAppointments = allData.appointments?.entry?.map((entry: any) => entry.resource) || [];
+        
+        // Calculate statistics
+        const todayCount = allAppointments.filter((apt: Appointment) => 
+          apt.start?.startsWith(today)
+        ).length;
+        
+        const upcomingCount = allAppointments.filter((apt: Appointment) => {
+          const aptDate = apt.start?.split('T')[0];
+          return aptDate && aptDate > today;
+        }).length;
+
+        setAppointments({
+          total: allAppointments.length,
+          today: todayCount,
+          upcoming: upcomingCount,
+          pending: 0 // Will be updated from pending response
+        });
+      }
+
+      if (pendingAppointmentsResponse.ok) {
+        const pendingData = await pendingAppointmentsResponse.json();
+        const pendingAppts = pendingData.appointments?.entry?.map((entry: any) => entry.resource) || [];
+        setPendingAppointments(pendingAppts.slice(0, 3)); // Show first 3 for dashboard
+        
+        // Update pending count
+        setAppointments(prev => ({ ...prev, pending: pendingAppts.length }));
+      }
+
+      if (todayAppointmentsResponse.ok) {
+        const todayData = await todayAppointmentsResponse.json();
+        const todayAppts = todayData.appointments?.entry?.map((entry: any) => entry.resource) || [];
+        // Sort by start time and take first 4 for dashboard
+        const sortedTodayAppts = todayAppts
+          .filter((apt: Appointment) => apt.start)
+          .sort((a: Appointment, b: Appointment) => 
+            new Date(a.start!).getTime() - new Date(b.start!).getTime()
+          )
+          .slice(0, 4);
+        setTodayAppointments(sortedTodayAppts);
+      }
     } catch (error) {
-      console.error('Error fetching booking requests:', error);
-      // Use mock data for demo
-      setBookingRequests(mockBookingRequests);
+      console.error('Error fetching appointment data:', error);
+      // Keep default values on error
     } finally {
       setLoading(false);
     }
   };
 
-  // Mock data for demo
-  const mockBookingRequests: BookingRequest[] = [
-    {
-      requestId: 'req-001',
-      patientId: 'patient-123',
-      practitionerId: session?.user || 'prac-001',
-      slotStart: '2025-01-15T10:30:00',
-      slotEnd: '2025-01-15T11:00:00',
-      reasonText: 'Follow-up for thyroid condition and fatigue symptoms',
-      timestamp: '2025-01-12T09:15:00Z'
-    },
-    {
-      requestId: 'req-002',
-      patientId: 'patient-456',
-      practitionerId: session?.user || 'prac-001',
-      slotStart: '2025-01-16T14:00:00',
-      slotEnd: '2025-01-16T14:30:00',
-      reasonText: 'Annual check-up and blood pressure monitoring',
-      timestamp: '2025-01-12T11:30:00Z'
-    },
-    {
-      requestId: 'req-003',
-      patientId: 'patient-789',
-      practitionerId: session?.user || 'prac-001',
-      slotStart: '2025-01-17T09:00:00',
-      slotEnd: '2025-01-17T09:30:00',
-      reasonText: 'Chest pain and irregular heartbeat concerns',
-      timestamp: '2025-01-12T14:45:00Z'
-    }
-  ];
+  const getPatientFromAppointment = (appointment: Appointment) => {
+    const patientParticipant = appointment.participant?.find(p => 
+      p.actor?.reference?.startsWith('Patient/')
+    );
+    return patientParticipant?.actor?.display || 'Patient';
+  };
 
-  const todayAppointments = [
-    {
-      id: '1',
-      time: '9:00 AM',
-      patientName: 'Sarah Mitchell',
-      type: 'Follow-up',
-      status: 'confirmed',
-      duration: '30 min'
-    },
-    {
-      id: '2',
-      time: '10:30 AM',
-      patientName: 'John Davis',
-      type: 'New Patient',
-      status: 'confirmed',
-      duration: '45 min'
-    },
-    {
-      id: '3',
-      time: '2:15 PM',
-      patientName: 'Maria Rodriguez',
-      type: 'Check-up',
-      status: 'confirmed',
-      duration: '30 min'
-    },
-    {
-      id: '4',
-      time: '3:45 PM',
-      patientName: 'James Wilson',
-      type: 'Consultation',
-      status: 'pending',
-      duration: '30 min'
-    }
-  ];
+  const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
+
+  const formatDateTime = (isoString: string) => {
+    return new Date(isoString).toLocaleString('en-AU', {
+      timeZone: 'Australia/Brisbane',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatTime = (isoString: string) => {
+    return new Date(isoString).toLocaleString('en-AU', {
+      timeZone: 'Australia/Brisbane',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const getAppointmentDuration = (start: string, end: string) => {
+    const startTime = new Date(start);
+    const endTime = new Date(end);
+    const diffMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
+    return `${diffMinutes} min`;
+  };
 
   const patientAlerts: PatientAlert[] = [
     {
@@ -261,20 +287,33 @@ export default function ProviderDashboardClient({
                 >
                   <div className="flex items-center space-x-4">
                     <div className="text-center min-w-[80px]">
-                      <div className="font-semibold text-primary">{appointment.time}</div>
-                      <div className="text-xs text-text-secondary">{appointment.duration}</div>
+                      <div className="font-semibold text-primary">
+                        {appointment.start ? formatTime(appointment.start) : 'TBD'}
+                      </div>
+                      <div className="text-xs text-text-secondary">
+                        {appointment.start && appointment.end 
+                          ? getAppointmentDuration(appointment.start, appointment.end)
+                          : '30 min'
+                        }
+                      </div>
                     </div>
                     <div>
-                      <h3 className="font-semibold">{appointment.patientName}</h3>
-                      <p className="text-sm text-text-secondary">{appointment.type}</p>
+                      <h3 className="font-semibold">{getPatientFromAppointment(appointment)}</h3>
+                      <p className="text-sm text-text-secondary">
+                        {appointment.reasonCode?.[0]?.text || appointment.description || 'Appointment'}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
                     <Badge 
-                      variant={appointment.status === 'confirmed' ? 'success' : 'warning'} 
+                      variant={
+                        appointment.status === 'booked' || appointment.status === 'fulfilled' ? 'success' : 
+                        appointment.status === 'pending' || appointment.status === 'proposed' ? 'warning' :
+                        appointment.status === 'cancelled' || appointment.status === 'noshow' ? 'danger' : 'info'
+                      } 
                       size="sm"
                     >
-                      {appointment.status}
+                      {appointment.status === 'booked' ? 'confirmed' : appointment.status}
                     </Badge>
                     <Button variant="outline" size="sm">
                       View
@@ -294,48 +333,43 @@ export default function ProviderDashboardClient({
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* New Booking Requests */}
+          {/* Pending Appointments */}
           <Card>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold">New Booking Requests</h3>
+              <h3 className="font-semibold">Pending Appointments</h3>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => router.push('/provider/booking-queue')}
+                onClick={() => router.push('/provider/appointments/pending')}
               >
-                View Queue
+                View All
               </Button>
             </div>
 
             <div className="space-y-3">
-              {bookingRequests.map((request) => (
+              {pendingAppointments.map((appointment) => (
                 <div
-                  key={request.requestId}
+                  key={appointment.id}
                   className="p-3 border rounded-lg bg-yellow-50 border-yellow-200"
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <div className="font-medium text-sm">Patient ID: {request.patientId}</div>
+                    <div className="font-medium text-sm">{getPatientFromAppointment(appointment)}</div>
                     <div className="text-xs text-text-secondary">
-                      {new Date(request.timestamp).toLocaleTimeString()}
+                      {appointment.meta?.lastUpdated ? formatDateTime(appointment.meta.lastUpdated) : ''}
                     </div>
                   </div>
                   <p className="text-sm text-text-secondary mb-2">
-                    {new Date(request.slotStart).toLocaleDateString()} at{' '}
-                    {new Date(request.slotStart).toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true
-                    })}
+                    {appointment.start ? formatDateTime(appointment.start) : 'Time TBD'}
                   </p>
                   <p className="text-xs text-text-secondary line-clamp-2">
-                    {request.reasonText}
+                    {appointment.description || appointment.reasonCode?.[0]?.text || 'No reason provided'}
                   </p>
                 </div>
               ))}
 
-              {bookingRequests.length === 0 && !loading && (
+              {pendingAppointments.length === 0 && !loading && (
                 <div className="text-center py-4">
-                  <p className="text-sm text-text-secondary">No new booking requests</p>
+                  <p className="text-sm text-text-secondary">No pending appointments</p>
                 </div>
               )}
             </div>
@@ -391,9 +425,9 @@ export default function ProviderDashboardClient({
               <Button
                 variant="outline"
                 fullWidth
-                onClick={() => router.push('/provider/booking-queue')}
+                onClick={() => router.push('/provider/appointments/pending')}
               >
-                📋 Review Booking Queue
+                📋 Review Pending Requests
               </Button>
               <Button
                 variant="outline"

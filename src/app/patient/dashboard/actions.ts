@@ -57,7 +57,7 @@ export async function getDashboardData(): Promise<{
 
     // Try to fetch appointments, but don't fail if this doesn't work
     try {
-      appointmentData = await searchAppointments(
+      const appointmentBundle = await searchAppointments(
         session.accessToken, 
         session.fhirBaseUrl, 
         session.patient,
@@ -66,6 +66,11 @@ export async function getDashboardData(): Promise<{
         undefined, // dateFrom (will use default)
         undefined  // dateTo (will use default)
       );
+      
+      // Extract appointments from Bundle
+      if (appointmentBundle?.entry) {
+        appointmentData = appointmentBundle.entry.map((entry: any) => entry.resource).filter(Boolean);
+      }
     } catch (error) {
       console.error('Error fetching appointments (will use mock data):', error);
       // Don't return error here - just use empty appointments array

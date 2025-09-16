@@ -1,4 +1,5 @@
 import { FHIRClient } from '../client';
+import { manageSlotStatusForAppointment } from '../slots/operations';
 
 /**
  * Search appointments by various parameters
@@ -9,7 +10,10 @@ export async function searchAppointments(
   fhirBaseUrl: string,
   patientId?: string,
   practitionerId?: string,
-  status?: string,
+  options?: string | {
+    status?: string;
+    _count?: number;
+  },
   dateFrom?: string,
   dateTo?: string
 ): Promise<any> {
@@ -17,48 +21,66 @@ export async function searchAppointments(
   
   if (patientId) queryParams.append('patient', patientId);
   if (practitionerId) queryParams.append('practitioner', practitionerId);
+  
+  // Handle backward compatibility: options can be a string (old status param) or object
+  let status: string | undefined;
+  let count: number | undefined;
+  
+  if (typeof options === 'string') {
+    // Legacy usage: third parameter is status string
+    status = options;
+  } else if (options && typeof options === 'object') {
+    // New usage: third parameter is options object
+    status = options.status;
+    count = options._count;
+  }
+  
   if (status) queryParams.append('status', status);
+  if (count) queryParams.append('_count', count.toString());
   
   // FHIR requires date parameters with time component and timezone (per swagger.json)
   if (dateFrom) {
     // If dateFrom provided, ensure it has time component
     const fromDate = dateFrom.includes('T') ? dateFrom : `${dateFrom}T00:00:00.000Z`;
     queryParams.append('date', `ge${fromDate}`);
+    
+    if (dateTo) {
+      // If dateTo also provided, add upper bound
+      const toDate = dateTo.includes('T') ? dateTo : `${dateTo}T23:59:59.999Z`;
+      queryParams.append('date', `le${toDate}`);
+    }
   } else {
-    // Default to appointments from 30 days ago at start of day
+    // Default to appointments from 30 days ago at start of day to 90 days in future
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     thirtyDaysAgo.setHours(0, 0, 0, 0);
     queryParams.append('date', `ge${thirtyDaysAgo.toISOString()}`);
-  }
-  
-  if (dateTo) {
-    // If dateTo provided, ensure it has time component
-    const toDate = dateTo.includes('T') ? dateTo : `${dateTo}T23:59:59.999Z`;
-    queryParams.append('date', `lt${toDate}`);
-  } else {
-    // Default to appointments up to 90 days in the future at end of day
+    
     const ninetyDaysFromNow = new Date();
     ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
     ninetyDaysFromNow.setHours(23, 59, 59, 999);
-    queryParams.append('date', `lt${ninetyDaysFromNow.toISOString()}`);
+    queryParams.append('date', `le${ninetyDaysFromNow.toISOString()}`);
   }
   
   const url = `${fhirBaseUrl}/Appointment?${queryParams.toString()}`;
   const response = await FHIRClient.fetchWithAuth(url, token);
   const bundle = await response.json();
   
-  // Extract appointments from FHIR Bundle
-  if (bundle.resourceType === 'Bundle' && bundle.entry) {
-    return bundle.entry.map((entry: any) => entry.resource).filter((resource: any) => resource);
+  // Return the full FHIR Bundle structure
+  // Some callers expect `result.entry`, others expect the resources directly
+  if (bundle.resourceType === 'Bundle') {
+    return bundle;
   }
   
-  // Fallback to empty array if no valid bundle structure
-  return [];
+  // Fallback to empty Bundle if no valid bundle structure
+  return {
+    resourceType: 'Bundle',
+    entry: []
+  };
 }
 
 /**
- * Create a new appointment
+ * Create a new appointment and manage slot status
  */
 export async function createAppointment(
   token: string,
@@ -70,22 +92,49 @@ export async function createAppointment(
     method: 'POST',
     body: JSON.stringify(appointmentData),
   });
-  return response.json();
+  
+  const result = await response.json();
+  
+  // Automatically manage slot status based on appointment status
+  if (response.ok) {
+    try {
+      await manageSlotStatusForAppointment(token, fhirBaseUrl, appointmentData, undefined, appointmentData.status);
+    } catch (slotError) {
+      console.warn('Failed to update slot status after appointment creation:', slotError);
+      // Don't fail the appointment creation if slot update fails
+    }
+  }
+  
+  return result;
 }
 
 /**
- * Update an appointment
+ * Update an appointment and manage slot status
  */
 export async function updateAppointment(
   token: string,
   fhirBaseUrl: string,
   appointmentId: string,
-  appointmentData: any
+  appointmentData: any,
+  oldStatus?: string
 ): Promise<any> {
   const url = `${fhirBaseUrl}/Appointment/${appointmentId}`;
   const response = await FHIRClient.fetchWithAuth(url, token, {
     method: 'PUT',
     body: JSON.stringify(appointmentData),
   });
-  return response.json();
+  
+  const result = await response.json();
+  
+  // Automatically manage slot status based on appointment status changes
+  if (response.ok) {
+    try {
+      await manageSlotStatusForAppointment(token, fhirBaseUrl, appointmentData, oldStatus, appointmentData.status);
+    } catch (slotError) {
+      console.warn('Failed to update slot status after appointment update:', slotError);
+      // Don't fail the appointment update if slot update fails
+    }
+  }
+  
+  return result;
 }

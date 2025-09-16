@@ -111,6 +111,151 @@ export async function deleteSlot(
 }
 
 /**
+ * Update slot status using PATCH (Oracle FHIR compliant)
+ * Uses official FHIR R4 slot status codes from https://hl7.org/fhir/valueset-slotstatus.html
+ */
+export async function updateSlotStatus(
+  token: string,
+  fhirBaseUrl: string,
+  slotId: string,
+  status: 'busy' | 'free' | 'busy-unavailable' | 'busy-tentative' | 'entered-in-error'
+): Promise<any> {
+  const patchOperations = [
+    {
+      op: 'replace',
+      path: '/status',
+      value: status
+    }
+  ];
+
+  return patchSlot(token, fhirBaseUrl, slotId, patchOperations);
+}
+
+/**
+ * Extract slot references from appointment
+ */
+export function extractSlotReferences(appointment: any): string[] {
+  const slotIds: string[] = [];
+  
+  // Check direct slot reference array
+  if (appointment.slot && Array.isArray(appointment.slot)) {
+    appointment.slot.forEach((slotRef: any) => {
+      if (slotRef.reference && slotRef.reference.startsWith('Slot/')) {
+        slotIds.push(slotRef.reference.replace('Slot/', ''));
+      }
+    });
+  }
+
+  // Check extensions for slot references
+  if (appointment.extension && Array.isArray(appointment.extension)) {
+    appointment.extension.forEach((ext: any) => {
+      if (ext.valueReference && ext.valueReference.reference?.startsWith('Slot/')) {
+        slotIds.push(ext.valueReference.reference.replace('Slot/', ''));
+      }
+    });
+  }
+
+  return slotIds;
+}
+
+/**
+ * Automatically manage slot status based on appointment status
+ * This is the main function that should be called for all appointment changes
+ */
+export async function manageSlotStatusForAppointment(
+  token: string,
+  fhirBaseUrl: string,
+  appointment: any,
+  oldStatus?: string,
+  newStatus?: string
+): Promise<void> {
+  const slotIds = extractSlotReferences(appointment);
+  if (slotIds.length === 0) {
+    // No slots to manage - exit gracefully
+    return;
+  }
+
+  const currentStatus = newStatus || appointment.status;
+  
+  // Determine what slot status should be based on appointment status
+  const targetSlotStatus = getSlotStatusFromAppointmentStatus(currentStatus);
+  const oldSlotStatus = oldStatus ? getSlotStatusFromAppointmentStatus(oldStatus) : null;
+  
+  // Only update if slot status actually needs to change
+  if (oldSlotStatus !== targetSlotStatus) {
+    for (const slotId of slotIds) {
+      try {
+        await updateSlotStatus(token, fhirBaseUrl, slotId, targetSlotStatus);
+        console.log(`Updated slot ${slotId} from ${oldSlotStatus} to ${targetSlotStatus} (appointment ${appointment.id}: ${oldStatus} -> ${currentStatus})`);
+      } catch (error) {
+        console.error(`Failed to update slot ${slotId} status:`, error);
+        // Continue with other slots even if one fails
+      }
+    }
+  }
+}
+
+/**
+ * Determine slot status based on appointment status
+ * Maps FHIR appointment statuses to official FHIR R4 slot statuses
+ * Reference: https://hl7.org/fhir/valueset-slotstatus.html
+ */
+function getSlotStatusFromAppointmentStatus(appointmentStatus: string): 'busy' | 'free' | 'busy-unavailable' | 'busy-tentative' | 'entered-in-error' {
+  switch (appointmentStatus) {
+    // busy: Indicates that the time interval is busy because one or more events have been scheduled
+    case 'pending':     // BUSY to prevent double-booking while awaiting approval
+    case 'booked':      // Confirmed appointment
+    case 'arrived':     // Patient has arrived
+    case 'checked-in':  // Patient checked in
+    case 'fulfilled':   // Appointment completed
+      return 'busy';
+    
+    // busy-tentative: Indicates that the time interval is busy because one or more events have been tentatively scheduled
+    case 'proposed':
+      return 'busy-tentative';
+    
+    // free: Indicates that the time interval is free for scheduling
+    case 'cancelled':   // Appointment cancelled
+    case 'noshow':      // Patient didn't show
+    case 'waitlist':    // On waitlist
+      return 'free';
+    
+    // entered-in-error: This instance should not have been part of this patient's medical record
+    case 'entered-in-error':
+      return 'entered-in-error';
+    
+    // Default to busy for unknown statuses (safer approach to prevent double-booking)
+    default:
+      console.warn(`Unknown appointment status: ${appointmentStatus}, defaulting slot to busy for safety`);
+      return 'busy';
+  }
+}
+
+/**
+ * Mark slots as busy when appointment is created/confirmed
+ * @deprecated Use manageSlotStatusForAppointment instead
+ */
+export async function markSlotsAsBusy(
+  token: string,
+  fhirBaseUrl: string,
+  appointment: any
+): Promise<void> {
+  return manageSlotStatusForAppointment(token, fhirBaseUrl, appointment);
+}
+
+/**
+ * Mark slots as free when appointment is cancelled  
+ * @deprecated Use manageSlotStatusForAppointment instead
+ */
+export async function markSlotsAsFree(
+  token: string,
+  fhirBaseUrl: string,
+  appointment: any
+): Promise<void> {
+  return manageSlotStatusForAppointment(token, fhirBaseUrl, appointment);
+}
+
+/**
  * Generate slots from a schedule
  * This is a utility function to create multiple slots based on a schedule pattern
  */

@@ -9,8 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@aws-sdk/client-sqs": "^3.883.0",
-    "@aws-sdk/types": "^3.862.0",
     "clsx": "^2.1.1",
     "fhirclient": "^2.6.0",
     "js-cookie": "^3.0.5",

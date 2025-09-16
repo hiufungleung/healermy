@@ -7,436 +7,386 @@ import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { searchAppointments, updateAppointment } from '@/app/api/fhir/appointments/operations';
 import type { Appointment } from '@/types/fhir';
 
-interface AppointmentWithPatient extends Appointment {
-  patientName?: string;
-  patientPhone?: string;
-  patientEmail?: string;
+interface AppointmentStats {
+  total: number;
+  today: number;
+  pending: number;
+  upcoming: number;
 }
 
 export default function ProviderAppointments() {
   const router = useRouter();
   const { session } = useAuth();
   
-  const [appointments, setAppointments] = useState<AppointmentWithPatient[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [stats, setStats] = useState<AppointmentStats>({ total: 0, today: 0, pending: 0, upcoming: 0 });
   const [loading, setLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
   });
-  const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'confirmed' | 'pending'>('today');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   useEffect(() => {
     fetchAppointments();
-  }, [selectedDate]);
+    fetchStats();
+  }, [selectedDate, statusFilter]);
+
+  const fetchStats = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const weekEnd = new Date();
+      weekEnd.setDate(weekEnd.getDate() + 7);
+      
+      const [allResponse, pendingResponse] = await Promise.all([
+        fetch(`/api/fhir/appointments?date-from=${today}&date-to=${weekEnd.toISOString().split('T')[0]}`, {
+          credentials: 'include',
+        }),
+        fetch(`/api/fhir/appointments?status=pending&_count=100`, {
+          credentials: 'include',
+        })
+      ]);
+
+      if (allResponse.ok) {
+        const allData = await allResponse.json();
+        const allAppts = allData.appointments?.entry?.map((e: any) => e.resource) || [];
+        
+        const todayCount = allAppts.filter((apt: Appointment) => 
+          apt.start?.startsWith(today)
+        ).length;
+        
+        const upcomingCount = allAppts.filter((apt: Appointment) => {
+          const aptDate = apt.start?.split('T')[0];
+          return aptDate && aptDate > today;
+        }).length;
+        
+        setStats(prev => ({
+          ...prev,
+          total: allAppts.length,
+          today: todayCount,
+          upcoming: upcomingCount
+        }));
+      }
+
+      if (pendingResponse.ok) {
+        const pendingData = await pendingResponse.json();
+        const pendingAppts = pendingData.appointments?.entry?.map((e: any) => e.resource) || [];
+        setStats(prev => ({ ...prev, pending: pendingAppts.length }));
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
 
   const fetchAppointments = async () => {
-    if (!session?.accessToken || !session?.practitionerId) return;
+    if (!session?.accessToken) return;
     
     setLoading(true);
     try {
-      const startDate = new Date(selectedDate);
-      startDate.setHours(0, 0, 0, 0);
+      const queryParams = new URLSearchParams({
+        'date-from': selectedDate,
+        'date-to': selectedDate,
+        '_count': '50'
+      });
       
-      const endDate = new Date(selectedDate);
-      if (filter === 'week') {
-        endDate.setDate(endDate.getDate() + 7);
+      if (statusFilter !== 'all') {
+        queryParams.append('status', statusFilter);
       }
-      endDate.setHours(23, 59, 59, 999);
 
-      const fetchedAppointments = await searchAppointments(
-        session.accessToken,
-        session.fhirBaseUrl,
-        undefined, // patientId
-        session.practitionerId, // practitionerId
-        undefined, // status
-        startDate.toISOString().split('T')[0], // dateFrom (date only)
-        endDate.toISOString().split('T')[0]    // dateTo (date only)
-      );
+      const response = await fetch(`/api/fhir/appointments?${queryParams.toString()}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch appointments: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      const fetchedAppointments = data.appointments?.entry 
+        ? data.appointments.entry.map((entry: any) => entry.resource).filter(Boolean)
+        : [];
+      
+      // Sort by start time
+      fetchedAppointments.sort((a: Appointment, b: Appointment) => {
+        if (!a.start || !b.start) return 0;
+        return new Date(a.start).getTime() - new Date(b.start).getTime();
+      });
       
       setAppointments(fetchedAppointments);
     } catch (error) {
       console.error('Error fetching appointments:', error);
-      // Use mock data for demo
-      setAppointments(mockAppointments);
+      setAppointments([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleStatusUpdate = async (appointmentId: string, newStatus: Appointment['status']) => {
-    if (!session?.accessToken) return;
-    
-    try {
-      const appointment = appointments.find(a => a.id === appointmentId);
-      if (!appointment) return;
-
-      const updatedAppointment = { ...appointment, status: newStatus };
-      await updateAppointment(session.accessToken, session.fhirBaseUrl, appointmentId, updatedAppointment);
-      
-      setAppointments(prev => prev.map(a => 
-        a.id === appointmentId ? { ...a, status: newStatus } : a
-      ));
-      
-      alert(`Appointment ${newStatus} successfully`);
-    } catch (error) {
-      console.error('Error updating appointment:', error);
-      alert('Failed to update appointment status');
-    }
+  const getPatientName = (appointment: Appointment) => {
+    const patientParticipant = appointment.participant?.find(p => 
+      p.actor?.reference?.startsWith('Patient/')
+    );
+    return patientParticipant?.actor?.display || 'Unknown Patient';
   };
 
-  const handleViewPreVisit = (appointmentId: string) => {
-    router.push(`/patient/pre-visit/${appointmentId}`);
+  const getPractitionerName = (appointment: Appointment) => {
+    const practitionerParticipant = appointment.participant?.find(p => 
+      p.actor?.reference?.startsWith('Practitioner/')
+    );
+    return practitionerParticipant?.actor?.display || 'Unknown Practitioner';
   };
 
-  const getStatusVariant = (status: Appointment['status']) => {
-    switch (status) {
-      case 'booked':
-      case 'arrived':
-        return 'success';
-      case 'pending':
-        return 'warning';
-      case 'cancelled':
-      case 'noshow':
-        return 'danger';
-      case 'fulfilled':
-        return 'info';
-      default:
-        return 'info';
-    }
-  };
-
-  const getTimeSlots = (date: string) => {
-    const slots = [];
-    const startHour = 9;
-    const endHour = 17;
-    
-    for (let hour = startHour; hour < endHour; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const timeSlot = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        slots.push(timeSlot);
-      }
-    }
-    
-    return slots;
-  };
-
-  const getAppointmentForSlot = (date: string, time: string) => {
-    return appointments.find(apt => {
-      if (!apt.start) return false;
-      const aptDate = new Date(apt.start);
-      const aptTime = aptDate.toTimeString().substring(0, 5);
-      const aptDateString = aptDate.toISOString().split('T')[0];
-      return aptDateString === date && aptTime === time;
+  const formatDateTime = (isoString: string) => {
+    return new Date(isoString).toLocaleString('en-AU', {
+      timeZone: 'Australia/Brisbane',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
     });
   };
 
-  const filteredAppointments = appointments.filter(appointment => {
-    if (!appointment.start) return false;
-    
-    const aptDate = new Date(appointment.start);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    switch (filter) {
-      case 'today':
-        return aptDate.toDateString() === today.toDateString();
-      case 'week':
-        const weekFromNow = new Date(today);
-        weekFromNow.setDate(weekFromNow.getDate() + 7);
-        return aptDate >= today && aptDate <= weekFromNow;
-      case 'confirmed':
-        return appointment.status === 'booked' || appointment.status === 'arrived';
+  const formatDuration = (start: string, end: string) => {
+    const startTime = new Date(start);
+    const endTime = new Date(end);
+    const diffMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
+    return `${diffMinutes}min`;
+  };
+
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case 'booked':
+      case 'fulfilled':
+        return 'success';
       case 'pending':
-        return appointment.status === 'pending';
+      case 'proposed':
+        return 'warning';
+      case 'cancelled':
+      case 'noshow':
+      case 'entered-in-error':
+        return 'danger';
+      case 'arrived':
+      case 'checked-in':
+        return 'info';
       default:
-        return true;
+        return 'info';
     }
-  });
+  };
 
-  // Mock data for demo
-  const mockAppointments: AppointmentWithPatient[] = [
-    {
-      resourceType: 'Appointment',
-      id: '1',
-      status: 'booked',
-      start: `${selectedDate}T09:00:00`,
-      end: `${selectedDate}T09:30:00`,
-      participant: [
-        { actor: { reference: 'Patient/patient-123' }, status: 'accepted' }
-      ],
-      reasonCode: [{ text: 'Follow-up for thyroid condition' }],
-      patientName: 'Sarah Mitchell',
-      patientPhone: '+61 2 9999 1234',
-      patientEmail: 'sarah@email.com'
-    },
-    {
-      resourceType: 'Appointment',
-      id: '2',
-      status: 'booked',
-      start: `${selectedDate}T10:30:00`,
-      end: `${selectedDate}T11:00:00`,
-      participant: [
-        { actor: { reference: 'Patient/patient-456' }, status: 'accepted' }
-      ],
-      reasonCode: [{ text: 'Annual check-up' }],
-      patientName: 'John Davis',
-      patientPhone: '+61 2 9999 5678',
-      patientEmail: 'john@email.com'
-    },
-    {
-      resourceType: 'Appointment',
-      id: '3',
-      status: 'pending',
-      start: `${selectedDate}T14:15:00`,
-      end: `${selectedDate}T14:45:00`,
-      participant: [
-        { actor: { reference: 'Patient/patient-789' }, status: 'tentative' }
-      ],
-      reasonCode: [{ text: 'Chest pain consultation' }],
-      patientName: 'Maria Rodriguez',
-      patientPhone: '+61 2 9999 9012',
-      patientEmail: 'maria@email.com'
-    },
-    {
-      resourceType: 'Appointment',
-      id: '4',
-      status: 'arrived',
-      start: `${selectedDate}T15:45:00`,
-      end: `${selectedDate}T16:15:00`,
-      participant: [
-        { actor: { reference: 'Patient/patient-101' }, status: 'accepted' }
-      ],
-      reasonCode: [{ text: 'Blood pressure monitoring' }],
-      patientName: 'James Wilson',
-      patientPhone: '+61 2 9999 3456',
-      patientEmail: 'james@email.com'
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'booked': return 'Confirmed';
+      case 'pending': return 'Pending';
+      case 'proposed': return 'Proposed';
+      case 'fulfilled': return 'Completed';
+      case 'cancelled': return 'Cancelled';
+      case 'noshow': return 'No Show';
+      case 'arrived': return 'Arrived';
+      case 'checked-in': return 'Checked In';
+      case 'waitlist': return 'Waitlist';
+      case 'entered-in-error': return 'Error';
+      default: return status;
     }
-  ];
+  };
 
-  const timeSlots = getTimeSlots(selectedDate);
+  const handleQuickAction = (appointmentId: string, action: string) => {
+    // TODO: Implement quick actions (check-in, complete, cancel, etc.)
+    console.log(`Quick action ${action} for appointment ${appointmentId}`);
+  };
 
   return (
-    <Layout>
+    <Layout patientName="Clinic Staff">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-text-primary mb-2">Appointment Management</h1>
-          <p className="text-text-secondary">Manage your appointments and patient schedule</p>
-        </div>
-
-        {/* Controls */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div className="flex items-center space-x-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Date</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">View</label>
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as any)}
-                className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="all">All Appointments</option>
-                <option value="today">Today Only</option>
-                <option value="week">This Week</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="pending">Pending</option>
-              </select>
-            </div>
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-text-primary">Appointments</h1>
+            <p className="text-text-secondary">Clinic-wide appointment management</p>
           </div>
-          
-          <div className="flex space-x-2">
+          <div className="flex space-x-3">
             <Button variant="outline" onClick={fetchAppointments}>
               Refresh
             </Button>
             <Button 
               variant="primary" 
-              onClick={() => router.push('/provider/booking-queue')}
+              onClick={() => router.push('/provider/appointments/pending')}
             >
-              Review Queue
+              Review Pending ({stats.pending})
             </Button>
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid md:grid-cols-4 gap-4 mb-8">
-          <Card padding="sm" className="text-center">
-            <div className="text-2xl font-bold text-primary">{appointments.length}</div>
-            <div className="text-sm text-text-secondary">Total Appointments</div>
-          </Card>
-          <Card padding="sm" className="text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {appointments.filter(a => a.status === 'booked' || a.status === 'arrived').length}
+        {/* Stats Cards */}
+        <div className="grid md:grid-cols-4 gap-6 mb-8">
+          <Card className="text-center" padding="sm">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
             </div>
-            <div className="text-sm text-text-secondary">Confirmed</div>
+            <div className="text-2xl font-bold text-blue-600">{stats.today}</div>
+            <div className="text-sm text-text-secondary">Today</div>
           </Card>
-          <Card padding="sm" className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">
-              {appointments.filter(a => a.status === 'pending').length}
+
+          <Card className="text-center" padding="sm">
+            <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </div>
+            <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
             <div className="text-sm text-text-secondary">Pending</div>
           </Card>
-          <Card padding="sm" className="text-center">
-            <div className="text-2xl font-bold text-blue-600">
-              {appointments.filter(a => a.status === 'arrived').length}
+
+          <Card className="text-center" padding="sm">
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </div>
-            <div className="text-sm text-text-secondary">Checked In</div>
+            <div className="text-2xl font-bold text-green-600">{stats.upcoming}</div>
+            <div className="text-sm text-text-secondary">This Week</div>
+          </Card>
+
+          <Card className="text-center" padding="sm">
+            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <div className="text-2xl font-bold text-purple-600">{stats.total}</div>
+            <div className="text-sm text-text-secondary">Total</div>
           </Card>
         </div>
 
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <p className="mt-2 text-text-secondary">Loading appointments...</p>
-          </div>
-        ) : (
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* Schedule Grid */}
-            <div className="lg:col-span-2">
-              <Card>
-                <h2 className="text-xl font-semibold mb-6">
-                  Schedule for {new Date(selectedDate).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </h2>
-                
-                <div className="space-y-2">
-                  {timeSlots.map((timeSlot) => {
-                    const appointment = getAppointmentForSlot(selectedDate, timeSlot);
-                    
-                    return (
-                      <div key={timeSlot} className="grid grid-cols-4 gap-4 p-3 border rounded-lg hover:bg-gray-50">
-                        <div className="font-mono text-sm text-text-secondary">
-                          {timeSlot}
-                        </div>
-                        
-                        {appointment ? (
-                          <>
-                            <div className="col-span-2">
-                              <div className="font-medium">{appointment.patientName}</div>
-                              <div className="text-sm text-text-secondary">
-                                {appointment.reasonCode?.[0]?.text}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <Badge variant={getStatusVariant(appointment.status)} size="sm">
-                                {appointment.status}
-                              </Badge>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="col-span-3 text-sm text-gray-400">
-                            Available
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </Card>
+        {/* Filters */}
+        <Card className="mb-6">
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">Date</label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="booked">Confirmed</option>
+                  <option value="arrived">Arrived</option>
+                  <option value="checked-in">Checked In</option>
+                  <option value="fulfilled">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="noshow">No Show</option>
+                </select>
+              </div>
             </div>
 
-            {/* Appointment List */}
-            <div>
-              <Card>
-                <h3 className="font-semibold mb-4">Today's Appointments</h3>
-                
-                <div className="space-y-3">
-                  {filteredAppointments.map((appointment) => (
-                    <div key={appointment.id} className="p-3 border rounded-lg">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <div className="font-medium">{appointment.patientName}</div>
-                          <div className="text-sm text-text-secondary">
-                            {appointment.start && new Date(appointment.start).toLocaleTimeString('en-US', {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true
-                            })}
-                          </div>
-                        </div>
-                        <Badge variant={getStatusVariant(appointment.status)} size="sm">
-                          {appointment.status}
-                        </Badge>
-                      </div>
-                      
-                      <div className="text-xs text-text-secondary mb-3">
-                        {appointment.reasonCode?.[0]?.text}
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-1">
-                        {appointment.status === 'pending' && (
-                          <>
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={() => handleStatusUpdate(appointment.id!, 'booked')}
-                            >
-                              Confirm
-                            </Button>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => handleStatusUpdate(appointment.id!, 'cancelled')}
-                            >
-                              Cancel
-                            </Button>
-                          </>
-                        )}
-                        
-                        {appointment.status === 'booked' && (
-                          <>
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={() => handleStatusUpdate(appointment.id!, 'arrived')}
-                            >
-                              Check In
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewPreVisit(appointment.id!)}
-                            >
-                              Pre-visit
-                            </Button>
-                          </>
-                        )}
-                        
-                        {appointment.status === 'arrived' && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleStatusUpdate(appointment.id!, 'fulfilled')}
-                          >
-                            Complete
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {filteredAppointments.length === 0 && (
-                    <div className="text-center py-8">
-                      <p className="text-text-secondary">No appointments found</p>
-                    </div>
-                  )}
-                </div>
-              </Card>
+            <div className="text-sm text-text-secondary">
+              Showing {appointments.length} appointments
             </div>
           </div>
-        )}
+        </Card>
+
+        {/* Appointments List */}
+        <Card>
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <p className="mt-4 text-text-secondary">Loading appointments...</p>
+            </div>
+          ) : appointments.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-text-primary mb-2">No Appointments</h3>
+              <p className="text-text-secondary">No appointments found for the selected date and filters.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {appointments.map((appointment) => (
+                <div
+                  key={appointment.id}
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="text-center min-w-[100px]">
+                      <div className="font-semibold text-primary">
+                        {appointment.start ? formatDateTime(appointment.start) : 'TBD'}
+                      </div>
+                      <div className="text-xs text-text-secondary">
+                        {appointment.start && appointment.end 
+                          ? formatDuration(appointment.start, appointment.end)
+                          : '30min'
+                        }
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-text-primary">
+                        {getPatientName(appointment)}
+                      </h3>
+                      <p className="text-sm text-text-secondary">
+                        Dr. {getPractitionerName(appointment)}
+                      </p>
+                      <p className="text-sm text-text-secondary">
+                        {appointment.reasonCode?.[0]?.text || appointment.description || 'General consultation'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <Badge 
+                      variant={getStatusVariant(appointment.status)} 
+                      size="sm"
+                    >
+                      {getStatusLabel(appointment.status)}
+                    </Badge>
+                    
+                    <div className="flex space-x-2">
+                      {appointment.status === 'booked' && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleQuickAction(appointment.id!, 'check-in')}
+                        >
+                          Check In
+                        </Button>
+                      )}
+                      
+                      {appointment.status === 'checked-in' && (
+                        <Button 
+                          variant="primary" 
+                          size="sm"
+                          onClick={() => handleQuickAction(appointment.id!, 'complete')}
+                        >
+                          Complete
+                        </Button>
+                      )}
+                      
+                      <Button variant="outline" size="sm">
+                        Details
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
       </div>
     </Layout>
   );

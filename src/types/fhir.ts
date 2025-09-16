@@ -101,7 +101,7 @@ export interface Slot {
 export interface Appointment {
   resourceType: 'Appointment';
   id: string;
-  status: 'proposed' | 'pending' | 'booked' | 'arrived' | 'fulfilled' | 'cancelled' | 'noshow';
+  status: 'proposed' | 'pending' | 'booked' | 'arrived' | 'fulfilled' | 'cancelled' | 'noshow' | 'entered-in-error' | 'checked-in' | 'waitlist';
   serviceType?: Array<{
     text?: string;
     coding?: Array<{
@@ -183,6 +183,72 @@ export interface Condition {
     reference?: string;
   };
   onsetDateTime?: string;
+}
+
+export interface Communication {
+  resourceType: 'Communication';
+  id: string;
+  status: 'preparation' | 'in-progress' | 'not-done' | 'on-hold' | 'stopped' | 'completed' | 'entered-in-error' | 'unknown';
+  category?: Array<{
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  }>;
+  medium?: Array<{
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  }>;
+  subject?: {
+    reference: string;
+    display?: string;
+  };
+  about?: Array<{
+    reference: string;
+    display?: string;
+  }>;
+  encounter?: {
+    reference: string;
+    display?: string;
+  };
+  sent?: string;
+  received?: string;
+  recipient: Array<{
+    reference: string;
+    display?: string;
+  }>;
+  sender?: {
+    reference: string;
+    display?: string;
+  };
+  payload: Array<{
+    contentString?: string;
+    contentAttachment?: {
+      contentType?: string;
+      data?: string;
+      url?: string;
+      size?: number;
+      title?: string;
+    };
+    contentReference?: {
+      reference: string;
+      display?: string;
+    };
+  }>;
+  note?: Array<{
+    authorReference?: {
+      reference: string;
+      display?: string;
+    };
+    time?: string;
+    text: string;
+  }>;
 }
 
 export interface Observation {
