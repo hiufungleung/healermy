@@ -45,8 +45,8 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
   const navItems = isPatient
     ? [
         { href: '/patient/dashboard', label: 'Dashboard' },
-        { href: '/patient/book-appointment', label: 'Book Appointment' },
-        { href: '/patient/notifications', label: 'Notifications' },
+        { href: '/patient/appointments', label: 'Appointment' },
+        { href: '/patient/notifications', label: 'Notification' },
         { href: '/patient/profile', label: 'Profile' },
       ]
     : isProvider
@@ -83,8 +83,8 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
                     className={clsx(
                       'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium',
                       pathname === item.href
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-text-secondary hover:text-text-primary hover:border-gray-300'
+                        ? 'border-primary text-black'
+                        : 'border-transparent text-black hover:text-black hover:font-bold hover:border-black'
                     )}
                   >
                     {item.label}
@@ -166,8 +166,8 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
                   className={clsx(
                     'block pl-3 pr-4 py-2 border-l-4 text-base font-medium',
                     pathname === item.href
-                      ? 'bg-blue-50 border-primary text-primary'
-                      : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'
+                      ? 'bg-gray-50 border-black text-black font-bold'
+                      : 'border-transparent text-black hover:bg-gray-50 hover:border-black hover:text-black hover:font-bold'
                   )}
                   onClick={() => setMobileMenuOpen(false)}
                 >
