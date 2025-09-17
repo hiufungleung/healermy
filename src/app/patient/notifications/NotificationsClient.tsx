@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
@@ -46,10 +46,19 @@ export default function NotificationsClient({
   patientName 
 }: NotificationsClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'action_required'>('all');
   const [localCommunications, setLocalCommunications] = useState<Communication[]>(communications);
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
   const [selectedMessage, setSelectedMessage] = useState<Communication | null>(null);
+
+  // Check URL parameters on mount and set filter accordingly
+  useEffect(() => {
+    const filterParam = searchParams.get('filter');
+    if (filterParam === 'unread' || filterParam === 'action_required') {
+      setActiveFilter(filterParam);
+    }
+  }, [searchParams]);
   
   // Static notifications data
   const [staticNotifications, setStaticNotifications] = useState<StaticNotification[]>([

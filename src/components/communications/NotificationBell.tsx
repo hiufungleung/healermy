@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 interface NotificationBellProps {
   className?: string;
@@ -11,6 +12,7 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { session } = useAuth();
 
   const fetchUnreadCount = async () => {
     try {
@@ -50,7 +52,13 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
   }, []);
 
   const handleClick = () => {
-    router.push('/patient/messages'); // or /provider/messages based on role
+    // Determine the correct notifications page based on user role
+    const notificationsPath = session?.role === 'provider'
+      ? '/provider/notifications'
+      : '/patient/notifications';
+
+    // Navigate to notifications page with unread filter parameter
+    router.push(`${notificationsPath}?filter=unread`);
   };
 
   return (
