@@ -46,7 +46,7 @@ export default function NotificationsClient({
   patientName 
 }: NotificationsClientProps) {
   const router = useRouter();
-  const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'sent' | 'received' | 'appointments' | 'system'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'action_required'>('all');
   const [localCommunications, setLocalCommunications] = useState<Communication[]>(communications);
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
   const [selectedMessage, setSelectedMessage] = useState<Communication | null>(null);
@@ -427,14 +427,9 @@ export default function NotificationsClient({
     switch (activeFilter) {
       case 'unread':
         return !isMessageRead(comm);
-      case 'sent':
-        return isSent;
-      case 'received':
-        return isReceived;
-      case 'appointments':
-        return category === 'appointment-update';
-      case 'system':
-        return category === 'system-notification';
+      case 'action_required':
+        // Communications don't have actionRequired flag, so return false for now
+        return false;
       default:
         return true;
     }
@@ -444,14 +439,8 @@ export default function NotificationsClient({
     switch (activeFilter) {
       case 'unread':
         return !notif.read;
-      case 'sent':
-        return false; // Static notifications are not "sent" by patient
-      case 'received':
-        return true; // All static notifications are considered received
-      case 'appointments':
-        return notif.type === 'appointment_confirmed' || notif.type === 'appointment_reminder';
-      case 'system':
-        return notif.type === 'system';
+      case 'action_required':
+        return notif.actionRequired;
       default:
         return true;
     }
@@ -468,11 +457,15 @@ export default function NotificationsClient({
   });
 
   // Combined counts for both dynamic and static data
-  const unreadCount = localCommunications.filter(comm => !isMessageRead(comm)).length + 
+  const unreadCount = localCommunications.filter(comm => !isMessageRead(comm)).length +
                      staticNotifications.filter(notif => !notif.read).length;
   const sentCount = localCommunications.filter(comm => comm.sender?.reference === `Patient/${patient?.id}`).length;
   const receivedCount = localCommunications.filter(comm => comm.recipient?.some(r => r.reference === `Patient/${patient?.id}`)).length +
                        staticNotifications.length; // Static notifications are considered "received"
+
+  // Action Required count - only messages explicitly marked as requiring action
+  const actionRequiredCount = staticNotifications.filter(notif => notif.actionRequired).length;
+
   const appointmentCount = localCommunications.filter(comm => comm.category?.[0]?.text === 'appointment-update').length +
                           staticNotifications.filter(notif => notif.type === 'appointment_confirmed' || notif.type === 'appointment_reminder').length;
   const systemCount = localCommunications.filter(comm => comm.category?.[0]?.text === 'system-notification').length +
@@ -508,8 +501,8 @@ export default function NotificationsClient({
         
         <Card padding="sm">
           <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">{receivedCount}</div>
-            <div className="text-sm text-text-secondary">Received</div>
+            <div className="text-2xl font-bold text-red-500">{actionRequiredCount}</div>
+            <div className="text-sm text-text-secondary">Action Required</div>
           </div>
         </Card>
         
@@ -527,10 +520,7 @@ export default function NotificationsClient({
           {[
             { key: 'all', label: 'All', count: totalCount },
             { key: 'unread', label: 'Unread', count: unreadCount },
-            { key: 'received', label: 'Received', count: receivedCount },
-            { key: 'sent', label: 'Sent', count: sentCount },
-            { key: 'appointments', label: 'Appointments', count: appointmentCount },
-            { key: 'system', label: 'System', count: systemCount }
+            { key: 'action_required', label: 'Action Required', count: actionRequiredCount }
           ].map((filter) => (
             <button
               key={filter.key}
@@ -585,15 +575,13 @@ export default function NotificationsClient({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center space-x-2">
-                              <h3 className={`font-semibold ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
-                                {getMessageTitle(comm)}
-                              </h3>
-                              {!isMessageRead(comm) && (
-                                <div className="w-2 h-2 bg-primary rounded-full"></div>
-                              )}
-                            </div>
+                          <div className="flex items-center space-x-2 mb-2">
+                            <h3 className={`font-semibold ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
+                              {getMessageTitle(comm)}
+                            </h3>
+                            {!isMessageRead(comm) && (
+                              <div className="w-2 h-2 bg-primary rounded-full"></div>
+                            )}
                             <Badge variant="info" size="sm">
                               {getCategoryDisplay(comm.category)}
                             </Badge>
