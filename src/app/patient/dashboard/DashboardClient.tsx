@@ -8,7 +8,7 @@ import {
   PatientInfoSkeleton,
   AppointmentSkeleton
 } from '@/components/common/LoadingSpinner';
-import { formatDateForDisplay, formatTimeForDisplay } from '@/lib/timezone';
+import { formatDateForDisplay, formatTimeForDisplay, getNowInAppTimezone } from '@/lib/timezone';
 import type { Patient, Appointment } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
 
@@ -213,8 +213,26 @@ export default function DashboardClient({
   const formattedAddress = patientAddress ? 
     `${patientAddress.line?.join(', ') || ''} ${patientAddress.city || ''} ${patientAddress.state || ''} ${patientAddress.postalCode || ''}`.trim() : null;
   
-  // Use only real FHIR appointments data - ensure it's always an array
-  const displayAppointments = Array.isArray(appointments) ? appointments : [];
+  // Filter appointments for upcoming section: confirmed/pending within next 3 days
+  const nowBrisbane = getNowInAppTimezone();
+  const threeDaysFromNow = new Date(nowBrisbane);
+  threeDaysFromNow.setDate(nowBrisbane.getDate() + 3);
+  threeDaysFromNow.setHours(23, 59, 59, 999); // End of the 3rd day
+
+  const displayAppointments = (Array.isArray(appointments) ? appointments : []).filter((appointment) => {
+    // Only show confirmed (booked) and pending appointments
+    if (appointment.status !== 'booked' && appointment.status !== 'pending') {
+      return false;
+    }
+
+    // Only show appointments within next 3 days (using Brisbane timezone)
+    const appointmentDate = appointment.start ? new Date(appointment.start) : null;
+    if (!appointmentDate || appointmentDate < nowBrisbane || appointmentDate > threeDaysFromNow) {
+      return false;
+    }
+
+    return true;
+  });
   
   const todayStatus = {
     nextAppointment: '10:30 AM',
@@ -307,7 +325,7 @@ export default function DashboardClient({
           >
             <div className="flex items-center space-x-4">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-blue-600 group-hover:animate-spin-once" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
               </div>
@@ -323,7 +341,7 @@ export default function DashboardClient({
           >
             <div className="flex items-center space-x-4">
               <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center group-hover:bg-amber-200 transition-colors">
-                <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-amber-600 group-hover:animate-swing-once" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
               </div>
@@ -339,7 +357,7 @@ export default function DashboardClient({
           >
             <div className="flex items-center space-x-4">
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-green-600 group-hover:animate-gentle-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
@@ -389,12 +407,17 @@ export default function DashboardClient({
                         <h3 className="font-semibold text-lg">{doctorName}</h3>
                         <p className="text-text-secondary">{specialty}</p>
                       </div>
-                      <Badge 
-                        variant={appointmentStatus === 'booked' || appointmentStatus === 'fulfilled' ? "success" : 
-                                appointmentStatus === 'cancelled' ? "danger" : "info"} 
+                      <Badge
+                        variant={appointmentStatus === 'booked' || appointmentStatus === 'fulfilled' ? "success" :
+                                appointmentStatus === 'cancelled' ? "danger" :
+                                appointmentStatus === 'pending' ? "warning" : "info"}
                         size="sm"
                       >
-                        {appointmentStatus}
+                        {appointmentStatus === 'booked' ? 'Confirmed' :
+                         appointmentStatus === 'pending' ? 'Pending Approval' :
+                         appointmentStatus === 'fulfilled' ? 'Completed' :
+                         appointmentStatus === 'cancelled' ? 'Cancelled' :
+                         appointmentStatus}
                       </Badge>
                     </div>
 

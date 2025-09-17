@@ -13,7 +13,7 @@ interface AppointmentsClientProps {
   session: AuthSession;
 }
 
-type FilterStatus = 'all' | 'upcoming' | 'pending' | 'completed' | 'cancelled';
+type FilterStatus = 'all' | 'pending' | 'booked' | 'completed' | 'cancelled';
 
 export default function AppointmentsClient({ session }: AppointmentsClientProps) {
   const router = useRouter();
@@ -33,7 +33,6 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
         });
         if (response.ok) {
           const data = await response.json();
-          console.log('Appointments API response:', data);
 
           // Handle different possible response structures
           if (Array.isArray(data)) {
@@ -64,17 +63,9 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
 
   // Filter and search appointments
   const filteredAppointments = (Array.isArray(appointments) ? appointments : []).filter((appointment) => {
-    const now = new Date();
-    const appointmentDate = appointment.start ? new Date(appointment.start) : null;
-
     // Status filter
     if (filterStatus !== 'all') {
-      if (filterStatus === 'upcoming') {
-        if (!appointmentDate || appointmentDate < now ||
-            appointment.status === 'cancelled' || appointment.status === 'fulfilled') {
-          return false;
-        }
-      } else if (appointment.status !== filterStatus) {
+      if (appointment.status !== filterStatus) {
         return false;
       }
     }
@@ -264,8 +255,8 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
           <div className="flex flex-wrap gap-2">
             {[
               { key: 'all', label: 'All' },
-              { key: 'upcoming', label: 'Upcoming' },
               { key: 'pending', label: 'Pending' },
+              { key: 'booked', label: 'Confirmed' },
               { key: 'completed', label: 'Completed' },
               { key: 'cancelled', label: 'Cancelled' }
             ].map(({ key, label }) => (
@@ -293,7 +284,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold">
               {filterStatus === 'all' ? 'All Appointments' :
-               filterStatus === 'upcoming' ? 'Upcoming Appointments' :
+               filterStatus === 'booked' ? 'Confirmed Appointments' :
                `${filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)} Appointments`}
             </h2>
             <div className="text-sm text-gray-500">
@@ -356,7 +347,11 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
                         }
                         size="sm"
                       >
-                        {appointmentStatus}
+                        {appointmentStatus === 'booked' ? 'Confirmed' :
+                         appointmentStatus === 'pending' ? 'Pending Approval' :
+                         appointmentStatus === 'fulfilled' ? 'Completed' :
+                         appointmentStatus === 'cancelled' ? 'Cancelled' :
+                         appointmentStatus}
                       </Badge>
                     </div>
 

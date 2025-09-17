@@ -49,7 +49,9 @@ export async function GET(request: NextRequest) {
       finalDateTo || undefined
     );
 
-    return NextResponse.json({ appointments: result });
+    // Extract appointments from FHIR Bundle structure
+    const appointments = result?.entry?.map((entry: any) => entry.resource).filter(Boolean) || [];
+    return NextResponse.json({ appointments });
   } catch (error) {
     console.error('Error in GET /api/fhir/appointments:', error);
     
