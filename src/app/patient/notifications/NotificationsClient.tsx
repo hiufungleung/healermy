@@ -59,6 +59,22 @@ export default function NotificationsClient({
       setActiveFilter(filterParam);
     }
   }, [searchParams]);
+
+  // Listen for URL changes (for when bell is clicked on the same page)
+  useEffect(() => {
+    const handlePopState = () => {
+      const url = new URL(window.location.href);
+      const filterParam = url.searchParams.get('filter');
+      if (filterParam === 'unread' || filterParam === 'action_required') {
+        setActiveFilter(filterParam);
+      } else {
+        setActiveFilter('all');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   
   // Static notifications data
   const [staticNotifications, setStaticNotifications] = useState<StaticNotification[]>([
