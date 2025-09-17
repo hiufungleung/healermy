@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { AppointmentSkeleton } from '@/components/common/LoadingSpinner';
+import { ContentContainer } from '@/components/common/ContentContainer';
 import { formatDateForDisplay } from '@/lib/timezone';
 import type { Appointment } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
@@ -287,7 +288,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
   };
 
   return (
-    <>
+    <ContentContainer size="lg">
       {/* Page Header */}
       <div className="mb-8">
         <div className="flex justify-between items-center">
@@ -492,6 +493,6 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
           )}
         </div>
       )}
-    </>
+    </ContentContainer>
   );
 }

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
+import { ContentContainer } from '@/components/common/ContentContainer';
 import { createFHIRDateTime } from '@/lib/timezone';
 import type { Practitioner, Appointment, Slot } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
@@ -163,7 +164,7 @@ export default function ConfirmAppointmentClient({
   ].filter(Boolean).join(', ') : '789 Care Avenue, Toowong, QLD 4066';
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <ContentContainer size="md">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-text-primary mb-2">
           Book New Appointment
@@ -328,6 +329,6 @@ export default function ConfirmAppointmentClient({
           </Button>
         </div>
       </Card>
-    </div>
+    </ContentContainer>
   );
 }

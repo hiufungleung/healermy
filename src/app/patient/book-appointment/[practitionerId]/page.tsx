@@ -6,6 +6,7 @@ import { Layout } from '@/components/common/Layout';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
+import { ContentContainer } from '@/components/common/ContentContainer';
 import { SlotSelectionGrid } from '@/components/common/SlotDisplay';
 import { formatTimeForDisplay, getDayBoundsInUTC } from '@/lib/timezone';
 import type { Practitioner, Slot } from '@/types/fhir';
@@ -213,7 +214,7 @@ export default function SelectAppointment() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <ContentContainer size="md">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-text-primary mb-2">
             Book New Appointment
@@ -358,7 +359,7 @@ export default function SelectAppointment() {
             </Button>
           </div>
         </Card>
-      </div>
+      </ContentContainer>
     </Layout>
   );
 }

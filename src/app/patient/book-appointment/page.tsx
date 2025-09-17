@@ -6,6 +6,7 @@ import { Layout } from '@/components/common/Layout';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
+import { ContentContainer } from '@/components/common/ContentContainer';
 import { PractitionerSearch } from '@/components/common/PractitionerSearch';
 import type { Practitioner } from '@/types/fhir';
 
@@ -140,7 +141,7 @@ export default function BookAppointment() {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <ContentContainer size="lg">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-text-primary mb-2">
             Book New Appointment
@@ -338,7 +339,7 @@ export default function BookAppointment() {
             )}
           </div>
         )}
-      </div>
+      </ContentContainer>
     </Layout>
   );
 }
