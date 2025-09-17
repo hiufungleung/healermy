@@ -27,6 +27,14 @@ export default function DashboardClient({
   const router = useRouter();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [patientName, setPatientName] = useState(initialPatientName);
+
+  // Extract first name from initial patient name for immediate display
+  const getFirstName = (fullName: string) => {
+    if (fullName.startsWith('Patient ')) return 'Patient';
+    return fullName.split(' ')[0] || 'Patient';
+  };
+
+  const [firstName, setFirstName] = useState(getFirstName(initialPatientName));
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loadingPatient, setLoadingPatient] = useState(true);
   const [loadingAppointments, setLoadingAppointments] = useState(true);
@@ -46,11 +54,15 @@ export default function DashboardClient({
 
           // Extract real patient name from FHIR data
           if (patientData?.name?.[0]) {
-            const given = patientData.name[0]?.given?.join(' ') || '';
+            const givenNames = patientData.name[0]?.given || [];
             const family = patientData.name[0]?.family || '';
-            const fullName = `${given} ${family}`.trim();
+            const givenNamesString = givenNames.join(' ');
+            const fullName = `${givenNamesString} ${family}`.trim();
+            const firstNameOnly = givenNames[0] || 'Patient';
+
             if (fullName) {
               setPatientName(fullName);
+              setFirstName(firstNameOnly);
               // Update the parent component (Layout) with the real patient name
               onPatientNameUpdate?.(fullName);
             }
@@ -216,7 +228,7 @@ export default function DashboardClient({
       {/* Welcome Section */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-text-primary mb-2">
-          Hi, {patientName}
+          Hi, {firstName}
         </h1>
       </div>
 
