@@ -166,6 +166,9 @@ export default function NotificationsClient({
       if (!response.ok) {
         console.error('Failed to mark message as read on server');
       }
+
+      // Dispatch event to update notification bell
+      window.dispatchEvent(new CustomEvent('messageUpdate'));
     } catch (error) {
       console.error('Failed to mark message as read:', error);
     } finally {
@@ -179,9 +182,12 @@ export default function NotificationsClient({
 
   // Function to mark static notification as read
   const markStaticAsRead = (id: string) => {
-    setStaticNotifications(prev => 
+    setStaticNotifications(prev =>
       prev.map(n => n.id === id ? { ...n, read: true } : n)
     );
+
+    // Dispatch event to update notification bell
+    window.dispatchEvent(new CustomEvent('messageUpdate'));
   };
 
   const markAllAsRead = () => {
@@ -207,6 +213,9 @@ export default function NotificationsClient({
     unreadMessages.forEach(comm => {
       if (comm.id) markAsRead(comm.id);
     });
+
+    // Dispatch event to update notification bell
+    window.dispatchEvent(new CustomEvent('messageUpdate'));
   };
 
   const handleMessageClick = (comm: Communication) => {
@@ -233,6 +242,9 @@ export default function NotificationsClient({
       
       // Make API call
       markAsRead(comm.id);
+
+      // Dispatch event to update notification bell
+      window.dispatchEvent(new CustomEvent('messageUpdate'));
     }
   };
 
@@ -497,18 +509,39 @@ export default function NotificationsClient({
                      staticNotifications.filter(notif => notif.type === 'system').length;
   const totalCount = localCommunications.length + staticNotifications.length;
 
+  // Function to get appointment status badge - shows blue "Appointment Status Update" for appointment status changes only
+  const getAppointmentStatusBadge = (message: string, notificationType?: string) => {
+    const lowerMessage = message.toLowerCase();
+
+    // Only show for actual appointment status updates, not reminders
+    if (notificationType === 'appointment_confirmed' ||
+        lowerMessage.includes('confirmed') ||
+        lowerMessage.includes('cancelled') ||
+        lowerMessage.includes('canceled') ||
+        lowerMessage.includes('reschedule') ||
+        lowerMessage.includes('rescheduled')) {
+      return (
+        <Badge variant="info" size="sm">
+          Appointment Status Update
+        </Badge>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-start mb-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary mb-2">Notifications & Messages</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-text-primary mb-2">Notifications & Messages</h1>
           <p className="text-text-secondary">Stay updated with your healthcare communications</p>
         </div>
-        
+
         {unreadCount > 0 && (
           <Button
             variant="outline"
             onClick={markAllAsRead}
+            className="self-start sm:self-auto"
           >
             Mark All as Read
           </Button>
@@ -516,32 +549,32 @@ export default function NotificationsClient({
       </div>
 
       {/* Summary Cards */}
-      <div className="grid md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <Card padding="sm">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary">{unreadCount}</div>
-            <div className="text-sm text-text-secondary">Unread Messages</div>
+          <div className="text-center py-2">
+            <div className="text-xl sm:text-2xl font-bold text-primary">{unreadCount}</div>
+            <div className="text-xs sm:text-sm text-text-secondary">Unread Messages</div>
           </div>
         </Card>
-        
+
         <Card padding="sm">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-red-500">{actionRequiredCount}</div>
-            <div className="text-sm text-text-secondary">Action Required</div>
+          <div className="text-center py-2">
+            <div className="text-xl sm:text-2xl font-bold text-red-500">{actionRequiredCount}</div>
+            <div className="text-xs sm:text-sm text-text-secondary">Action Required</div>
           </div>
         </Card>
-        
+
         <Card padding="sm">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-text-primary">{totalCount}</div>
-            <div className="text-sm text-text-secondary">Total Messages</div>
+          <div className="text-center py-2">
+            <div className="text-xl sm:text-2xl font-bold text-text-primary">{totalCount}</div>
+            <div className="text-xs sm:text-sm text-text-secondary">Total Messages</div>
           </div>
         </Card>
       </div>
 
       {/* Filter Tabs */}
       <Card className="mb-6">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
           {[
             { key: 'all', label: 'All', count: totalCount },
             { key: 'unread', label: 'Unread', count: unreadCount },
@@ -550,13 +583,13 @@ export default function NotificationsClient({
             <button
               key={filter.key}
               onClick={() => setActiveFilter(filter.key as any)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors flex-shrink-0 ${
                 activeFilter === filter.key
                   ? 'bg-primary text-white'
                   : 'bg-gray-100 text-text-secondary hover:bg-gray-200'
               }`}
             >
-              {filter.label} ({filter.count})
+              <span className="whitespace-nowrap">{filter.label} ({filter.count})</span>
             </button>
           ))}
         </div>
@@ -600,16 +633,22 @@ export default function NotificationsClient({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <h3 className={`font-semibold ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
-                              {getMessageTitle(comm)}
-                            </h3>
-                            {!isMessageRead(comm) && (
-                              <div className="w-2 h-2 bg-primary rounded-full"></div>
-                            )}
-                            <Badge variant="info" size="sm">
-                              {getCategoryDisplay(comm.category)}
-                            </Badge>
+                          <div className="mb-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                              <div className="flex items-center space-x-2 mb-1 sm:mb-0">
+                                <h3 className={`font-semibold ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
+                                  {getMessageTitle(comm)}
+                                </h3>
+                                {!isMessageRead(comm) && (
+                                  <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                <Badge variant="info" size="sm">
+                                  {getCategoryDisplay(comm.category)}
+                                </Badge>
+                              </div>
+                            </div>
                           </div>
                           <div className="text-sm text-text-secondary mb-2">
                             From: {getSenderDisplay(comm)}
@@ -624,45 +663,46 @@ export default function NotificationsClient({
                         </div>
                         
                         {/* Actions */}
-                        <div className="flex items-center space-x-2 ml-4">
-                        {!isMessageRead(comm) && (
+                        <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 ml-2 sm:ml-4 flex-shrink-0">
+                          {!isMessageRead(comm) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (comm.id) {
+                                  setLocalCommunications(prev =>
+                                    prev.map(localComm =>
+                                      localComm.id === comm.id
+                                        ? {
+                                            ...localComm,
+                                            extension: [
+                                              ...(localComm.extension || []),
+                                              {
+                                                url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
+                                                valueDateTime: new Date().toISOString()
+                                              }
+                                            ]
+                                          }
+                                        : localComm
+                                    )
+                                  );
+                                  markAsRead(comm.id);
+                                }
+                              }}
+                              className="text-sm text-primary hover:underline"
+                            >
+                              Mark as Read
+                            </button>
+                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (comm.id) {
-                                setLocalCommunications(prev => 
-                                  prev.map(localComm => 
-                                    localComm.id === comm.id 
-                                      ? {
-                                          ...localComm,
-                                          extension: [
-                                            ...(localComm.extension || []),
-                                            {
-                                              url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
-                                              valueDateTime: new Date().toISOString()
-                                            }
-                                          ]
-                                        }
-                                      : localComm
-                                  )
-                                );
-                                markAsRead(comm.id);
-                              }
+                              deleteNotification(comm.id);
                             }}
-                            className="text-sm text-primary hover:underline"
+                            className="text-sm text-text-secondary hover:text-red-600"
                           >
-                            Mark as Read
+                            Delete
                           </button>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteNotification(comm.id);
-                          }}
-                          className="text-sm text-text-secondary hover:text-red-600"
-                        >
-                          Delete
-                        </button>
+                        </div>
                       </div>
                     </div>
                     
@@ -705,8 +745,7 @@ export default function NotificationsClient({
                       </div>
                     )}
                   </div>
-                </div>
-              </Card>
+                </Card>
             );
             } else {
               // Static notification
@@ -731,18 +770,25 @@ export default function NotificationsClient({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <h3 className={`font-semibold ${!notif.read ? 'text-text-primary' : 'text-text-secondary'}`}>
-                              {notif.title}
-                            </h3>
-                            {!notif.read && (
-                              <div className="w-2 h-2 bg-primary rounded-full"></div>
-                            )}
-                            {notif.actionRequired && (
-                              <Badge variant="warning" size="sm">
-                                Action Required
-                              </Badge>
-                            )}
+                          <div className="mb-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                              <div className="flex items-center space-x-2 mb-1 sm:mb-0">
+                                <h3 className={`font-semibold ${!notif.read ? 'text-text-primary' : 'text-text-secondary'}`}>
+                                  {notif.title}
+                                </h3>
+                                {!notif.read && (
+                                  <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {notif.actionRequired && (
+                                  <Badge variant="warning" size="sm">
+                                    Action Required
+                                  </Badge>
+                                )}
+                                {getAppointmentStatusBadge(notif.message, notif.type)}
+                              </div>
+                            </div>
                           </div>
                           <p className="text-text-secondary text-sm mb-2">
                             {notif.message.substring(0, 100)}
@@ -754,7 +800,7 @@ export default function NotificationsClient({
                         </div>
                         
                         {/* Actions */}
-                        <div className="flex items-center space-x-2 ml-4">
+                        <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 ml-2 sm:ml-4 flex-shrink-0">
                           {!notif.read && (
                             <button
                               onClick={() => markStaticAsRead(notif.id)}
