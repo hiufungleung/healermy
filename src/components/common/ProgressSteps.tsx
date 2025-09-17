@@ -42,7 +42,7 @@ export function ProgressSteps({ steps, currentStep, className }: ProgressStepsPr
 
   return (
     <div className={clsx('mb-8', className)}>
-      <div className="flex items-center justify-between max-w-2xl">
+      <div className="flex items-center justify-between">
         {steps.map((step, index) => (
           <React.Fragment key={step.id}>
             {/* Step Circle and Label */}

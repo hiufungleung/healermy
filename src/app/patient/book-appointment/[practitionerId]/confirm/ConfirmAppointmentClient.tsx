@@ -175,15 +175,14 @@ export default function ConfirmAppointmentClient({
         </p>
       </div>
 
-      {/* Progress Steps */}
+      {/* Progress Steps - Updated for combined flow */}
       <ProgressSteps
         steps={[
-          { id: 1, label: 'Search', status: 'completed' },
-          { id: 2, label: 'Select Doctor & Date', status: 'completed' },
-          { id: 3, label: 'Confirm', status: 'active' },
-          { id: 4, label: 'Complete', status: 'upcoming' }
+          { id: 1, label: 'Search & Select', status: 'completed' },
+          { id: 2, label: 'Confirm', status: 'active' },
+          { id: 3, label: 'Complete', status: 'upcoming' }
         ]}
-        currentStep={3}
+        currentStep={2}
       />
 
       <Card>

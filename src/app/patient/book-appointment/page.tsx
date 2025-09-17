@@ -9,6 +9,7 @@ import { Badge } from '@/components/common/Badge';
 import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { PractitionerSearch } from '@/components/common/PractitionerSearch';
+import { formatTimeForDisplay } from '@/lib/timezone';
 import type { Practitioner } from '@/types/fhir';
 
 export default function BookAppointment() {
@@ -29,6 +30,13 @@ export default function BookAppointment() {
   const [totalPractitioners, setTotalPractitioners] = useState<number | undefined>();
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
+
+  // Expandable cards state
+  const [expandedPractitionerId, setExpandedPractitionerId] = useState<string | null>(null);
+  const [practitionerSlots, setPractitionerSlots] = useState<Record<string, Record<string, any[]>>>({});
+  const [slotsLoading, setSlotsLoading] = useState<Record<string, boolean>>({});
+  const [selectedDates, setSelectedDates] = useState<Record<string, string>>({});
+  const [selectedSlots, setSelectedSlots] = useState<Record<string, string>>({});
 
   const fetchPractitioners = useCallback(async (page = 1, isSearch = false) => {
     if (isSearch || page === 1) {
@@ -129,8 +137,105 @@ export default function BookAppointment() {
     fetchPractitioners(1, false); // page 1, not a search
   }, [fetchPractitioners]);
 
-  const handleBookNow = (practitioner: Practitioner) => {
-    router.push(`/patient/book-appointment/${practitioner.id}`);
+  // Optimized slot fetching for next 7 days to reduce API calls
+  const fetchSlotsForPractitioner = async (practitionerId: string) => {
+    try {
+      console.log('Fetching 7-day schedules for practitioner:', practitionerId);
+
+      // First get schedules for this practitioner
+      const schedulesResponse = await fetch(`/api/fhir/schedules?actor=Practitioner/${practitionerId}`, {
+        credentials: 'include',
+      });
+
+      if (!schedulesResponse.ok) {
+        console.error('Schedules API failed with status:', schedulesResponse.status, schedulesResponse.statusText);
+        return {};
+      }
+
+      const schedulesData = await schedulesResponse.json();
+      console.log('Schedules data:', schedulesData);
+
+      if (!schedulesData.schedules || schedulesData.schedules.length === 0) {
+        console.log('No schedules found for practitioner');
+        return {};
+      }
+
+      const scheduleIds = schedulesData.schedules.map((s: any) => s.id);
+      console.log('Schedule IDs:', scheduleIds);
+
+      // Calculate date range for next 7 days including today
+      const startDate = new Date();
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + 6); // 7 days total (today + next 6)
+      endDate.setHours(23, 59, 59, 999);
+
+      console.log('Fetching slots for date range:', startDate.toISOString(), 'to', endDate.toISOString());
+
+      // Fetch more slots to cover 7 days
+      const response = await fetch(`/api/fhir/slots?_count=200`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        console.error('Slots API failed with status:', response.status, response.statusText);
+        return {};
+      }
+
+      const result = await response.json();
+      const allSlots = result.slots || [];
+      console.log('Total slots from API:', allSlots.length);
+
+      // Filter slots that belong to this practitioner's schedules
+      const practitionerSlots = allSlots.filter((slot: any) =>
+        scheduleIds.some((scheduleId: string) => slot.schedule?.reference === `Schedule/${scheduleId}`)
+      );
+
+      console.log('Filtered practitioner slots:', practitionerSlots.length);
+
+      // Filter by date range and free status, then organize by date
+      const slotsByDate: Record<string, any[]> = {};
+
+      practitionerSlots.forEach((slot: any) => {
+        const slotStart = new Date(slot.start);
+        if (slot.status === 'free' && slotStart >= startDate && slotStart <= endDate) {
+          const dateKey = slotStart.toISOString().split('T')[0]; // YYYY-MM-DD format
+          if (!slotsByDate[dateKey]) {
+            slotsByDate[dateKey] = [];
+          }
+          slotsByDate[dateKey].push(slot);
+        }
+      });
+
+      console.log('Slots organized by date:', Object.keys(slotsByDate).map(date => `${date}: ${slotsByDate[date].length} slots`));
+      return slotsByDate;
+
+    } catch (error) {
+      console.error('Error fetching slots:', error);
+      return {};
+    }
+  };
+
+  const handleBookNow = async (practitioner: Practitioner) => {
+    // Check if this card is already expanded
+    if (expandedPractitionerId === practitioner.id) {
+      // Card is expanded, collapse it
+      setExpandedPractitionerId(null);
+      return;
+    }
+
+    // Expand this card and fetch slots for next 7 days
+    setExpandedPractitionerId(practitioner.id);
+    setSlotsLoading(prev => ({ ...prev, [practitioner.id]: true }));
+
+    // Set default date to today
+    const today = new Date().toISOString().split('T')[0];
+    setSelectedDates(prev => ({ ...prev, [practitioner.id]: today }));
+
+    // Fetch slots for all 7 days (organized by date)
+    const slotsByDate = await fetchSlotsForPractitioner(practitioner.id);
+    setPractitionerSlots(prev => ({ ...prev, [practitioner.id]: slotsByDate }));
+    setSlotsLoading(prev => ({ ...prev, [practitioner.id]: false }));
   };
 
   const handleNextPage = () => {
@@ -152,13 +257,12 @@ export default function BookAppointment() {
           </p>
         </div>
 
-        {/* Progress Steps */}
+        {/* Progress Steps - Updated for combined flow */}
         <ProgressSteps
           steps={[
-            { id: 1, label: 'Search', status: 'active' },
-            { id: 2, label: 'Select Doctor & Date', status: 'upcoming' },
-            { id: 3, label: 'Confirm', status: 'upcoming' },
-            { id: 4, label: 'Complete', status: 'upcoming' }
+            { id: 1, label: 'Search & Select', status: 'active' },
+            { id: 2, label: 'Confirm', status: 'upcoming' },
+            { id: 3, label: 'Complete', status: 'upcoming' }
           ]}
           currentStep={1}
         />
@@ -291,12 +395,122 @@ export default function BookAppointment() {
                       <Button
                         variant={practitioner.active ? "primary" : "outline"}
                         onClick={() => handleBookNow(practitioner)}
-                        disabled={!practitioner.active}
+                        disabled={!practitioner.active || slotsLoading[practitioner.id]}
                       >
-                        {practitioner.active ? 'Book Now' : 'Unavailable'}
+                        {slotsLoading[practitioner.id]
+                          ? 'Loading...'
+                          : expandedPractitionerId === practitioner.id
+                            ? 'Collapse'
+                            : practitioner.active
+                              ? 'Book Now'
+                              : 'Unavailable'
+                        }
                       </Button>
                     </div>
                   </div>
+
+                  {/* Expandable Content */}
+                  {expandedPractitionerId === practitioner.id && (
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                      <h3 className="text-lg font-semibold mb-4">Select Date & Time</h3>
+
+                      {/* Date Selection */}
+                      <div className="mb-6">
+                        <h4 className="font-medium mb-3">Choose Date</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
+                          {Array.from({ length: 7 }, (_, i) => {
+                            const date = new Date();
+                            date.setDate(date.getDate() + i);
+                            const dateStr = date.toISOString().split('T')[0];
+                            const isSelected = selectedDates[practitioner.id] === dateStr;
+                            const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                            const dayNum = date.getDate();
+                            const month = date.toLocaleDateString('en-US', { month: 'short' });
+
+                            return (
+                              <button
+                                key={dateStr}
+                                onClick={async () => {
+                                  setSelectedDates(prev => ({ ...prev, [practitioner.id]: dateStr }));
+                                  setSlotsLoading(prev => ({ ...prev, [practitioner.id]: true }));
+                                  const slots = await fetchSlotsForPractitioner(practitioner.id, dateStr);
+                                  setPractitionerSlots(prev => ({ ...prev, [practitioner.id]: slots }));
+                                  setSlotsLoading(prev => ({ ...prev, [practitioner.id]: false }));
+                                }}
+                                className={`p-3 rounded-lg border text-center transition-colors ${
+                                  isSelected
+                                    ? 'bg-primary text-white border-primary'
+                                    : 'bg-white hover:bg-gray-50 border-gray-200'
+                                }`}
+                              >
+                                <div className="text-xs">{dayName}</div>
+                                <div className="font-semibold">{dayNum}</div>
+                                <div className="text-xs">{month}</div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Time Slot Selection */}
+                      <div className="mb-6">
+                        <h4 className="font-medium mb-3">Available Times</h4>
+                        {slotsLoading[practitioner.id] ? (
+                          <div className="text-center py-8">
+                            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                            <p className="mt-2 text-text-secondary">Loading available times...</p>
+                          </div>
+                        ) : !practitionerSlots[practitioner.id]?.[selectedDates[practitioner.id] || ''] || practitionerSlots[practitioner.id]?.[selectedDates[practitioner.id] || '']?.length === 0 ? (
+                          <div className="text-center py-8">
+                            <p className="text-text-secondary">No available time slots for this date.</p>
+                            <p className="text-sm text-text-secondary mt-2">Please try a different date.</p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                            {practitionerSlots[practitioner.id]?.[selectedDates[practitioner.id] || '']?.map((slot: any) => {
+                              const timeDisplay = formatTimeForDisplay(slot.start);
+                              const isSelected = selectedSlots[practitioner.id] === slot.id;
+
+                              return (
+                                <button
+                                  key={slot.id}
+                                  onClick={() => {
+                                    setSelectedSlots(prev => ({ ...prev, [practitioner.id]: slot.id }));
+                                  }}
+                                  className={`p-3 rounded-lg border text-center transition-colors ${
+                                    isSelected
+                                      ? 'bg-primary text-white border-primary'
+                                      : 'bg-white hover:bg-gray-50 border-gray-200'
+                                  }`}
+                                >
+                                  {timeDisplay}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Next Button */}
+                      {selectedSlots[practitioner.id] && (
+                        <div className="flex justify-end">
+                          <Button
+                            variant="primary"
+                            onClick={() => {
+                              const selectedSlotId = selectedSlots[practitioner.id];
+                              const selectedDate = selectedDates[practitioner.id];
+                              const selectedSlot = practitionerSlots[practitioner.id]?.[selectedDate]?.find((s: any) => s.id === selectedSlotId);
+                              const selectedTime = selectedSlot ? formatTimeForDisplay(selectedSlot.start) : '';
+
+                              router.push(`/patient/book-appointment/${practitioner.id}/confirm?date=${selectedDate}&time=${selectedTime}&slotId=${selectedSlotId}`);
+                            }}
+                          >
+                            Next →
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </Card>
               );
               })}

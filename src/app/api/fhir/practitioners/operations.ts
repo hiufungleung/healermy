@@ -20,7 +20,7 @@ export async function searchPractitioners(
   }
 ): Promise<any> {
   const queryParams = new URLSearchParams();
-  
+
   if (searchOptions) {
     Object.entries(searchOptions).forEach(([key, value]) => {
       if (value !== undefined) {
@@ -28,7 +28,7 @@ export async function searchPractitioners(
       }
     });
   }
-  
+
   const url = `${fhirBaseUrl}/Practitioner${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
   const response = await FHIRClient.fetchWithAuth(url, token);
   return response.json();
