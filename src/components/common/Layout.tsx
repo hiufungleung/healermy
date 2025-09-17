@@ -84,7 +84,7 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
                       'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium',
                       pathname === item.href
                         ? 'border-primary text-black'
-                        : 'border-transparent text-black hover:text-black hover:font-bold hover:border-black'
+                        : 'border-transparent text-black hover:text-black hover:font-bold hover:border-blue-500'
                     )}
                   >
                     {item.label}

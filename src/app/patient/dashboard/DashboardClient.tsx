@@ -6,10 +6,9 @@ import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import {
   PatientInfoSkeleton,
-  AppointmentSkeleton,
-  TodayStatusSkeleton
+  AppointmentSkeleton
 } from '@/components/common/LoadingSpinner';
-import { formatForDisplay, formatDateForDisplay, formatTimeForDisplay, getNowInAppTimezone, isFutureTime } from '@/lib/timezone';
+import { formatDateForDisplay, formatTimeForDisplay } from '@/lib/timezone';
 import type { Patient, Appointment } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
 
@@ -228,7 +227,7 @@ export default function DashboardClient({
       {/* Welcome Section */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-text-primary mb-2">
-          Hi, {firstName}
+          Welcome, {firstName}
         </h1>
       </div>
 
@@ -236,7 +235,7 @@ export default function DashboardClient({
       {loadingPatient ? (
         <PatientInfoSkeleton className="mb-8" />
       ) : patient ? (
-        <div className="bg-white rounded-lg border border-border p-6 mb-8">
+        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Patient Information</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
@@ -299,54 +298,54 @@ export default function DashboardClient({
       ) : null}
 
       {/* Quick Actions */}
-      <div className="grid md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white rounded-lg border border-border p-4 cursor-pointer hover:shadow-md transition-shadow">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+        <div className="grid md:grid-cols-3 gap-4">
           <button
             onClick={() => router.push('/patient/book-appointment')}
-            className="w-full flex items-center space-x-4"
+            className="group bg-white rounded-lg border-2 border-blue-200 p-4 hover:border-blue-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
           >
-            <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            </div>
-            <div className="text-left">
-              <p className="font-semibold">Add Appointment</p>
-              <p className="text-sm text-text-secondary">Book a new appointment</p>
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-gray-900 group-hover:text-blue-700">Book Appointment</p>
+              </div>
             </div>
           </button>
-        </div>
 
-        <div className="bg-white rounded-lg border border-border p-4 cursor-pointer hover:shadow-md transition-shadow">
           <button
-            onClick={() => router.push('/patient/messages')}
-            className="w-full flex items-center space-x-4"
+            onClick={() => router.push('/patient/notifications')}
+            className="group bg-white rounded-lg border-2 border-amber-200 p-4 hover:border-amber-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
           >
-            <div className="w-12 h-12 bg-yellow-50 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-            </div>
-            <div className="text-left">
-              <p className="font-semibold">View Notifications</p>
-              <p className="text-sm text-text-secondary">Check your messages</p>
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center group-hover:bg-amber-200 transition-colors">
+                <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-gray-900 group-hover:text-amber-700">Check Messages</p>
+              </div>
             </div>
           </button>
-        </div>
 
-        <div className="bg-white rounded-lg border border-border p-4 cursor-pointer hover:shadow-md transition-shadow">
           <button
             onClick={() => router.push('/patient/profile')}
-            className="w-full flex items-center space-x-4"
+            className="group bg-white rounded-lg border-2 border-green-200 p-4 hover:border-green-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
           >
-            <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <div className="text-left">
-              <p className="font-semibold">Edit Profile</p>
-              <p className="text-sm text-text-secondary">Update your information</p>
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-gray-900 group-hover:text-green-700">Edit Profile</p>
+              </div>
             </div>
           </button>
         </div>
