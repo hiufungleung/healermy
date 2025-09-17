@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { AppointmentSkeleton } from '@/components/common/LoadingSpinner';
-import { formatDateForDisplay, formatTimeForDisplay } from '@/lib/timezone';
+import { formatDateForDisplay } from '@/lib/timezone';
 import type { Appointment } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
 
@@ -35,17 +35,93 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
           const data = await response.json();
 
           // Handle different possible response structures
+          let appointmentsList: any[] = [];
           if (Array.isArray(data)) {
-            setAppointments(data);
+            appointmentsList = data;
           } else if (data.appointments && Array.isArray(data.appointments)) {
-            setAppointments(data.appointments);
+            appointmentsList = data.appointments;
           } else if (data.entry && Array.isArray(data.entry)) {
             // Handle FHIR Bundle format
-            setAppointments(data.entry.map((entry: any) => entry.resource).filter(Boolean));
+            appointmentsList = data.entry.map((entry: any) => entry.resource).filter(Boolean);
           } else {
             console.warn('Unexpected appointments API response format:', data);
-            setAppointments([]);
+            appointmentsList = [];
           }
+
+          // Extract unique practitioner IDs to avoid duplicate API calls
+          const practitionerIds = new Set<string>();
+          appointmentsList.forEach((appointment: any) => {
+            const practitionerParticipant = appointment.participant?.find((p: any) =>
+              p.actor?.reference?.startsWith('Practitioner/')
+            );
+            if (practitionerParticipant?.actor?.reference) {
+              const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
+              practitionerIds.add(practitionerId);
+            }
+          });
+
+          // Fetch all practitioner details simultaneously
+          const practitionerPromises = Array.from(practitionerIds).map(async (practitionerId) => {
+            try {
+              const practitionerResponse = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
+                credentials: 'include'
+              });
+              if (practitionerResponse.ok) {
+                const practitionerData = await practitionerResponse.json();
+                return {
+                  id: practitionerId,
+                  data: practitionerData
+                };
+              }
+            } catch (error) {
+              console.warn(`Failed to fetch practitioner ${practitionerId}:`, error);
+            }
+            return null;
+          });
+
+          // Wait for all practitioner API calls to complete simultaneously
+          const practitionerResults = await Promise.all(practitionerPromises);
+
+          // Create a map of practitioner data for quick lookup
+          const practitionersMap = new Map();
+          practitionerResults.forEach((result) => {
+            if (result) {
+              practitionersMap.set(result.id, result.data);
+            }
+          });
+
+          // Add practitioner details to appointments
+          const appointmentsWithDetails = appointmentsList.map((appointment: any) => {
+            const practitionerParticipant = appointment.participant?.find((p: any) =>
+              p.actor?.reference?.startsWith('Practitioner/')
+            );
+
+            if (practitionerParticipant?.actor?.reference) {
+              const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
+              const practitionerData = practitionersMap.get(practitionerId);
+
+              if (practitionerData) {
+                appointment.practitionerDetails = {
+                  name: practitionerData.name?.[0] ?
+                    `${(practitionerData.name[0].prefix || []).join(' ')} ${(practitionerData.name[0].given || []).join(' ')} ${practitionerData.name[0].family || ''}`.trim() :
+                    'Provider',
+                  specialty: practitionerData.qualification?.[0]?.code?.text || 'General',
+                  address: practitionerData.address?.[0] ?
+                    [
+                      ...(practitionerData.address[0].line || []),
+                      practitionerData.address[0].city || practitionerData.address[0].district,
+                      practitionerData.address[0].state,
+                      practitionerData.address[0].postalCode
+                    ].filter(Boolean).join(', ') : 'TBD',
+                  phone: practitionerData.telecom?.find((t: any) => t.system === 'phone')?.value || 'N/A'
+                };
+              }
+            }
+
+            return appointment;
+          });
+
+          setAppointments(appointmentsWithDetails);
         } else {
           console.error('Failed to fetch appointments:', response.status, response.statusText);
           setAppointments([]);
@@ -319,15 +395,14 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
             <div className="space-y-4">
               {filteredAppointments.map((appointment) => {
                 const appointmentStatus = appointment.status;
-                const doctorName = appointment.participant?.find(p =>
-                  p.actor?.reference?.startsWith('Practitioner/'))?.actor?.display || 'Provider';
+                const doctorName = (appointment as any).practitionerDetails?.name || 'Provider';
                 const appointmentDate = appointment.start;
-                const appointmentTime = appointmentDate ? formatTimeForDisplay(appointmentDate) : 'TBD';
                 const appointmentDateDisplay = appointmentDate ? formatDateForDisplay(appointmentDate) : 'TBD';
-                const specialty = appointment.serviceType?.[0]?.text ||
+                const specialty = (appointment as any).practitionerDetails?.specialty ||
+                                appointment.serviceType?.[0]?.text ||
                                 appointment.serviceType?.[0]?.coding?.[0]?.display || 'General';
-                const location = appointment.participant?.find(p =>
-                  p.actor?.reference?.startsWith('Location/'))?.actor?.display || 'TBD';
+                const location = (appointment as any).practitionerDetails?.address || 'TBD';
+                const phoneNumber = (appointment as any).practitionerDetails?.phone || 'N/A';
 
                 const canCancel = appointmentStatus !== 'cancelled' && appointmentStatus !== 'fulfilled';
                 const canReschedule = appointmentStatus !== 'cancelled' && appointmentStatus !== 'fulfilled';
@@ -364,9 +439,9 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
                       </div>
                       <div className="flex items-center space-x-2">
                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                         </svg>
-                        <span className="font-medium">{appointmentTime}</span>
+                        <span className="font-medium">{phoneNumber}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

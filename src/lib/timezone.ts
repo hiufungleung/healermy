@@ -7,6 +7,16 @@
 export const APP_TIMEZONE = process.env.NEXT_PUBLIC_APP_TIMEZONE || 'Australia/Brisbane';
 
 /**
+ * Get the user's locale from their computer/browser
+ */
+function getUserLocale(): string {
+  if (typeof window !== 'undefined') {
+    return navigator.language;
+  }
+  return 'en-AU'; // Server-side fallback
+}
+
+/**
  * Convert a UTC date/time string to Brisbane timezone
  * Returns the same moment in time, but adjusted for Brisbane timezone display
  */
@@ -66,7 +76,7 @@ export function formatForDisplay(date: string | Date, options?: Intl.DateTimeFor
     ...options
   };
   
-  return dateObj.toLocaleString('en-AU', defaultOptions);
+  return dateObj.toLocaleString(getUserLocale(), defaultOptions);
 }
 
 /**

@@ -8,7 +8,7 @@ import {
   PatientInfoSkeleton,
   AppointmentSkeleton
 } from '@/components/common/LoadingSpinner';
-import { formatDateForDisplay, formatTimeForDisplay, getNowInAppTimezone } from '@/lib/timezone';
+import { formatDateForDisplay, getNowInAppTimezone } from '@/lib/timezone';
 import type { Patient, Appointment } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
 
@@ -81,7 +81,82 @@ export default function DashboardClient({
         });
         if (response.ok) {
           const data = await response.json();
-          setAppointments(data.appointments || []);
+          const appointments = data.appointments || [];
+
+          // Extract unique practitioner IDs to avoid duplicate API calls
+          const practitionerIds = new Set<string>();
+          appointments.forEach((appointment: any) => {
+            const practitionerParticipant = appointment.participant?.find((p: any) =>
+              p.actor?.reference?.startsWith('Practitioner/')
+            );
+            if (practitionerParticipant?.actor?.reference) {
+              const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
+              practitionerIds.add(practitionerId);
+            }
+          });
+
+          // Fetch all practitioner details simultaneously
+          const practitionerPromises = Array.from(practitionerIds).map(async (practitionerId) => {
+            try {
+              const practitionerResponse = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
+                credentials: 'include'
+              });
+              if (practitionerResponse.ok) {
+                const practitionerData = await practitionerResponse.json();
+                return {
+                  id: practitionerId,
+                  data: practitionerData
+                };
+              }
+            } catch (error) {
+              console.warn(`Failed to fetch practitioner ${practitionerId}:`, error);
+            }
+            return null;
+          });
+
+          // Wait for all practitioner API calls to complete simultaneously
+          const practitionerResults = await Promise.all(practitionerPromises);
+
+          // Create a map of practitioner data for quick lookup
+          const practitionersMap = new Map();
+          practitionerResults.forEach((result) => {
+            if (result) {
+              practitionersMap.set(result.id, result.data);
+            }
+          });
+
+          // Add practitioner details to appointments
+          const appointmentsWithDetails = appointments.map((appointment: any) => {
+            const practitionerParticipant = appointment.participant?.find((p: any) =>
+              p.actor?.reference?.startsWith('Practitioner/')
+            );
+
+            if (practitionerParticipant?.actor?.reference) {
+              const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
+              const practitionerData = practitionersMap.get(practitionerId);
+
+              if (practitionerData) {
+                appointment.practitionerDetails = {
+                  name: practitionerData.name?.[0] ?
+                    `${(practitionerData.name[0].prefix || []).join(' ')} ${(practitionerData.name[0].given || []).join(' ')} ${practitionerData.name[0].family || ''}`.trim() :
+                    'Provider',
+                  specialty: practitionerData.qualification?.[0]?.code?.text || 'General',
+                  address: practitionerData.address?.[0] ?
+                    [
+                      ...(practitionerData.address[0].line || []),
+                      practitionerData.address[0].city || practitionerData.address[0].district,
+                      practitionerData.address[0].state,
+                      practitionerData.address[0].postalCode
+                    ].filter(Boolean).join(', ') : 'TBD',
+                  phone: practitionerData.telecom?.find((t: any) => t.system === 'phone')?.value || 'N/A'
+                };
+              }
+            }
+
+            return appointment;
+          });
+
+          setAppointments(appointmentsWithDetails);
         }
       } catch (error) {
         console.error('Error fetching appointments:', error);
@@ -388,14 +463,16 @@ export default function DashboardClient({
               {loadingAppointments ? (
                 <AppointmentSkeleton count={2} />
               ) : displayAppointments.map((appointment) => {
-                // Extract FHIR appointment data
+                // Extract FHIR appointment data with practitioner details
                 const appointmentStatus = appointment.status;
-                const doctorName = appointment.participant?.find(p => p.actor?.reference?.startsWith('Practitioner/'))?.actor?.display || 'Provider';
+                const doctorName = (appointment as any).practitionerDetails?.name || 'Provider';
                 const appointmentDate = appointment.start;
-                const appointmentTime = appointmentDate ? formatTimeForDisplay(appointmentDate) : 'TBD';
                 const appointmentDateDisplay = appointmentDate ? formatDateForDisplay(appointmentDate) : 'TBD';
-                const specialty = appointment.serviceType?.[0]?.text || appointment.serviceType?.[0]?.coding?.[0]?.display || 'General';
-                const location = appointment.participant?.find(p => p.actor?.reference?.startsWith('Location/'))?.actor?.display || 'TBD';
+                const specialty = (appointment as any).practitionerDetails?.specialty ||
+                               appointment.serviceType?.[0]?.text ||
+                               appointment.serviceType?.[0]?.coding?.[0]?.display || 'General';
+                const location = (appointment as any).practitionerDetails?.address || 'TBD';
+                const phoneNumber = (appointment as any).practitionerDetails?.phone || 'N/A';
 
                 return (
                   <div
@@ -430,9 +507,9 @@ export default function DashboardClient({
                       </div>
                       <div className="flex items-center space-x-2">
                         <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                         </svg>
-                        <span>{appointmentTime}</span>
+                        <span>{phoneNumber}</span>
                       </div>
                       <div className="flex items-center space-x-2 col-span-2">
                         <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
