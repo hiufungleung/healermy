@@ -131,117 +131,126 @@ export function PractitionerSearch({
     <div className="mb-6">
       {/* FHIR Search Filters */}
       {showAdvancedFilters && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
-          {/* Given Name */}
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-2">
-              Given Name
-            </label>
-            <input
-              type="text"
-              placeholder="First name..."
-              value={givenName}
-              onChange={(e) => setGivenName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
+        <div className="space-y-4 mb-4">
+          {/* Name Fields Row - Always 2 columns on mobile+ */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {/* Given Name */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                Given Name
+              </label>
+              <input
+                type="text"
+                placeholder="First name..."
+                value={givenName}
+                onChange={(e) => setGivenName(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
+              />
+            </div>
+
+            {/* Family Name */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                Family Name
+              </label>
+              <input
+                type="text"
+                placeholder="Last name..."
+                value={familyName}
+                onChange={(e) => setFamilyName(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
+              />
+            </div>
           </div>
 
-          {/* Family Name */}
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-2">
-              Family Name
-            </label>
-            <input
-              type="text"
-              placeholder="Last name..."
-              value={familyName}
-              onChange={(e) => setFamilyName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
+          {/* Contact Fields Row - 2 columns on mobile, responsive on larger screens */}
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4">
+            {/* Phone */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                Phone
+              </label>
+              <input
+                type="text"
+                placeholder="Phone number..."
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
+              />
+            </div>
+
+            {/* Practitioner ID */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                Practitioner ID
+              </label>
+              <input
+                type="text"
+                placeholder="ID..."
+                value={practitionerId}
+                onChange={(e) => setPractitionerId(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
+              />
+            </div>
           </div>
 
-          {/* Phone */}
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-2">
-              Phone
-            </label>
-            <input
-              type="text"
-              placeholder="Phone number..."
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
+          {/* Location Fields Row - Responsive based on screen size */}
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            {/* Address City */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                City
+              </label>
+              <input
+                type="text"
+                placeholder="City..."
+                value={addressCity}
+                onChange={(e) => setAddressCity(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
+              />
+            </div>
 
-          {/* Practitioner ID */}
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-2">
-              Practitioner ID
-            </label>
-            <input
-              type="text"
-              placeholder="ID..."
-              value={practitionerId}
-              onChange={(e) => setPractitionerId(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
+            {/* Address State */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                State
+              </label>
+              <input
+                type="text"
+                placeholder="State..."
+                value={addressState}
+                onChange={(e) => setAddressState(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
+              />
+            </div>
 
-          {/* Address City */}
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-2">
-              City
-            </label>
-            <input
-              type="text"
-              placeholder="City..."
-              value={addressCity}
-              onChange={(e) => setAddressCity(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
+            {/* Address Postal Code */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                Postal Code
+              </label>
+              <input
+                type="text"
+                placeholder="Postal code..."
+                value={addressPostalCode}
+                onChange={(e) => setAddressPostalCode(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
+              />
+            </div>
 
-          {/* Address State */}
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-2">
-              State
-            </label>
-            <input
-              type="text"
-              placeholder="State..."
-              value={addressState}
-              onChange={(e) => setAddressState(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
-          {/* Address Postal Code */}
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-2">
-              Postal Code
-            </label>
-            <input
-              type="text"
-              placeholder="Postal code..."
-              value={addressPostalCode}
-              onChange={(e) => setAddressPostalCode(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
-          {/* Address Country */}
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-2">
-              Country
-            </label>
-            <input
-              type="text"
-              placeholder="Country..."
-              value={addressCountry}
-              onChange={(e) => setAddressCountry(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
+            {/* Address Country */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                Country
+              </label>
+              <input
+                type="text"
+                placeholder="Country..."
+                value={addressCountry}
+                onChange={(e) => setAddressCountry(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
+              />
+            </div>
           </div>
         </div>
       )}
