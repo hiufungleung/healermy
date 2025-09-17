@@ -7,13 +7,11 @@ import type { AuthSession } from '@/types/auth';
 
 interface DashboardWrapperProps {
   initialPatientName: string;
-  greeting: string;
   session: AuthSession;
 }
 
 export default function DashboardWrapper({
   initialPatientName,
-  greeting,
   session
 }: DashboardWrapperProps) {
   const [patientName, setPatientName] = useState(initialPatientName);
@@ -23,7 +21,6 @@ export default function DashboardWrapper({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <DashboardClient
           patientName={patientName}
-          greeting={greeting}
           session={session}
           onPatientNameUpdate={setPatientName}
         />

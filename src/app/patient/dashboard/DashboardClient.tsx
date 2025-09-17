@@ -15,14 +15,12 @@ import type { AuthSession } from '@/types/auth';
 
 interface DashboardClientProps {
   patientName: string;
-  greeting: string;
   session: AuthSession;
   onPatientNameUpdate?: (name: string) => void;
 }
 
 export default function DashboardClient({
   patientName: initialPatientName,
-  greeting,
   session,
   onPatientNameUpdate
 }: DashboardClientProps) {
@@ -218,7 +216,7 @@ export default function DashboardClient({
       {/* Welcome Section */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-text-primary mb-2">
-          Good {greeting}, {patientName}
+          Hi, {patientName}
         </h1>
       </div>
 

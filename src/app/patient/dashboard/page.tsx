@@ -11,13 +11,9 @@ export default async function PatientDashboard() {
     redirect('/');
   }
 
-  const currentHour = new Date().getHours();
-  const greeting = currentHour < 12 ? 'Morning' : currentHour < 18 ? 'Afternoon' : 'Evening';
-
   return (
     <DashboardWrapper
       initialPatientName={patientName}
-      greeting={greeting}
       session={session}
     />
   );
