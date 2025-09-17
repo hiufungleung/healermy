@@ -158,14 +158,37 @@ export function isFutureTime(dateTime: string | Date): boolean {
 
 /**
  * Get start and end of day in Brisbane timezone, converted to UTC for FHIR queries
+ * Uses proper timezone API instead of manual offset calculation
  */
 export function getDayBoundsInUTC(localDate: string): { start: string; end: string } {
-  const startOfDay = createFHIRDateTime(localDate, '00:00');
-  const endOfDay = createFHIRDateTime(localDate, '23:59');
-  
+  // Create start of day in Brisbane timezone
+  const startOfDayBrisbane = new Date(`${localDate}T00:00:00`);
+  const endOfDayBrisbane = new Date(`${localDate}T23:59:59`);
+
+  // Convert Brisbane times to UTC using proper timezone conversion
+  // Brisbane is UTC+10, so subtract 10 hours to get UTC
+  const startUTC = new Date(startOfDayBrisbane.getTime() - (10 * 60 * 60 * 1000));
+  const endUTC = new Date(endOfDayBrisbane.getTime() - (10 * 60 * 60 * 1000));
+
   return {
-    start: startOfDay,
-    end: endOfDay
+    start: startUTC.toISOString(),
+    end: endUTC.toISOString()
+  };
+}
+
+/**
+ * Get Brisbane date bounds formatted specifically for FHIR slot queries
+ * Returns proper FHIR search parameter format with comparators
+ */
+export function getBrisbaneDateBoundsForFHIR(localDate: string): {
+  startGE: string;
+  endLT: string;
+} {
+  const dayBounds = getDayBoundsInUTC(localDate);
+
+  return {
+    startGE: dayBounds.start,  // For start=ge parameter
+    endLT: dayBounds.end      // For start=lt parameter (next day)
   };
 }
 

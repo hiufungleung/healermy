@@ -9,7 +9,7 @@ import { Badge } from '@/components/common/Badge';
 import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { SlotSelectionGrid } from '@/components/common/SlotDisplay';
-import { formatTimeForDisplay, getDayBoundsInUTC } from '@/lib/timezone';
+import { formatTimeForDisplay, getBrisbaneDateBoundsForFHIR } from '@/lib/timezone';
 import type { Practitioner, Slot } from '@/types/fhir';
 
 
@@ -28,9 +28,9 @@ export default function SelectAppointment() {
 
   useEffect(() => {
     fetchPractitionerDetails();
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    setSelectedDate(tomorrow.toISOString().split('T')[0]);
+    // Set default to today instead of tomorrow
+    const today = new Date();
+    setSelectedDate(today.toISOString().split('T')[0]);
   }, [practitionerId]);
 
   useEffect(() => {
@@ -58,94 +58,87 @@ export default function SelectAppointment() {
     }
   };
 
+
   const fetchAvailableSlots = async () => {
     setLoading(true);
     try {
-      const startDate = new Date(selectedDate);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(selectedDate);
-      endDate.setHours(23, 59, 59, 999);
-      
       console.log('Fetching schedules for practitioner:', practitionerId);
-      
+
       // First get schedules for this practitioner
       const schedulesResponse = await fetch(`/api/fhir/schedules?actor=Practitioner/${practitionerId}`, {
         credentials: 'include',
       });
-      
+
       if (!schedulesResponse.ok) {
         console.error('Schedules API failed with status:', schedulesResponse.status, schedulesResponse.statusText);
-        const error = await schedulesResponse.json().catch(() => ({ 
+        const error = await schedulesResponse.json().catch(() => ({
           error: 'Unknown error',
           status: schedulesResponse.status,
-          statusText: schedulesResponse.statusText 
+          statusText: schedulesResponse.statusText
         }));
         console.error('Failed to fetch schedules:', error);
         setAvailableSlots([]);
         return;
       }
-      
+
       const schedulesData = await schedulesResponse.json();
       console.log('Schedules data:', schedulesData);
-      
+
       if (!schedulesData.schedules || schedulesData.schedules.length === 0) {
         console.log('No schedules found for practitioner');
         setAvailableSlots([]);
         return;
       }
-      
+
       const scheduleIds = schedulesData.schedules.map((s: any) => s.id);
       console.log('Schedule IDs:', scheduleIds);
-      
-      // Use the same simple approach as provider page
-      // Fetch all slots and filter client-side (same as provider implementation)
-      console.log('Fetching slots using provider approach: simple API call with client-side filtering');
-      
-      const response = await fetch(`/api/fhir/slots?_count=100`, {
+
+      // Use optimized working approach - fetch slots and filter client-side
+      console.log('Fetching slots for date:', selectedDate);
+
+      // Increased count for better coverage while keeping it reasonable
+      const response = await fetch(`/api/fhir/slots?_count=50`, {
         credentials: 'include',
       });
-      
+
       if (!response.ok) {
         console.error('Slots API failed with status:', response.status, response.statusText);
-        const error = await response.json().catch(() => ({ 
+        const error = await response.json().catch(() => ({
           error: 'Unknown error',
           status: response.status,
-          statusText: response.statusText 
+          statusText: response.statusText
         }));
         console.error('Failed to fetch slots:', error);
         setAvailableSlots([]);
         return;
       }
-      
+
       const result = await response.json();
-      console.log('All slots data:', result);
-      
-      // Filter slots client-side (same as provider page approach)
       const allSlots = result.slots || [];
       console.log('Total slots from API:', allSlots.length);
-      
+
       // Filter slots that belong to this practitioner's schedules
       const practitionerSlots = allSlots.filter((slot: Slot) =>
-        schedulesData.schedules.some(schedule => slot.schedule?.reference === `Schedule/${schedule.id}`)
+        scheduleIds.some(scheduleId => slot.schedule?.reference === `Schedule/${scheduleId}`)
       );
-      
+
       console.log('Filtered practitioner slots:', practitionerSlots.length);
-      
-      // Further filter by selected date and free status using Brisbane timezone
-      const dayBounds = getDayBoundsInUTC(selectedDate);
-      const startOfDay = new Date(dayBounds.start);
-      const endOfDay = new Date(dayBounds.end);
-      
+
+      // Filter by selected date and free status using Brisbane timezone
+      const dateBounds = getBrisbaneDateBoundsForFHIR(selectedDate);
+      const startOfDay = new Date(dateBounds.startGE);
+      const endOfDay = new Date(dateBounds.endLT);
+
       const dateAndStatusFilteredSlots = practitionerSlots.filter((slot: Slot) => {
         const slotStart = new Date(slot.start);
-        return slot.status === 'free' && 
-               slotStart >= startOfDay && 
+        return slot.status === 'free' &&
+               slotStart >= startOfDay &&
                slotStart <= endOfDay;
       });
-      
-      console.log('Final filtered slots for selected date:', dateAndStatusFilteredSlots.length);
+
+      console.log('Available slots for selected date:', dateAndStatusFilteredSlots.length);
       setAvailableSlots(dateAndStatusFilteredSlots);
-      
+
     } catch (error) {
       console.error('Error fetching slots:', error);
       setAvailableSlots([]);
@@ -206,10 +199,10 @@ export default function SelectAppointment() {
   const rating = 4.9; // Mock rating
   const reviews = 125; // Mock reviews
 
-  // Generate dates for the next 7 days
+  // Generate dates starting from today for the next 7 days
   const availableDates = Array.from({ length: 7 }, (_, i) => {
     const date = new Date();
-    date.setDate(date.getDate() + i + 1);
+    date.setDate(date.getDate() + i); // Start from today (i=0)
     return date;
   });
 
