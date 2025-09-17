@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { ContentContainer } from '@/components/common/ContentContainer';
+import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { createFHIRDateTime } from '@/lib/timezone';
 import type { Practitioner, Appointment, Slot } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
@@ -175,38 +176,15 @@ export default function ConfirmAppointmentClient({
       </div>
 
       {/* Progress Steps */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between max-w-2xl">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-semibold">
-              ✓
-            </div>
-            <span className="ml-2 text-sm">Search</span>
-          </div>
-          <div className="flex-1 h-1 bg-primary mx-2"></div>
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-semibold">
-              ✓
-            </div>
-            <span className="ml-2 text-sm">Select Doctor & Date</span>
-          </div>
-          <div className="flex-1 h-1 bg-primary mx-2"></div>
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold">
-              3
-            </div>
-            <span className="ml-2 text-sm font-semibold">Confirm</span>
-          </div>
-          <div className="flex-1 h-1 bg-gray-200 mx-2"></div>
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-gray-200 text-gray-500 rounded-full flex items-center justify-center font-semibold">
-              4
-            </div>
-            <span className="ml-2 text-sm text-gray-500">Complete</span>
-          </div>
-        </div>
-        <p className="text-right text-sm text-text-secondary mt-2">Step 3 of 4</p>
-      </div>
+      <ProgressSteps
+        steps={[
+          { id: 1, label: 'Search', status: 'completed' },
+          { id: 2, label: 'Select Doctor & Date', status: 'completed' },
+          { id: 3, label: 'Confirm', status: 'active' },
+          { id: 4, label: 'Complete', status: 'upcoming' }
+        ]}
+        currentStep={3}
+      />
 
       <Card>
         <h2 className="text-xl font-semibold mb-4">Confirm Your Appointment</h2>

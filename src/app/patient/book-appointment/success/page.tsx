@@ -5,46 +5,25 @@ import { useRouter } from 'next/navigation';
 import { Layout } from '@/components/common/Layout';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
+import { ContentContainer } from '@/components/common/ContentContainer';
+import { ProgressSteps } from '@/components/common/ProgressSteps';
 
 export default function BookingSuccess() {
   const router = useRouter();
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <ContentContainer size="sm">
         {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between max-w-2xl">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-semibold">
-                ✓
-              </div>
-              <span className="ml-2 text-sm">Search</span>
-            </div>
-            <div className="flex-1 h-1 bg-green-500 mx-2"></div>
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-semibold">
-                ✓
-              </div>
-              <span className="ml-2 text-sm">Select Doctor & Date</span>
-            </div>
-            <div className="flex-1 h-1 bg-green-500 mx-2"></div>
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-semibold">
-                ✓
-              </div>
-              <span className="ml-2 text-sm">Confirm</span>
-            </div>
-            <div className="flex-1 h-1 bg-green-500 mx-2"></div>
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-semibold">
-                ✓
-              </div>
-              <span className="ml-2 text-sm font-semibold">Complete</span>
-            </div>
-          </div>
-          <p className="text-right text-sm text-text-secondary mt-2">Step 4 of 4</p>
-        </div>
+        <ProgressSteps
+          steps={[
+            { id: 1, label: 'Search', status: 'completed' },
+            { id: 2, label: 'Select Doctor & Date', status: 'completed' },
+            { id: 3, label: 'Confirm', status: 'completed' },
+            { id: 4, label: 'Complete', status: 'completed' }
+          ]}
+          currentStep={4}
+        />
 
         <Card className="text-center">
           {/* Success Icon */}
@@ -115,7 +94,7 @@ export default function BookingSuccess() {
             </p>
           </div>
         </Card>
-      </div>
+      </ContentContainer>
     </Layout>
   );
 }

@@ -7,6 +7,7 @@ import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { ContentContainer } from '@/components/common/ContentContainer';
+import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { PractitionerSearch } from '@/components/common/PractitionerSearch';
 import type { Practitioner } from '@/types/fhir';
 
@@ -151,6 +152,17 @@ export default function BookAppointment() {
           </p>
         </div>
 
+        {/* Progress Steps */}
+        <ProgressSteps
+          steps={[
+            { id: 1, label: 'Search', status: 'active' },
+            { id: 2, label: 'Select Doctor & Date', status: 'upcoming' },
+            { id: 3, label: 'Confirm', status: 'upcoming' },
+            { id: 4, label: 'Complete', status: 'upcoming' }
+          ]}
+          currentStep={1}
+        />
+
         {/* Practitioner Search */}
         <PractitionerSearch
           onFiltersChange={handleFiltersChange}
@@ -272,16 +284,6 @@ export default function BookAppointment() {
                             </span>
                           </div>
                         )}
-                        
-                        <div className="mt-4 pt-3 border-t border-gray-100">
-                          <p className="text-sm text-text-secondary mb-2">Book an appointment:</p>
-                          <p className="text-xs text-text-secondary">
-                            {practitioner.active 
-                              ? 'Click "Book Now" to view available appointment times'
-                              : 'This practitioner is currently not accepting new appointments'
-                            }
-                          </p>
-                        </div>
                       </div>
                     </div>
                     
