@@ -13,6 +13,8 @@ export async function searchAppointments(
   options?: string | {
     status?: string;
     _count?: number;
+    'date-from'?: string;
+    'date-to'?: string;
   },
   dateFrom?: string,
   dateTo?: string
@@ -25,7 +27,9 @@ export async function searchAppointments(
   // Handle backward compatibility: options can be a string (old status param) or object
   let status: string | undefined;
   let count: number | undefined;
-  
+  let optionsDateFrom: string | undefined;
+  let optionsDateTo: string | undefined;
+
   if (typeof options === 'string') {
     // Legacy usage: third parameter is status string
     status = options;
@@ -33,20 +37,26 @@ export async function searchAppointments(
     // New usage: third parameter is options object
     status = options.status;
     count = options._count;
+    optionsDateFrom = options['date-from'];
+    optionsDateTo = options['date-to'];
   }
-  
+
   if (status) queryParams.append('status', status);
   if (count) queryParams.append('_count', count.toString());
-  
+
+  // Use date parameters from options object first, then fall back to function parameters
+  const finalDateFrom = optionsDateFrom || dateFrom;
+  const finalDateTo = optionsDateTo || dateTo;
+
   // FHIR requires date parameters with time component and timezone (per swagger.json)
-  if (dateFrom) {
+  if (finalDateFrom) {
     // If dateFrom provided, ensure it has time component
-    const fromDate = dateFrom.includes('T') ? dateFrom : `${dateFrom}T00:00:00.000Z`;
+    const fromDate = finalDateFrom.includes('T') ? finalDateFrom : `${finalDateFrom}T00:00:00.000Z`;
     queryParams.append('date', `ge${fromDate}`);
-    
-    if (dateTo) {
+
+    if (finalDateTo) {
       // If dateTo also provided, add upper bound
-      const toDate = dateTo.includes('T') ? dateTo : `${dateTo}T23:59:59.999Z`;
+      const toDate = finalDateTo.includes('T') ? finalDateTo : `${finalDateTo}T23:59:59.999Z`;
       queryParams.append('date', `le${toDate}`);
     }
   } else {

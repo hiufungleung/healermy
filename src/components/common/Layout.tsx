@@ -54,7 +54,6 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
         { href: '/provider/dashboard', label: 'Dashboard' },
         { href: '/provider/practitioner', label: 'Manage Practitioners' },
         { href: '/provider/appointments', label: 'Appointments' },
-        { href: '/provider/appointments/pending', label: 'Pending Requests' },
         { href: '/provider/notifications', label: 'Notifications' },
         { href: '/provider/profile', label: 'Profile' },
       ]
