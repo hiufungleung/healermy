@@ -80,6 +80,27 @@ export async function updateCommunication(
 }
 
 /**
+ * Delete a communication
+ */
+export async function deleteCommunication(
+  token: string,
+  fhirBaseUrl: string,
+  communicationId: string
+): Promise<any> {
+  const url = `${fhirBaseUrl}/Communication/${communicationId}`;
+  const response = await FHIRClient.fetchWithAuth(url, token, {
+    method: 'DELETE',
+  });
+
+  // DELETE requests typically return 204 No Content or 200 OK
+  if (response.status === 204) {
+    return { success: true };
+  }
+
+  return response.json();
+}
+
+/**
  * Helper function to create automatic status update messages
  */
 export async function createStatusUpdateMessage(

@@ -76,8 +76,8 @@ export default function NotificationsClient({
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
   
-  // Static notifications data
-  const [staticNotifications, setStaticNotifications] = useState<StaticNotification[]>([
+  // Static notifications data (initial data)
+  const initialStaticNotifications: StaticNotification[] = [
     {
       id: 'static-1',
       type: 'appointment_confirmed',
@@ -123,7 +123,16 @@ export default function NotificationsClient({
       read: true,
       actionRequired: false
     }
-  ]);
+  ];
+
+  const [staticNotifications, setStaticNotifications] = useState<StaticNotification[]>([]);
+
+  // Initialize static notifications, filtering out deleted ones
+  useEffect(() => {
+    const deletedIds = JSON.parse(localStorage.getItem('deletedStaticNotifications') || '[]');
+    const filteredNotifications = initialStaticNotifications.filter(notif => !deletedIds.includes(notif.id));
+    setStaticNotifications(filteredNotifications);
+  }, []);
 
   // Function to check if message is read
   const isMessageRead = (comm: Communication): boolean => {
@@ -248,15 +257,43 @@ export default function NotificationsClient({
     }
   };
 
-  const deleteNotification = (id: string) => {
-    setLocalCommunications(localCommunications.filter(n => n.id !== id));
+  const deleteNotification = async (id: string) => {
+    // Immediately update local state for instant UI feedback
+    setLocalCommunications(prev => prev.filter(n => n.id !== id));
     if (selectedMessage?.id === id) {
       setSelectedMessage(null);
+    }
+
+    try {
+      // Call backend API to permanently delete the communication
+      const response = await fetch(`/api/fhir/communications/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        console.error('Failed to delete communication on server');
+        // Could potentially revert local state here if needed
+      }
+
+      // Dispatch event to update notification bell
+      window.dispatchEvent(new CustomEvent('messageUpdate'));
+    } catch (error) {
+      console.error('Failed to delete communication:', error);
+      // Could potentially revert local state here if needed
     }
   };
 
   const deleteStaticNotification = (id: string) => {
-    setStaticNotifications(staticNotifications.filter(n => n.id !== id));
+    setStaticNotifications(prev => prev.filter(n => n.id !== id));
+
+    // Store deleted notification IDs in localStorage for persistence
+    const deletedIds = JSON.parse(localStorage.getItem('deletedStaticNotifications') || '[]');
+    const updatedDeletedIds = [...deletedIds, id];
+    localStorage.setItem('deletedStaticNotifications', JSON.stringify(updatedDeletedIds));
+
+    // Dispatch event to update notification bell
+    window.dispatchEvent(new CustomEvent('messageUpdate'));
   };
 
   const getStaticNotificationIcon = (type: StaticNotification['type']) => {
