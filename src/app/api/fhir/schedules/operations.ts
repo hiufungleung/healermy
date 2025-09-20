@@ -1,19 +1,21 @@
 import { FHIRClient } from '../client';
 
 /**
- * Search schedules by practitioner ID
+ * Search schedules by practitioner ID - Direct FHIR query approach
  */
 export async function searchSchedules(
   token: string,
   fhirBaseUrl: string,
   searchOptions?: {
-    actor?: string; // Practitioner/[id]
-    date?: string;   // Date range
+    actor?: string;   // Practitioner/{id}
+    date?: string;    // Date range with ge/le comparators
+    specialty?: string;
     _count?: number;
   }
 ): Promise<any> {
   const queryParams = new URLSearchParams();
-  
+
+  // Add search parameters directly as provided
   if (searchOptions) {
     Object.entries(searchOptions).forEach(([key, value]) => {
       if (value !== undefined) {
@@ -21,10 +23,15 @@ export async function searchSchedules(
       }
     });
   }
-  
-  const url = `${fhirBaseUrl}/Schedule${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+
+  const url = `${fhirBaseUrl}/Schedule?${queryParams.toString()}`;
+  console.log('Schedule query URL:', url);
+
   const response = await FHIRClient.fetchWithAuth(url, token);
-  return response.json();
+  const result = await response.json();
+
+  console.log('Schedule query result:', result);
+  return result;
 }
 
 /**

@@ -16,10 +16,11 @@ export async function GET(request: NextRequest) {
     
     const { searchParams } = request.nextUrl;
     
-    // Build search options from query parameters
+    // Build search options from query parameters - Direct FHIR mapping
     const searchOptions: {
       actor?: string;
       date?: string;
+      specialty?: string;
       _count?: number;
     } = {};
 
@@ -28,6 +29,9 @@ export async function GET(request: NextRequest) {
     }
     if (searchParams.get('date')) {
       searchOptions.date = searchParams.get('date')!;
+    }
+    if (searchParams.get('specialty')) {
+      searchOptions.specialty = searchParams.get('specialty')!;
     }
     if (searchParams.get('_count')) {
       searchOptions._count = parseInt(searchParams.get('_count')!);

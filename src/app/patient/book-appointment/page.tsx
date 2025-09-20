@@ -9,7 +9,9 @@ import { Badge } from '@/components/common/Badge';
 import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { PractitionerSearch } from '@/components/common/PractitionerSearch';
-import { formatTimeForDisplay } from '@/lib/timezone';
+import {
+  formatTimeForDisplay
+} from '@/lib/timezone';
 import type { Practitioner } from '@/types/fhir';
 
 export default function BookAppointment() {
@@ -99,7 +101,7 @@ export default function BookAppointment() {
         setPractitioners(result.practitioners || []);
       } else {
         // Next page - append practitioners  
-        setPractitioners(prev => [...prev, ...(result.practitioners || [])]);
+        setPractitioners((prev: any[]) => [...prev, ...(result.practitioners || [])]);
       }
       
       setTotalPractitioners(result.total);
@@ -137,15 +139,19 @@ export default function BookAppointment() {
     fetchPractitioners(1, false); // page 1, not a search
   }, [fetchPractitioners]);
 
-  // Optimized slot fetching for next 7 days to reduce API calls
+  // Timezone-aware slot fetching for next 7 days using Brisbane timezone
   const fetchSlotsForPractitioner = async (practitionerId: string) => {
     try {
       console.log('Fetching 7-day schedules for practitioner:', practitionerId);
 
-      // First get schedules for this practitioner
-      const schedulesResponse = await fetch(`/api/fhir/schedules?actor=Practitioner/${practitionerId}`, {
-        credentials: 'include',
-      });
+      // Get all schedules for this practitioner (no date filter)
+      // We'll filter dates on client side using patient's local timezone
+      const schedulesResponse = await fetch(
+        `/api/fhir/schedules?actor=Practitioner/${practitionerId}`,
+        {
+          credentials: 'include',
+        }
+      );
 
       if (!schedulesResponse.ok) {
         console.error('Schedules API failed with status:', schedulesResponse.status, schedulesResponse.statusText);
@@ -163,43 +169,100 @@ export default function BookAppointment() {
       const scheduleIds = schedulesData.schedules.map((s: any) => s.id);
       console.log('Schedule IDs:', scheduleIds);
 
-      // Calculate date range for next 7 days including today
-      const startDate = new Date();
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + 6); // 7 days total (today + next 6)
-      endDate.setHours(23, 59, 59, 999);
+      // Note: Date range filtering now happens client-side in slot organization
+      // This allows us to respect patient's local timezone properly
+      console.log('Fetching all slots for practitioner (client-side date filtering)');
 
-      console.log('Fetching slots for date range:', startDate.toISOString(), 'to', endDate.toISOString());
+      // Build direct FHIR slot query - matching your successful Postman approach
+      // First try with just the first schedule ID to test basic connectivity
+      const testScheduleId = scheduleIds[0];
+      console.log('Testing with single schedule ID:', testScheduleId);
 
-      // Fetch more slots to cover 7 days
-      const response = await fetch(`/api/fhir/slots?_count=200`, {
+      const slotParams = new URLSearchParams({
+        schedule: `Schedule/${testScheduleId}`,
+        status: 'free',
+        _count: '50'
+      });
+
+      console.log('Fetching slots with simplified params:', slotParams.toString());
+      console.log('Full slot API URL:', `/api/fhir/slots?${slotParams.toString()}`);
+
+      const response = await fetch(`/api/fhir/slots?${slotParams.toString()}`, {
+        method: 'GET',
         credentials: 'include',
       });
 
+      console.log('Slots response status:', response.status);
+      console.log('Slots response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
-        console.error('Slots API failed with status:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Slots API error response:', errorText);
+        console.error('Failed to fetch slots: HTTP', response.status);
         return {};
       }
 
       const result = await response.json();
+      console.log('Raw slots API response structure:', {
+        hasSlots: !!result.slots,
+        slotsLength: result.slots?.length || 0,
+        total: result.total,
+        keys: Object.keys(result)
+      });
+
+      if (result.slots && result.slots.length > 0) {
+        console.log('Sample slot data:', result.slots[0]);
+      }
+
       const allSlots = result.slots || [];
       console.log('Total slots from API:', allSlots.length);
 
-      // Filter slots that belong to this practitioner's schedules
-      const practitionerSlots = allSlots.filter((slot: any) =>
-        scheduleIds.some((scheduleId: string) => slot.schedule?.reference === `Schedule/${scheduleId}`)
-      );
+      // If no slots found with first schedule, try with all schedule IDs
+      if (allSlots.length === 0 && scheduleIds.length > 1) {
+        console.log('No slots found with first schedule, trying all schedules...');
 
-      console.log('Filtered practitioner slots:', practitionerSlots.length);
+        const allScheduleParams = new URLSearchParams({
+          status: 'free',
+          _count: '50'
+        });
 
-      // Filter by date range and free status, then organize by date
+        scheduleIds.forEach((scheduleId: string) => {
+          allScheduleParams.append('schedule', `Schedule/${scheduleId}`);
+        });
+
+        console.log('Retrying with all schedule params:', allScheduleParams.toString());
+
+        const retryResponse = await fetch(`/api/fhir/slots?${allScheduleParams.toString()}`, {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        if (retryResponse.ok) {
+          const retryResult = await retryResponse.json();
+          console.log('Retry response - slots found:', retryResult.slots?.length || 0);
+          const retrySlots = retryResult.slots || [];
+
+          if (retrySlots.length > 0) {
+            // Use retry results
+            allSlots.push(...retrySlots);
+            console.log('Using retry results, total slots:', allSlots.length);
+          }
+        }
+      }
+
+      // Filter and organize slots using patient's local timezone
       const slotsByDate: Record<string, any[]> = {};
 
-      practitionerSlots.forEach((slot: any) => {
-        const slotStart = new Date(slot.start);
-        if (slot.status === 'free' && slotStart >= startDate && slotStart <= endDate) {
-          const dateKey = slotStart.toISOString().split('T')[0]; // YYYY-MM-DD format
+      allSlots.forEach((slot: any) => {
+        // Convert UTC slot time to patient's local timezone
+        const localSlotTime = new Date(slot.start);
+        const now = new Date();
+
+        // Check if slot is in the future using local timezone
+        if (slot.status === 'free' && localSlotTime > now) {
+          // Use patient's local date for grouping (YYYY-MM-DD format)
+          const dateKey = localSlotTime.toLocaleDateString('en-CA');
+
           if (!slotsByDate[dateKey]) {
             slotsByDate[dateKey] = [];
           }
@@ -207,7 +270,9 @@ export default function BookAppointment() {
         }
       });
 
-      console.log('Slots organized by date:', Object.keys(slotsByDate).map(date => `${date}: ${slotsByDate[date].length} slots`));
+      console.log('Slots organized by patient local timezone dates:',
+        Object.keys(slotsByDate).map(date => `${date}: ${slotsByDate[date].length} slots`)
+      );
       return slotsByDate;
 
     } catch (error) {
@@ -226,16 +291,16 @@ export default function BookAppointment() {
 
     // Expand this card and fetch slots for next 7 days
     setExpandedPractitionerId(practitioner.id);
-    setSlotsLoading(prev => ({ ...prev, [practitioner.id]: true }));
+    setSlotsLoading((prev: Record<string, boolean>) => ({ ...prev, [practitioner.id]: true }));
 
-    // Set default date to today
-    const today = new Date().toISOString().split('T')[0];
-    setSelectedDates(prev => ({ ...prev, [practitioner.id]: today }));
+    // Set default date to today in patient's local timezone
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format
+    setSelectedDates((prev: Record<string, string>) => ({ ...prev, [practitioner.id]: today }));
 
     // Fetch slots for all 7 days (organized by date)
     const slotsByDate = await fetchSlotsForPractitioner(practitioner.id);
-    setPractitionerSlots(prev => ({ ...prev, [practitioner.id]: slotsByDate }));
-    setSlotsLoading(prev => ({ ...prev, [practitioner.id]: false }));
+    setPractitionerSlots((prev: Record<string, Record<string, any[]>>) => ({ ...prev, [practitioner.id]: slotsByDate }));
+    setSlotsLoading((prev: Record<string, boolean>) => ({ ...prev, [practitioner.id]: false }));
   };
 
   const handleNextPage = () => {
@@ -286,18 +351,18 @@ export default function BookAppointment() {
         ) : practitioners.length > 0 ? (
           <>
             <div className="space-y-4">
-              {practitioners.map((practitioner) => {
+              {practitioners.map((practitioner: any) => {
               const name = practitioner.name?.[0];
               const displayName = name?.text || 
                 `${name?.prefix?.join(' ') || ''} ${name?.given?.join(' ') || ''} ${name?.family || ''}`.trim() ||
                 'Unknown Practitioner';
               
               // Extract qualifications - show all degrees/certifications
-              const qualifications = practitioner.qualification?.map(q => 
+              const qualifications = practitioner.qualification?.map((q: any) =>
                 q.code?.text || q.code?.coding?.[0]?.display
               ).filter(Boolean) || [];
               
-              // Extract primary address
+              // Extract primary address - format in single line
               const address = practitioner.address?.[0];
               const addressString = address ? [
                 address.line?.join(', '),
@@ -307,105 +372,108 @@ export default function BookAppointment() {
               ].filter(Boolean).join(', ') : null;
               
               // Extract contact info
-              const phone = practitioner.telecom?.find(t => t.system === 'phone')?.value;
-              const email = practitioner.telecom?.find(t => t.system === 'email')?.value;
+              const phone = practitioner.telecom?.find((t: any) => t.system === 'phone')?.value;
+              const email = practitioner.telecom?.find((t: any) => t.system === 'email')?.value;
               
               // Extract identifiers for display (NPI, etc.)
-              const npi = practitioner.identifier?.find(id => 
+              const npi = practitioner.identifier?.find((id: any) =>
                 id.type?.coding?.[0]?.code === 'NPI'
               )?.value;
 
               return (
-                <Card key={practitioner.id} className="hover:shadow-md transition-shadow">
-                  <div className="flex justify-between items-start">
-                    <div className="flex space-x-4">
-                      <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h3 className="text-xl font-semibold text-text-primary">{displayName}</h3>
-                            {qualifications.length > 0 && (
-                              <p className="text-sm text-primary font-medium">{qualifications.join(', ')}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center ml-4">
-                            {practitioner.active ? (
-                              <Badge variant="success" size="sm">Active</Badge>
-                            ) : (
-                              <Badge variant="danger" size="sm">Inactive</Badge>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {/* Location */}
-                        {addressString && (
-                          <div className="flex items-start mb-2">
-                            <svg className="w-4 h-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <p className="text-sm text-text-secondary">{addressString}</p>
-                          </div>
-                        )}
-                        
-                        {/* Contact Information */}
-                        <div className="flex flex-wrap items-center gap-4 mb-3">
-                          {phone && (
-                            <div className="flex items-center">
-                              <svg className="w-4 h-4 text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                              </svg>
-                              <span className="text-sm text-text-secondary">{phone}</span>
-                            </div>
-                          )}
-                          {email && (
-                            <div className="flex items-center">
-                              <svg className="w-4 h-4 text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                              </svg>
-                              <span className="text-sm text-text-secondary">{email}</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Professional Info */}
-                        {npi && (
-                          <div className="mb-3">
-                            <p className="text-xs text-text-secondary">NPI: {npi}</p>
-                          </div>
-                        )}
-                        
-                        {/* Gender */}
-                        {practitioner.gender && (
-                          <div className="mb-3">
-                            <span className="inline-flex items-center px-2 py-1 bg-gray-100 rounded text-xs text-text-secondary capitalize">
-                              {practitioner.gender}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                <Card key={practitioner.id} className="hover:shadow-md transition-shadow relative">
+                  {/* Fixed Button - Always in top-right corner */}
+                  <div className="absolute top-4 right-4 z-10">
+                    <Button
+                      variant={practitioner.active ? "primary" : "outline"}
+                      size="sm"
+                      onClick={() => handleBookNow(practitioner)}
+                      disabled={!practitioner.active || slotsLoading[practitioner.id]}
+                      className="w-16 h-8 text-xs px-2 py-1 sm:w-20 sm:h-9 sm:text-sm sm:px-3 sm:py-2 md:w-24 md:h-10 md:text-base md:px-4 md:py-2"
+                    >
+                      {slotsLoading[practitioner.id]
+                        ? 'Loading...'
+                        : expandedPractitionerId === practitioner.id
+                          ? 'Collapse'
+                          : practitioner.active
+                            ? 'Book'
+                            : 'Unavailable'
+                      }
+                    </Button>
+                  </div>
+
+                  <div className="flex space-x-4 pr-24">
+                    {/* Avatar */}
+                    <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
                     </div>
-                    
-                    <div className="ml-4 flex-shrink-0">
-                      <Button
-                        variant={practitioner.active ? "primary" : "outline"}
-                        onClick={() => handleBookNow(practitioner)}
-                        disabled={!practitioner.active || slotsLoading[practitioner.id]}
-                      >
-                        {slotsLoading[practitioner.id]
-                          ? 'Loading...'
-                          : expandedPractitionerId === practitioner.id
-                            ? 'Collapse'
-                            : practitioner.active
-                              ? 'Book Now'
-                              : 'Unavailable'
-                        }
-                      </Button>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <h3 className="text-xl font-semibold text-text-primary">{displayName}</h3>
+                          {qualifications.length > 0 && (
+                            <p className="text-sm text-primary font-medium">{qualifications.join(', ')}</p>
+                          )}
+                        </div>
+                        <div className="flex-shrink-0">
+                          {practitioner.active ? (
+                            <Badge variant="success" size="sm">Active</Badge>
+                          ) : (
+                            <Badge variant="danger" size="sm">Inactive</Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Location */}
+                      {addressString && (
+                        <div className="flex items-start mb-2">
+                          <svg className="w-4 h-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <p className="text-sm text-text-secondary">{addressString}</p>
+                        </div>
+                      )}
+
+                      {/* Contact Information */}
+                      <div className="flex flex-wrap items-center gap-4 mb-3">
+                        {phone && (
+                          <div className="flex items-center">
+                            <svg className="w-4 h-4 text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                            </svg>
+                            <span className="text-sm text-text-secondary">{phone}</span>
+                          </div>
+                        )}
+                        {email && (
+                          <div className="flex items-center">
+                            <svg className="w-4 h-4 text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            <span className="text-sm text-text-secondary">{email}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Professional Info */}
+                      {npi && (
+                        <div className="mb-3">
+                          <p className="text-xs text-text-secondary">NPI: {npi}</p>
+                        </div>
+                      )}
+
+                      {/* Gender */}
+                      {practitioner.gender && (
+                        <div className="mb-3">
+                          <span className="inline-flex items-center px-2 py-1 bg-gray-100 rounded text-xs text-text-secondary capitalize">
+                            {practitioner.gender}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -419,23 +487,23 @@ export default function BookAppointment() {
                         <h4 className="font-medium mb-3">Choose Date</h4>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
                           {Array.from({ length: 7 }, (_, i) => {
-                            const date = new Date();
-                            date.setDate(date.getDate() + i);
-                            const dateStr = date.toISOString().split('T')[0];
+                            // Use patient's local timezone for consistent date calculation
+                            const localDate = new Date();
+                            localDate.setDate(localDate.getDate() + i);
+                            const dateStr = localDate.toLocaleDateString('en-CA'); // YYYY-MM-DD
                             const isSelected = selectedDates[practitioner.id] === dateStr;
-                            const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-                            const dayNum = date.getDate();
-                            const month = date.toLocaleDateString('en-US', { month: 'short' });
+
+                            // Format display using patient's local timezone
+                            const displayDate = new Date(dateStr + 'T12:00:00'); // Noon to avoid timezone edge cases
+                            const dayNum = displayDate.getDate();
+                            const month = displayDate.toLocaleDateString('en-US', { month: 'short' });
+                            const weekday = displayDate.toLocaleDateString('en-US', { weekday: 'short' });
 
                             return (
                               <button
                                 key={dateStr}
-                                onClick={async () => {
-                                  setSelectedDates(prev => ({ ...prev, [practitioner.id]: dateStr }));
-                                  setSlotsLoading(prev => ({ ...prev, [practitioner.id]: true }));
-                                  const slots = await fetchSlotsForPractitioner(practitioner.id, dateStr);
-                                  setPractitionerSlots(prev => ({ ...prev, [practitioner.id]: slots }));
-                                  setSlotsLoading(prev => ({ ...prev, [practitioner.id]: false }));
+                                onClick={() => {
+                                  setSelectedDates((prev: Record<string, string>) => ({ ...prev, [practitioner.id]: dateStr }));
                                 }}
                                 className={`p-3 rounded-lg border text-center transition-colors ${
                                   isSelected
@@ -443,7 +511,7 @@ export default function BookAppointment() {
                                     : 'bg-white hover:bg-gray-50 border-gray-200'
                                 }`}
                               >
-                                <div className="text-xs">{dayName}</div>
+                                <div className="text-xs">{weekday}</div>
                                 <div className="font-semibold">{dayNum}</div>
                                 <div className="text-xs">{month}</div>
                               </button>
@@ -475,7 +543,7 @@ export default function BookAppointment() {
                                 <button
                                   key={slot.id}
                                   onClick={() => {
-                                    setSelectedSlots(prev => ({ ...prev, [practitioner.id]: slot.id }));
+                                    setSelectedSlots((prev: Record<string, string>) => ({ ...prev, [practitioner.id]: slot.id }));
                                   }}
                                   className={`p-3 rounded-lg border text-center transition-colors ${
                                     isSelected

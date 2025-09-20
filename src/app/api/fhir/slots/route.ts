@@ -21,11 +21,17 @@ export async function GET(request: NextRequest) {
     
     // Build the FHIR URL with all query parameters (including ge/lt prefixes)
     const fhirUrl = `${session.fhirBaseUrl}/Slot?${request.nextUrl.searchParams.toString()}`;
-    
+
+    console.log('Slots API - FHIR URL:', fhirUrl);
+    console.log('Slots API - Query params:', Object.fromEntries(request.nextUrl.searchParams.entries()));
+
     // Use centralized FHIRClient for consistent error handling and logging
     const response = await FHIRClient.fetchWithAuth(fhirUrl, token);
 
+    console.log('Slots API - FHIR response status:', response.status);
+
     const fhirBundle = await response.json();
+    console.log('Slots API - FHIR response bundle:', JSON.stringify(fhirBundle, null, 2));
     
     // Transform FHIR Bundle to expected format
     const slots = fhirBundle.entry?.map((entry: any) => entry.resource) || [];
