@@ -45,68 +45,22 @@ export default async function ProviderAppointmentsPage() {
     endOfPeriod.setDate(today.getDate() + 6); // Today + 6 days = 7 days total
     const periodEnd = endOfPeriod.toISOString().split('T')[0];
 
-    // Fetch all appointments for next 7 days + all pending appointments (no date filter for pending)
-    const [periodResults, pendingResults, completedResults, cancelledResults] = await Promise.all([
-      // All appointments in next 7 days
-      searchAppointments(
-        token,
-        session.fhirBaseUrl,
-        undefined, // patientId
-        undefined, // practitionerId (fetch ALL - clinic perspective)
-        {
-          'date-from': periodStart,
-          'date-to': periodEnd,
-          _count: 200
-        }
-      ),
-      // All pending appointments (no date filter)
-      searchAppointments(
-        token,
-        session.fhirBaseUrl,
-        undefined, // patientId
-        undefined, // practitionerId (fetch ALL - clinic perspective)
-        {
-          status: 'pending',
-          _count: 100
-        }
-      ),
-      // Completed appointments in next 7 days
-      searchAppointments(
-        token,
-        session.fhirBaseUrl,
-        undefined, // patientId
-        undefined, // practitionerId (fetch ALL - clinic perspective)
-        {
-          status: 'fulfilled',
-          'date-from': periodStart,
-          'date-to': periodEnd,
-          _count: 100
-        }
-      ),
-      // Cancelled appointments in next 7 days
-      searchAppointments(
-        token,
-        session.fhirBaseUrl,
-        undefined, // patientId
-        undefined, // practitionerId (fetch ALL - clinic perspective)
-        {
-          status: 'cancelled',
-          'date-from': periodStart,
-          'date-to': periodEnd,
-          _count: 100
-        }
-      )
-    ]);
+    // Optimized: Single FHIR query for appointments in the 7-day period
+    // This fetches all appointments (regardless of status) within the date range
+    const periodResults = await searchAppointments(
+      token,
+      session.fhirBaseUrl,
+      undefined, // patientId
+      undefined, // practitionerId (fetch ALL - clinic perspective)
+      {
+        'date-from': periodStart,
+        'date-to': periodEnd,
+        _count: 300 // Higher count to ensure we get all appointments in the period
+      }
+    );
 
-    // Process period appointments
-    const periodAppts = periodResults.entry?.map((entry: any) => entry.resource).filter(Boolean) || [];
-    allAppointments = [...periodAppts];
-
-    // Process pending appointments (add unique ones only)
-    const pendingAppts = pendingResults.entry?.map((entry: any) => entry.resource).filter(Boolean) || [];
-    const periodAppointmentIds = new Set(allAppointments.map(apt => apt.id));
-    const uniquePendingAppts = pendingAppts.filter((apt: Appointment) => !periodAppointmentIds.has(apt.id));
-    allAppointments = [...allAppointments, ...uniquePendingAppts];
+    // Process all appointments from the period
+    allAppointments = periodResults.entry?.map((entry: any) => entry.resource).filter(Boolean) || [];
 
     // Sort appointments: pending first, then by start time
     allAppointments.sort((a: Appointment, b: Appointment) => {
@@ -121,28 +75,33 @@ export default async function ProviderAppointmentsPage() {
       return new Date(a.start).getTime() - new Date(b.start).getTime();
     });
 
-    // Calculate stats
+    // Calculate stats from the single result set
     const todayCount = allAppointments.filter((apt: Appointment) =>
       apt.start?.startsWith(periodStart)
     ).length;
 
-    const completedAppts = completedResults.entry?.map((e: any) => e.resource) || [];
-    const cancelledAppts = cancelledResults.entry?.map((e: any) => e.resource) || [];
+    const pendingCount = allAppointments.filter((apt: Appointment) =>
+      apt.status === 'pending'
+    ).length;
+
+    const completedCount = allAppointments.filter((apt: Appointment) =>
+      apt.status === 'fulfilled'
+    ).length;
+
+    const cancelledCount = allAppointments.filter((apt: Appointment) =>
+      apt.status === 'cancelled'
+    ).length;
 
     stats = {
       today: todayCount,
-      pending: pendingAppts.length,
-      completed: completedAppts.length,
-      cancelled: cancelledAppts.length
+      pending: pendingCount,
+      completed: completedCount,
+      cancelled: cancelledCount
     };
 
     // Extract provider name (placeholder for now)
     providerName = 'Dr. Provider'; // TODO: Fetch actual provider name
 
-    console.log('🔍 [SERVER DEBUG] Period appointments:', periodAppts.length);
-    console.log('🔍 [SERVER DEBUG] Pending appointments:', pendingAppts.length);
-    console.log('🔍 [SERVER DEBUG] Total final appointments:', allAppointments.length);
-    console.log('🔍 [SERVER DEBUG] Appointments with pending status:', allAppointments.filter(apt => apt.status === 'pending').length);
 
   } catch (error) {
     console.error('Error fetching appointments:', error);
@@ -153,7 +112,7 @@ export default async function ProviderAppointmentsPage() {
       <ProviderAppointmentsClient
         appointments={allAppointments}
         stats={stats}
-        session={{ role: session.role, userId: session.fhirUser || session.patient }}
+        session={{ role: session.role, userId: session.fhirUser || session.patient || '' }}
       />
     </Layout>
   );

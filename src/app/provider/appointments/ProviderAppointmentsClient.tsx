@@ -449,7 +449,7 @@ export default function ProviderAppointmentsClient({
           </p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => router.refresh()}>
+          <Button variant="outline" onClick={() => window.location.reload()}>
             Refresh
           </Button>
           <Button

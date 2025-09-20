@@ -83,80 +83,10 @@ export default function DashboardClient({
           const data = await response.json();
           const appointments = data.appointments || [];
 
-          // Extract unique practitioner IDs to avoid duplicate API calls
-          const practitionerIds = new Set<string>();
-          appointments.forEach((appointment: any) => {
-            const practitionerParticipant = appointment.participant?.find((p: any) =>
-              p.actor?.reference?.startsWith('Practitioner/')
-            );
-            if (practitionerParticipant?.actor?.reference) {
-              const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
-              practitionerIds.add(practitionerId);
-            }
-          });
-
-          // Fetch all practitioner details simultaneously
-          const practitionerPromises = Array.from(practitionerIds).map(async (practitionerId) => {
-            try {
-              const practitionerResponse = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
-                credentials: 'include'
-              });
-              if (practitionerResponse.ok) {
-                const practitionerData = await practitionerResponse.json();
-                return {
-                  id: practitionerId,
-                  data: practitionerData
-                };
-              }
-            } catch (error) {
-              console.warn(`Failed to fetch practitioner ${practitionerId}:`, error);
-            }
-            return null;
-          });
-
-          // Wait for all practitioner API calls to complete simultaneously
-          const practitionerResults = await Promise.all(practitionerPromises);
-
-          // Create a map of practitioner data for quick lookup
-          const practitionersMap = new Map();
-          practitionerResults.forEach((result) => {
-            if (result) {
-              practitionersMap.set(result.id, result.data);
-            }
-          });
-
-          // Add practitioner details to appointments
-          const appointmentsWithDetails = appointments.map((appointment: any) => {
-            const practitionerParticipant = appointment.participant?.find((p: any) =>
-              p.actor?.reference?.startsWith('Practitioner/')
-            );
-
-            if (practitionerParticipant?.actor?.reference) {
-              const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
-              const practitionerData = practitionersMap.get(practitionerId);
-
-              if (practitionerData) {
-                appointment.practitionerDetails = {
-                  name: practitionerData.name?.[0] ?
-                    `${(practitionerData.name[0].prefix || []).join(' ')} ${(practitionerData.name[0].given || []).join(' ')} ${practitionerData.name[0].family || ''}`.trim() :
-                    'Provider',
-                  specialty: practitionerData.qualification?.[0]?.code?.text || 'General',
-                  address: practitionerData.address?.[0] ?
-                    [
-                      ...(practitionerData.address[0].line || []),
-                      practitionerData.address[0].city || practitionerData.address[0].district,
-                      practitionerData.address[0].state,
-                      practitionerData.address[0].postalCode
-                    ].filter(Boolean).join(', ') : 'TBD',
-                  phone: practitionerData.telecom?.find((t: any) => t.system === 'phone')?.value || 'N/A'
-                };
-              }
-            }
-
-            return appointment;
-          });
-
-          setAppointments(appointmentsWithDetails);
+          // Use the reusable appointment enhancement utility
+          const { enhanceAppointmentsWithPractitionerDetails } = await import('@/lib/appointmentDetailInfo');
+          const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
+          setAppointments(enhancedAppointments);
         }
       } catch (error) {
         console.error('Error fetching appointments:', error);
@@ -201,13 +131,19 @@ export default function DashboardClient({
       
       // Show success message and refresh appointments
       alert('Appointment cancelled successfully. The provider has been notified.');
-      // Refresh appointments instead of full page reload
+
+      // Refresh appointments with proper name resolution using reusable utility
       const refreshResponse = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
         credentials: 'include'
       });
       if (refreshResponse.ok) {
         const data = await refreshResponse.json();
-        setAppointments(data.appointments || []);
+        const appointments = data.appointments || [];
+
+        // Use the reusable appointment enhancement utility
+        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/lib/appointmentDetailInfo');
+        const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
+        setAppointments(enhancedAppointments);
       }
       
     } catch (error) {
@@ -254,13 +190,19 @@ export default function DashboardClient({
       
       // Show success message and refresh appointments
       alert('Reschedule request sent successfully. The provider will review and contact you with available times.');
-      // Refresh appointments instead of full page reload
+
+      // Refresh appointments with proper name resolution using reusable utility
       const refreshResponse = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
         credentials: 'include'
       });
       if (refreshResponse.ok) {
         const data = await refreshResponse.json();
-        setAppointments(data.appointments || []);
+        const appointments = data.appointments || [];
+
+        // Use the reusable appointment enhancement utility
+        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/lib/appointmentDetailInfo');
+        const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
+        setAppointments(enhancedAppointments);
       }
       
     } catch (error) {
