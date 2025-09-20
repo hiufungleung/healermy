@@ -155,7 +155,7 @@ export async function createManualMessage(
 }
 
 /**
- * Mark a communication as read by adding a note
+ * Mark a communication as read by adding an extension
  */
 export async function markCommunicationAsRead(
   token: string,
@@ -165,30 +165,42 @@ export async function markCommunicationAsRead(
 ): Promise<any> {
   // Get the existing communication
   const communication = await getCommunication(token, fhirBaseUrl, communicationId);
-  
-  // Add a read note
-  const readNote = {
-    authorReference: { reference: readerRef },
-    time: new Date().toISOString(),
-    text: 'READ'
-  };
-  
-  // Add to existing notes or create new notes array
-  communication.note = communication.note || [];
-  communication.note.push(readNote);
-  
-  return updateCommunication(token, fhirBaseUrl, communicationId, communication);
+
+  // Check if already marked as read by this user
+  const existingReadExtension = communication.extension?.find((ext: any) =>
+    ext.url === 'http://hl7.org/fhir/StructureDefinition/communication-read-status'
+  );
+
+  if (!existingReadExtension) {
+    // Add read status extension
+    const readExtension = {
+      url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
+      valueDateTime: new Date().toISOString()
+    };
+
+    // Add to existing extensions or create new extensions array
+    communication.extension = communication.extension || [];
+    communication.extension.push(readExtension);
+
+    return updateCommunication(token, fhirBaseUrl, communicationId, communication);
+  }
+
+  // Already marked as read, return existing communication
+  return communication;
 }
 
 /**
- * Check if a communication has been read by a specific user
+ * Check if a communication has been read
  */
-export function isCommunicationRead(communication: any, readerRef: string): boolean {
-  if (!communication.note) return false;
-  
-  return communication.note.some((note: any) => 
-    note.authorReference?.reference === readerRef && note.text === 'READ'
+export function isCommunicationRead(communication: any): boolean {
+  if (!communication.extension) return false;
+
+  // Check for read status extension
+  const readExtension = communication.extension.find((ext: any) =>
+    ext.url === 'http://hl7.org/fhir/StructureDefinition/communication-read-status'
   );
+
+  return !!readExtension?.valueDateTime;
 }
 
 /**
@@ -210,7 +222,7 @@ export async function getUnreadCommunicationsCount(
   
   let unreadCount = 0;
   for (const entry of communications.entry) {
-    if (!isCommunicationRead(entry.resource, userRef)) {
+    if (!isCommunicationRead(entry.resource)) {
       unreadCount++;
     }
   }
