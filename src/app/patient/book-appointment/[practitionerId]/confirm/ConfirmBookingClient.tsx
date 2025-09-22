@@ -15,6 +15,7 @@ interface ConfirmBookingClientProps {
   selectedTime: string;
   selectedSlotId: string;
   reasonText: string;
+  symptoms: string;
   practitionerId: string;
   session: Pick<AuthSession, 'patient' | 'role'> | null;
 }
@@ -25,6 +26,7 @@ export default function ConfirmBookingClient({
   selectedTime,
   selectedSlotId,
   reasonText,
+  symptoms,
   practitionerId,
   session
 }: ConfirmBookingClientProps) {
@@ -37,9 +39,78 @@ export default function ConfirmBookingClient({
     setError('');
 
     try {
-      // Here would be the final appointment creation logic
-      // For now, redirect to success page
-      router.push('/patient/book-appointment/success');
+      // Create appointment via FHIR API
+      // Use a simpler approach - create datetime by parsing the existing format
+      let appointmentStartTime: string;
+      let appointmentEndTime: string;
+
+      try {
+        // Try to parse the time directly if it's already in a good format
+        const startDate = new Date(`${selectedDate} ${selectedTime}`);
+        if (isNaN(startDate.getTime())) {
+          throw new Error('Invalid date format');
+        }
+        appointmentStartTime = startDate.toISOString();
+        appointmentEndTime = new Date(startDate.getTime() + (30 * 60 * 1000)).toISOString();
+      } catch (dateError) {
+        // Fallback: use current time plus selected date
+        console.warn('Date parsing failed, using fallback method');
+        const today = new Date();
+        const fallbackDate = new Date(selectedDate);
+        fallbackDate.setHours(today.getHours(), today.getMinutes(), 0, 0);
+        appointmentStartTime = fallbackDate.toISOString();
+        appointmentEndTime = new Date(fallbackDate.getTime() + (30 * 60 * 1000)).toISOString();
+      }
+
+      const appointmentData = {
+        resourceType: 'Appointment',
+        status: 'pending',
+        slot: [
+          {
+            reference: `Slot/${selectedSlotId}`
+          }
+        ],
+        participant: [
+          {
+            actor: {
+              reference: `Patient/${session?.patient || 'demo-patient'}`
+            },
+            status: 'accepted'
+          },
+          {
+            actor: {
+              reference: `Practitioner/${practitionerId}`
+            },
+            status: 'needs-action'
+          }
+        ],
+        start: appointmentStartTime,
+        end: appointmentEndTime,
+        reasonCode: [
+          {
+            text: reasonText
+          }
+        ],
+        description: reasonText
+      };
+
+      const response = await fetch('/api/fhir/appointments', {
+        method: 'POST',
+        credentials: 'include',
+        body: JSON.stringify(appointmentData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Failed to create appointment: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Appointment created successfully:', result);
+
+      // Redirect to dashboard with success indication
+      router.push('/patient/dashboard?booking=success');
+
     } catch (error) {
       console.error('Error confirming booking:', error);
       setError(error instanceof Error ? error.message : 'Failed to confirm booking');

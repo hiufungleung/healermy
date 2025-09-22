@@ -65,7 +65,19 @@ export function NavigationButtons({
   };
 
   const currentSize = sizeConfig[size];
-  const currentLayout = layoutConfig[layout];
+
+  // Determine layout based on button presence
+  const hasOnlyRightButton = !leftButton && rightButton;
+  const hasOnlyLeftButton = leftButton && !rightButton;
+
+  let currentLayout = layoutConfig[layout];
+
+  // Override layout for single button cases when className includes justify-end or justify-start
+  if (hasOnlyRightButton && className.includes('justify-end')) {
+    currentLayout = layout === 'responsive' ? 'flex flex-col sm:flex-row sm:justify-end' : 'flex flex-row justify-end';
+  } else if (hasOnlyLeftButton && className.includes('justify-start')) {
+    currentLayout = layout === 'responsive' ? 'flex flex-col sm:flex-row sm:justify-start' : 'flex flex-row justify-start';
+  }
 
   const renderButton = (button: NavigationButton, isLeft: boolean) => {
     const icon = button.icon ? iconMap[button.icon] : null;

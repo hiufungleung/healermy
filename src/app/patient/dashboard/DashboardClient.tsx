@@ -251,8 +251,29 @@ export default function DashboardClient({
     return true;
   });
   
+  // Calculate today's status from real appointments
+  const now = new Date();
+  const today = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+  // Filter appointments for today that haven't started yet
+  const todayAppointments = appointments?.filter(apt => {
+    if (!apt.start) return false;
+    const aptDate = apt.start.split('T')[0];
+    const aptDateTime = new Date(apt.start);
+    return aptDate === today && aptDateTime > now && (apt.status === 'booked' || apt.status === 'pending');
+  }) || [];
+
+  // Find the next appointment today
+  const nextTodayAppointment = todayAppointments
+    .sort((a, b) => new Date(a.start!).getTime() - new Date(b.start!).getTime())[0];
+
   const todayStatus = {
-    nextAppointment: '10:30 AM',
+    nextAppointment: nextTodayAppointment ?
+      new Date(nextTodayAppointment.start!).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }) : null,
     queuePosition: null,
     waitTime: null
   };
