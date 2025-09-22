@@ -9,6 +9,7 @@ import { Badge } from '@/components/common/Badge';
 import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { PractitionerSearch } from '@/components/common/PractitionerSearch';
+import { FormNavigationButtons } from '@/components/common/NavigationButtons';
 import {
   formatTimeForDisplay
 } from '@/lib/timezone';
@@ -561,21 +562,20 @@ export default function BookAppointment() {
 
                       {/* Next Button */}
                       {selectedSlots[practitioner.id] && (
-                        <div className="flex justify-end">
-                          <Button
-                            variant="primary"
-                            onClick={() => {
-                              const selectedSlotId = selectedSlots[practitioner.id];
-                              const selectedDate = selectedDates[practitioner.id];
-                              const selectedSlot = practitionerSlots[practitioner.id]?.[selectedDate]?.find((s: any) => s.id === selectedSlotId);
-                              const selectedTime = selectedSlot ? formatTimeForDisplay(selectedSlot.start) : '';
+                        <FormNavigationButtons
+                          onNext={() => {
+                            const selectedSlotId = selectedSlots[practitioner.id];
+                            const selectedDate = selectedDates[practitioner.id];
+                            const selectedSlot = practitionerSlots[practitioner.id]?.[selectedDate]?.find((s: any) => s.id === selectedSlotId);
+                            const selectedTime = selectedSlot ? formatTimeForDisplay(selectedSlot.start) : '';
 
-                              router.push(`/patient/book-appointment/${practitioner.id}/confirm?date=${selectedDate}&time=${selectedTime}&slotId=${selectedSlotId}`);
-                            }}
-                          >
-                            Next →
-                          </Button>
-                        </div>
+                            router.push(`/patient/book-appointment/${practitioner.id}/visit-info?date=${selectedDate}&time=${selectedTime}&slotId=${selectedSlotId}`);
+                          }}
+                          nextLabel="Next"
+                          showPrevious={false}
+                          size="md"
+                          className="justify-end"
+                        />
                       )}
                     </div>
                   )}

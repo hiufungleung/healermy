@@ -290,16 +290,16 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
   return (
     <ContentContainer size="lg">
       {/* Page Header */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-text-primary">My Appointments</h1>
-            <p className="text-text-secondary mt-1">Manage your appointments and schedule new ones</p>
+      <div className="mb-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+          <div className="flex-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-text-primary mb-2">My Appointments</h1>
+            <p className="text-text-secondary text-sm sm:text-base">Manage your appointments and schedule new ones</p>
           </div>
           <Button
             variant="primary"
             onClick={() => router.push('/patient/book-appointment')}
-            className="flex items-center space-x-2"
+            className="flex items-center justify-center space-x-2 px-4 py-3 sm:px-6 w-full sm:w-auto"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -309,47 +309,44 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
         </div>
       </div>
 
-      {/* Filters and Search */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          {/* Search */}
-          <div className="flex-1">
-            <div className="relative">
-              <svg className="absolute left-3 top-3 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search by doctor name or specialty..."
-                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-transparent"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
+      {/* Search */}
+      <div className="mb-4">
+        <div className="relative">
+          <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search by doctor name or specialty"
+            className="pl-10 pr-4 py-3 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-base"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
 
-          {/* Status Filter */}
-          <div className="flex flex-wrap gap-2">
-            {[
-              { key: 'all', label: 'All' },
-              { key: 'pending', label: 'Pending' },
-              { key: 'booked', label: 'Confirmed' },
-              { key: 'completed', label: 'Completed' },
-              { key: 'cancelled', label: 'Cancelled' }
-            ].map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setFilterStatus(key as FilterStatus)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  filterStatus === key
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+      {/* Status Filter Pills */}
+      <div className="mb-6">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: 'all', label: 'All' },
+            { key: 'pending', label: 'Pending' },
+            { key: 'booked', label: 'Confirmed' },
+            { key: 'completed', label: 'Completed' },
+            { key: 'cancelled', label: 'Cancelled' }
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setFilterStatus(key as FilterStatus)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors min-w-0 ${
+                filterStatus === key
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -409,56 +406,62 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
                 const canReschedule = appointmentStatus !== 'cancelled' && appointmentStatus !== 'fulfilled';
 
                 return (
-                  <div key={appointment.id} className="border rounded-lg p-6 hover:bg-gray-50 transition-colors">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="font-semibold text-lg text-gray-900">{doctorName}</h3>
-                        <p className="text-gray-600">{specialty}</p>
+                  <div key={appointment.id} className="bg-white border rounded-lg p-4 sm:p-6 hover:shadow-md transition-all">
+                    {/* Header */}
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-lg text-gray-900 mb-1">{doctorName}</h3>
+                        <p className="text-gray-600 text-sm">{specialty}</p>
                       </div>
-                      <Badge
-                        variant={
-                          appointmentStatus === 'booked' || appointmentStatus === 'fulfilled' ? "success" :
-                          appointmentStatus === 'cancelled' ? "danger" :
-                          appointmentStatus === 'pending' ? "warning" : "info"
-                        }
-                        size="sm"
-                      >
-                        {appointmentStatus === 'booked' ? 'Confirmed' :
-                         appointmentStatus === 'pending' ? 'Pending Approval' :
-                         appointmentStatus === 'fulfilled' ? 'Completed' :
-                         appointmentStatus === 'cancelled' ? 'Cancelled' :
-                         appointmentStatus}
-                      </Badge>
+                      <div className="self-start">
+                        <Badge
+                          variant={
+                            appointmentStatus === 'booked' || appointmentStatus === 'fulfilled' ? "success" :
+                            appointmentStatus === 'cancelled' ? "danger" :
+                            appointmentStatus === 'pending' ? "warning" : "info"
+                          }
+                          size="sm"
+                        >
+                          {appointmentStatus === 'booked' ? 'Confirmed' :
+                           appointmentStatus === 'pending' ? 'Pending' :
+                           appointmentStatus === 'fulfilled' ? 'Completed' :
+                           appointmentStatus === 'cancelled' ? 'Cancelled' :
+                           appointmentStatus}
+                        </Badge>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm">
+                    {/* Details */}
+                    <div className="space-y-3 mb-4">
                       <div className="flex items-center space-x-2">
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        <span className="font-medium">{appointmentDateDisplay}</span>
+                        <span className="font-medium text-sm text-gray-900">{appointmentDateDisplay}</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                         </svg>
-                        <span className="font-medium">{phoneNumber}</span>
+                        <span className="text-sm text-gray-600">{phoneNumber}</span>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="flex items-start space-x-2">
+                        <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        <span className="font-medium">{location}</span>
+                        <span className="text-sm text-gray-600 leading-tight">{location}</span>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    {/* Actions */}
+                    <div className="flex flex-col sm:flex-row gap-2">
                       {appointment.id && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => router.push(`/patient/appointments/${appointment.id}`)}
+                          className="w-full sm:w-auto"
                         >
                           View Details
                         </Button>
@@ -470,6 +473,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
                           size="sm"
                           onClick={() => handleRescheduleAppointment(appointment.id)}
                           disabled={reschedulingAppointments.has(appointment.id)}
+                          className="w-full sm:w-auto"
                         >
                           {reschedulingAppointments.has(appointment.id) ? 'Requesting...' : 'Reschedule'}
                         </Button>
@@ -481,6 +485,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
                           size="sm"
                           onClick={() => handleCancelAppointment(appointment.id)}
                           disabled={cancellingAppointments.has(appointment.id)}
+                          className="w-full sm:w-auto"
                         >
                           {cancellingAppointments.has(appointment.id) ? 'Cancelling...' : 'Cancel'}
                         </Button>

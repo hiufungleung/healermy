@@ -3,14 +3,14 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/common/Card';
-import { Button } from '@/components/common/Button';
 import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
+import { FormNavigationButtons } from '@/components/common/NavigationButtons';
 import { createFHIRDateTime } from '@/lib/timezone';
 import type { Practitioner, Appointment, Slot } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
 
-interface ConfirmAppointmentClientProps {
+interface VisitInfoClientProps {
   practitioner: Practitioner;
   selectedSlot: Slot | null;
   selectedDate: string;
@@ -20,7 +20,7 @@ interface ConfirmAppointmentClientProps {
   session: Pick<AuthSession, 'patient' | 'role'> | null;
 }
 
-export default function ConfirmAppointmentClient({
+export default function VisitInfoClient({
   practitioner,
   selectedSlot,
   selectedDate,
@@ -28,7 +28,7 @@ export default function ConfirmAppointmentClient({
   selectedSlotId,
   practitionerId,
   session
-}: ConfirmAppointmentClientProps) {
+}: VisitInfoClientProps) {
   const router = useRouter();
   const [reasonText, setReasonText] = useState('');
   const [symptoms, setSymptoms] = useState('');
@@ -126,8 +126,8 @@ export default function ConfirmAppointmentClient({
       const result = await response.json();
       console.log('Appointment created successfully:', result);
       
-      // Redirect to success page or dashboard
-      router.push('/patient/dashboard?success=appointment-created');
+      // Redirect to confirm page to show appointment summary
+      router.push(`/patient/book-appointment/${practitionerId}/confirm?date=${selectedDate}&time=${selectedTime}&slotId=${selectedSlotId}&reasonText=${encodeURIComponent(reasonText)}`);
       
     } catch (error) {
       console.error('Error creating appointment:', error);
@@ -138,7 +138,7 @@ export default function ConfirmAppointmentClient({
   };
 
   const handlePrevious = () => {
-    router.push(`/patient/book-appointment/${practitionerId}?date=${selectedDate}&time=${selectedTime}`);
+    router.push(`/patient/book-appointment?back=true`);
   };
 
   // Gracefully handle name construction with optional prefix
@@ -179,16 +179,16 @@ export default function ConfirmAppointmentClient({
       <ProgressSteps
         steps={[
           { id: 1, label: 'Search & Select', status: 'completed' },
-          { id: 2, label: 'Confirm', status: 'active' },
-          { id: 3, label: 'Complete', status: 'upcoming' }
+          { id: 2, label: 'Visit Information', status: 'active' },
+          { id: 3, label: 'Confirm', status: 'upcoming' }
         ]}
         currentStep={2}
       />
 
       <Card>
-        <h2 className="text-xl font-semibold mb-4">Confirm Your Appointment</h2>
+        <h2 className="text-xl font-semibold mb-4">Visit Information</h2>
         <p className="text-text-secondary mb-6">
-          Please review your appointment details and provide additional information
+          Please provide information about your visit
         </p>
 
         {/* Appointment Summary */}
@@ -289,22 +289,17 @@ export default function ConfirmAppointmentClient({
         )}
 
         {/* Navigation Buttons */}
-        <div className="flex justify-between">
-          <Button
-            variant="outline"
-            onClick={handlePrevious}
-            disabled={loading}
-          >
-            ← Previous
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleSubmit}
-            disabled={loading || !reasonText.trim()}
-          >
-            {loading ? 'Creating Appointment...' : 'Confirm Appointment →'}
-          </Button>
-        </div>
+        <FormNavigationButtons
+          onPrevious={handlePrevious}
+          onNext={handleSubmit}
+          previousLabel="Previous"
+          nextLabel="Next: Review"
+          nextLoading={loading}
+          previousDisabled={loading}
+          nextDisabled={!reasonText.trim()}
+          nextVariant="primary"
+          size="md"
+        />
       </Card>
     </ContentContainer>
   );
