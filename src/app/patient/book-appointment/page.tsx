@@ -537,7 +537,13 @@ export default function BookAppointment() {
                         ) : (
                           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                             {practitionerSlots[practitioner.id]?.[selectedDates[practitioner.id] || '']?.map((slot: any) => {
-                              const timeDisplay = formatTimeForDisplay(slot.start);
+                              // Extract only time from slot start, exclude date
+                              const slotDate = new Date(slot.start);
+                              const timeDisplay = slotDate.toLocaleTimeString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: true
+                              });
                               const isSelected = selectedSlots[practitioner.id] === slot.id;
 
                               return (

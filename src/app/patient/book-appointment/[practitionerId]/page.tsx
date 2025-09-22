@@ -9,7 +9,7 @@ import { Badge } from '@/components/common/Badge';
 import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { SlotSelectionGrid } from '@/components/common/SlotDisplay';
-import { formatTimeForDisplay, getBrisbaneDateBoundsForFHIR } from '@/lib/timezone';
+import { formatTimeForDisplay } from '@/lib/timezone';
 import type { Practitioner, Slot } from '@/types/fhir';
 
 
@@ -124,10 +124,9 @@ export default function SelectAppointment() {
 
       console.log('Filtered practitioner slots:', practitionerSlots.length);
 
-      // Filter by selected date and free status using Brisbane timezone
-      const dateBounds = getBrisbaneDateBoundsForFHIR(selectedDate);
-      const startOfDay = new Date(dateBounds.startGE);
-      const endOfDay = new Date(dateBounds.endLT);
+      // Filter by selected date and free status using patient's local timezone
+      const startOfDay = new Date(`${selectedDate}T00:00:00`);
+      const endOfDay = new Date(`${selectedDate}T23:59:59`);
 
       const dateAndStatusFilteredSlots = practitionerSlots.filter((slot: Slot) => {
         const slotStart = new Date(slot.start);

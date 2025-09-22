@@ -59,7 +59,7 @@ export default function VisitInfoClient({
     return `${newHours.toString().padStart(2, '0')}:${newMins.toString().padStart(2, '0')}`;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!reasonText.trim()) {
       setError('Please provide a reason for your visit');
       return;
@@ -69,72 +69,18 @@ export default function VisitInfoClient({
       setError('No slot selected. Please go back and select a time slot.');
       return;
     }
-    
-    setLoading(true);
-    setError('');
-    
-    try {
-      // Calculate appointment duration from slot data or default to 30 minutes
-      const appointmentStartTime = selectedSlot?.start || createFHIRDateTime(selectedDate, convertTo24Hour(selectedTime));
-      const appointmentEndTime = selectedSlot?.end || createFHIRDateTime(selectedDate, addMinutes(convertTo24Hour(selectedTime), 30));
-      
-      // Create FHIR Appointment with proper structure
-      const appointmentData: Partial<Appointment> = {
-        resourceType: 'Appointment',
-        status: 'pending', // Changed to pending as requested
-        slot: [
-          {
-            reference: `Slot/${selectedSlotId}`
-          }
-        ],
-        participant: [
-          {
-            actor: {
-              reference: `Patient/${session?.patient || 'demo-patient'}`
-            },
-            status: 'accepted'
-          },
-          {
-            actor: {
-              reference: `Practitioner/${practitionerId}`
-            },
-            status: 'needs-action'
-          }
-        ],
-        start: appointmentStartTime,
-        end: appointmentEndTime,
-        reasonCode: [
-          {
-            text: reasonText
-          }
-        ],
-        description: reasonText
-      };
-      
-      // Create appointment via API
-      const response = await fetch('/api/fhir/appointments', {
-        method: 'POST',
-        credentials: 'include',
-        body: JSON.stringify(appointmentData),
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `Failed to create appointment: ${response.status}`);
-      }
+    // Navigate to confirm page with all the form data
+    // Don't create the appointment yet - that should happen on the confirm page
+    const params = new URLSearchParams({
+      date: selectedDate,
+      time: selectedTime,
+      slotId: selectedSlotId,
+      reasonText: reasonText,
+      symptoms: symptoms
+    });
 
-      const result = await response.json();
-      console.log('Appointment created successfully:', result);
-      
-      // Redirect to confirm page to show appointment summary
-      router.push(`/patient/book-appointment/${practitionerId}/confirm?date=${selectedDate}&time=${selectedTime}&slotId=${selectedSlotId}&reasonText=${encodeURIComponent(reasonText)}`);
-      
-    } catch (error) {
-      console.error('Error creating appointment:', error);
-      setError(error instanceof Error ? error.message : 'Failed to create appointment');
-    } finally {
-      setLoading(false);
-    }
+    router.push(`/patient/book-appointment/${practitionerId}/confirm?${params.toString()}`);
   };
 
   const handlePrevious = () => {
