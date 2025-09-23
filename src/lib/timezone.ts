@@ -1,10 +1,10 @@
 /**
- * Timezone utilities for Brisbane/Australia time handling
+ * Timezone utilities for local time handling
  * Centralizes all timezone conversions across the application
  */
 
-// Get the application timezone from environment variable
-export const APP_TIMEZONE = process.env.NEXT_PUBLIC_APP_TIMEZONE || 'Australia/Brisbane';
+// Get the application timezone from environment variable or use local timezone
+export const APP_TIMEZONE = process.env.NEXT_PUBLIC_APP_TIMEZONE || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 /**
  * Get the user's locale from their computer/browser
@@ -17,54 +17,38 @@ function getUserLocale(): string {
 }
 
 /**
- * Convert a UTC date/time string to Brisbane timezone
- * Returns the same moment in time, but adjusted for Brisbane timezone display
+ * Convert a UTC date/time string to local timezone
+ * Returns the same moment in time, but adjusted for local timezone display
  */
 export function convertToAppTimezone(utcDateTime: string | Date): Date {
   const date = typeof utcDateTime === 'string' ? new Date(utcDateTime) : utcDateTime;
-  
+
   // If the input date is invalid, return it as-is to avoid further errors
   if (isNaN(date.getTime())) {
     console.error('Invalid date passed to convertToAppTimezone:', utcDateTime);
     return date;
   }
-  
-  // Brisbane is UTC+10 (no daylight saving in Queensland)
-  const brisbaneOffsetMinutes = 10 * 60; // 600 minutes
-  
-  // Create a new date with the Brisbane offset applied
-  return new Date(date.getTime() + brisbaneOffsetMinutes * 60 * 1000);
+
+  // Return the date as-is since new Date() already handles local timezone conversion
+  return date;
 }
 
 /**
- * Convert a local Brisbane date/time to UTC for FHIR storage
+ * Convert a local date/time to UTC for FHIR storage
  */
 export function convertToUTC(localDateTime: string | Date): Date {
   const date = typeof localDateTime === 'string' ? new Date(localDateTime) : localDateTime;
-  
-  // Create a date as if it's in Brisbane timezone, then convert to UTC
-  const brisbaneTime = new Date(date.toLocaleString('sv-SE')); // ISO format without timezone
-  const utcOffset = getBrisbaneOffsetMinutes();
-  
-  return new Date(brisbaneTime.getTime() - utcOffset * 60000);
+
+  // Return the date as-is since new Date() with ISO string creates UTC time
+  return date;
 }
 
 /**
- * Get current Brisbane offset from UTC in minutes
- * Brisbane is UTC+10 normally, UTC+11 during daylight saving (which Brisbane doesn't observe)
- * But Queensland doesn't observe daylight saving, so it's always UTC+10
- */
-function getBrisbaneOffsetMinutes(): number {
-  // Brisbane/Queensland is always UTC+10 (no daylight saving)
-  return 10 * 60; // 600 minutes
-}
-
-/**
- * Format a date for display in Brisbane timezone
+ * Format a date for display in local timezone
  */
 export function formatForDisplay(date: string | Date, options?: Intl.DateTimeFormatOptions): string {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  
+
   const defaultOptions: Intl.DateTimeFormatOptions = {
     timeZone: APP_TIMEZONE,
     year: 'numeric',
@@ -75,12 +59,12 @@ export function formatForDisplay(date: string | Date, options?: Intl.DateTimeFor
     hour12: true,
     ...options
   };
-  
+
   return dateObj.toLocaleString(getUserLocale(), defaultOptions);
 }
 
 /**
- * Format a date for display in Brisbane timezone (date only)
+ * Format a date for display in local timezone (date only)
  */
 export function formatDateForDisplay(date: string | Date): string {
   return formatForDisplay(date, {
@@ -91,7 +75,7 @@ export function formatDateForDisplay(date: string | Date): string {
 }
 
 /**
- * Format a date for display in Brisbane timezone (time only)
+ * Format a date for display in local timezone (time only)
  */
 export function formatTimeForDisplay(date: string | Date): string {
   return formatForDisplay(date, {
@@ -102,28 +86,28 @@ export function formatTimeForDisplay(date: string | Date): string {
 }
 
 /**
- * Create a FHIR-compatible ISO date string from Brisbane date/time input
- * Ensures all slot times are stored in UTC but created from Brisbane timezone context
+ * Create a FHIR-compatible ISO date string from local date/time input
+ * Ensures all slot times are stored properly for FHIR
  */
 export function createFHIRDateTime(localDate: string, localTime: string): string {
-  // Combine date and time in Brisbane timezone
-  const brisbaneDateTime = `${localDate}T${localTime}:00`;
-  
-  // Convert to UTC for FHIR storage
-  const utcDate = convertToUTC(brisbaneDateTime);
-  
-  return utcDate.toISOString();
+  // Combine date and time in local timezone
+  const localDateTime = `${localDate}T${localTime}:00`;
+
+  // Create date object which will be in local timezone
+  const date = new Date(localDateTime);
+
+  return date.toISOString();
 }
 
 /**
- * Get current time in Brisbane timezone as Date object
- * Uses more reliable timezone conversion method
+ * Get current time in local timezone as Date object
+ * Uses proper timezone conversion method
  */
 export function getNowInAppTimezone(): Date {
   const now = new Date();
-  
-  // Get the current time in Brisbane timezone using proper Intl.DateTimeFormat
-  const brisbaneTime = new Intl.DateTimeFormat('en-CA', {
+
+  // Get the current time in local timezone using proper Intl.DateTimeFormat
+  const localTime = new Intl.DateTimeFormat('en-CA', {
     timeZone: APP_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
@@ -135,34 +119,34 @@ export function getNowInAppTimezone(): Date {
   }).formatToParts(now);
 
   // Build an ISO-like string from the parts
-  const year = brisbaneTime.find(part => part.type === 'year')?.value || '';
-  const month = brisbaneTime.find(part => part.type === 'month')?.value || '';
-  const day = brisbaneTime.find(part => part.type === 'day')?.value || '';
-  const hour = brisbaneTime.find(part => part.type === 'hour')?.value || '';
-  const minute = brisbaneTime.find(part => part.type === 'minute')?.value || '';
-  const second = brisbaneTime.find(part => part.type === 'second')?.value || '';
-  
+  const year = localTime.find(part => part.type === 'year')?.value || '';
+  const month = localTime.find(part => part.type === 'month')?.value || '';
+  const day = localTime.find(part => part.type === 'day')?.value || '';
+  const hour = localTime.find(part => part.type === 'hour')?.value || '';
+  const minute = localTime.find(part => part.type === 'minute')?.value || '';
+  const second = localTime.find(part => part.type === 'second')?.value || '';
+
   // Create a new date from these components (treating as local time)
   return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
 }
 
 /**
- * Check if a date/time is in the future relative to Brisbane timezone
+ * Check if a date/time is in the future relative to local timezone
  */
 export function isFutureTime(dateTime: string | Date): boolean {
   const targetDate = typeof dateTime === 'string' ? new Date(dateTime) : dateTime;
-  const nowBrisbane = getNowInAppTimezone();
-  
-  return targetDate > nowBrisbane;
+  const nowLocal = getNowInAppTimezone();
+
+  return targetDate > nowLocal;
 }
 
 /**
- * Get start and end of day in Brisbane timezone, converted to UTC for FHIR queries
+ * Get start and end of day in local timezone, converted to UTC for FHIR queries
  */
 export function getDayBoundsInUTC(localDate: string): { start: string; end: string } {
   const startOfDay = createFHIRDateTime(localDate, '00:00');
   const endOfDay = createFHIRDateTime(localDate, '23:59');
-  
+
   return {
     start: startOfDay,
     end: endOfDay
@@ -170,7 +154,7 @@ export function getDayBoundsInUTC(localDate: string): { start: string; end: stri
 }
 
 /**
- * Convert FHIR date range to Brisbane timezone for UI display
+ * Convert FHIR date range to local timezone for UI display
  */
 export function convertFHIRDateRangeToLocal(startUTC: string, endUTC: string): {
   startLocal: string;
@@ -178,7 +162,7 @@ export function convertFHIRDateRangeToLocal(startUTC: string, endUTC: string): {
 } {
   const startDate = convertToAppTimezone(startUTC);
   const endDate = convertToAppTimezone(endUTC);
-  
+
   return {
     startLocal: startDate.toISOString(),
     endLocal: endDate.toISOString()
@@ -186,17 +170,17 @@ export function convertFHIRDateRangeToLocal(startUTC: string, endUTC: string): {
 }
 
 /**
- * Format slot time for UI display (showing Brisbane time)
+ * Format slot time for UI display (showing local time)
  */
 export function formatSlotTime(slotStart: string, slotEnd: string): string {
   const startTime = formatTimeForDisplay(slotStart);
   const endTime = formatTimeForDisplay(slotEnd);
-  
+
   return `${startTime} - ${endTime}`;
 }
 
 /**
- * Create date input value (YYYY-MM-DD) for Brisbane timezone
+ * Create date input value (YYYY-MM-DD) for local timezone
  */
 export function getDateInputValue(date?: Date): string {
   const targetDate = date || getNowInAppTimezone();
@@ -204,7 +188,7 @@ export function getDateInputValue(date?: Date): string {
 }
 
 /**
- * Create time input value (HH:mm) for Brisbane timezone
+ * Create time input value (HH:mm) for local timezone
  */
 export function getTimeInputValue(date?: Date): string {
   const targetDate = date || getNowInAppTimezone();

@@ -6,6 +6,7 @@ import { Layout } from '@/components/common/Layout';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
+import { PopupConfirmation } from '@/components/common/PopupConfirmation';
 import { CreateScheduleForm } from '@/components/provider/CreateScheduleForm';
 import { GenerateSlotsForm } from '@/components/provider/GenerateSlotsForm';
 import { SlotCalendar } from '@/components/provider/SlotCalendar';
@@ -31,6 +32,11 @@ export default function PractitionerDetailPage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [dateFilter, setDateFilter] = useState<string>('');
 
+  // Delete schedule states
+  const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState<string>('');
+
   // Filter slots when schedules or filters change
   useEffect(() => {
     if (schedules.length > 0 && allSlots.length > 0) {
@@ -53,16 +59,26 @@ export default function PractitionerDetailPage() {
         );
       }
       
-      // Apply date filter using Brisbane timezone
+      // Apply date filter using local timezone
       if (dateFilter) {
+        console.log('Date filter applied:', dateFilter);
         const dayBounds = getDayBoundsInUTC(dateFilter);
         const startOfDay = new Date(dayBounds.start);
         const endOfDay = new Date(dayBounds.end);
-        
+
+        console.log('Day bounds:', { startOfDay, endOfDay });
+        console.log('Slots before date filter:', filteredSlots.length);
+
         filteredSlots = filteredSlots.filter((slot: Slot) => {
           const slotStart = new Date(slot.start);
-          return slotStart >= startOfDay && slotStart <= endOfDay;
+          const isInRange = slotStart >= startOfDay && slotStart <= endOfDay;
+          if (!isInRange) {
+            console.log('Slot filtered out:', slot.start, 'not in range', startOfDay, 'to', endOfDay);
+          }
+          return isInRange;
         });
+
+        console.log('Slots after date filter:', filteredSlots.length);
       }
       
       // Remove duplicates based on start/end time (same slot duplicated)
@@ -173,29 +189,67 @@ export default function PractitionerDetailPage() {
     }
   };
 
-  const handleDeleteSchedule = async (scheduleId: string) => {
-    if (!confirm('Are you sure you want to delete this schedule? This will also delete all associated slots.')) {
-      return;
-    }
+  // Open delete confirmation modal
+  const openDeleteConfirmation = (scheduleToDelete: string) => {
+    setScheduleToDelete(scheduleToDelete);
+  };
+
+  // Close delete confirmation modal
+  const closeDeleteConfirmation = () => {
+    setScheduleToDelete(null);
+    setDeleteProgress('');
+  };
+
+  // Execute schedule deletion
+  const executeDeleteSchedule = async () => {
+    if (!scheduleToDelete) return;
+
+    setDeleteLoading(true);
+    setDeleteProgress('Initializing deletion...');
 
     try {
-      const response = await fetch(`/api/fhir/schedules/${scheduleId}`, {
+      console.log('=== DELETE SCHEDULE DEBUG ===');
+      console.log('Deleting schedule:', scheduleToDelete);
+
+      setDeleteProgress('Finding associated appointments and slots...');
+
+      const response = await fetch(`/api/fhir/schedules/${scheduleToDelete}`, {
         method: 'DELETE',
         credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
+      console.log('Delete response status:', response.status);
+
       if (response.ok) {
+        setDeleteProgress('Deletion completed successfully');
+
         // Remove from local state
-        setSchedules(prev => prev.filter(s => s.id !== scheduleId));
+        setSchedules(prev => prev.filter(s => s.id !== scheduleToDelete));
         // Also remove associated slots
-        setSlots(prev => prev.filter(slot => slot.schedule?.reference !== `Schedule/${scheduleId}`));
+        setSlots(prev => prev.filter(slot => slot.schedule?.reference !== `Schedule/${scheduleToDelete}`));
+
+        // Close modal and reset state
+        setScheduleToDelete(null);
+        setDeleteLoading(false);
+        setDeleteProgress('');
       } else {
         const errorData = await response.json();
-        alert(errorData.error || 'Failed to delete schedule');
+        console.error('Delete error response:', errorData);
+        setDeleteProgress(`Error: ${errorData.error || 'Failed to delete schedule'}`);
+        // Keep modal open to show error
       }
     } catch (error) {
       console.error('Error deleting schedule:', error);
-      alert('Failed to delete schedule');
+      setDeleteProgress('Error: Failed to delete schedule. Please try again.');
+      // Keep modal open to show error
+    } finally {
+      // Only reset loading if successful (modal was closed above)
+      if (!scheduleToDelete) {
+        setDeleteLoading(false);
+      }
     }
   };
 
@@ -456,7 +510,7 @@ export default function PractitionerDetailPage() {
                               <Button
                                 variant="danger"
                                 size="sm"
-                                onClick={() => handleDeleteSchedule(schedule.id!)}
+                                onClick={() => openDeleteConfirmation(schedule.id!)}
                                 className="flex items-center"
                               >
                                 <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -680,6 +734,32 @@ export default function PractitionerDetailPage() {
           isOpen={showGenerateSlots}
           onClose={() => setShowGenerateSlots(false)}
           onSuccess={handleSlotsGenerated}
+        />
+
+        {/* Delete Schedule Confirmation */}
+        <PopupConfirmation
+          isOpen={!!scheduleToDelete}
+          onConfirm={executeDeleteSchedule}
+          onCancel={() => {
+            setScheduleToDelete(null);
+            setDeleteLoading(false);
+            setDeleteProgress('');
+          }}
+          isLoading={deleteLoading}
+          title="Delete Schedule"
+          message="Are you sure you want to delete this schedule? This action cannot be undone."
+          confirmText="Delete Schedule"
+          cancelText="Cancel"
+          variant="danger"
+          loadingText="Deleting schedule..."
+          progressMessage={deleteProgress}
+          details={
+            <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+              <li>Cancel all associated appointments</li>
+              <li>Delete all related time slots</li>
+              <li>Remove the schedule permanently</li>
+            </ul>
+          }
         />
       </div>
     </Layout>

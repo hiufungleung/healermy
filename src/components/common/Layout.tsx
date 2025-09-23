@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { LogoutConfirmation } from './LogoutConfirmation';
+import { PopupConfirmation } from './PopupConfirmation';
 import { NotificationBell } from '../communications/NotificationBell';
 
 interface LayoutProps {
@@ -182,7 +182,7 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
       <main>{children}</main>
       
       {/* Logout Confirmation Modal */}
-      <LogoutConfirmation
+      <PopupConfirmation
         isOpen={showLogoutConfirmation}
         onConfirm={handleLogoutConfirm}
         onCancel={handleLogoutCancel}
