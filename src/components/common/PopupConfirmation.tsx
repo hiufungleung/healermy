@@ -107,14 +107,16 @@ export function PopupConfirmation({
 
             {/* Buttons */}
             <div className="flex space-x-3">
-              <Button
-                variant="outline"
-                fullWidth
-                onClick={onCancel}
-                disabled={isLoading}
-              >
-                {cancelText}
-              </Button>
+              {cancelText && (
+                <Button
+                  variant="outline"
+                  fullWidth
+                  onClick={onCancel}
+                  disabled={isLoading}
+                >
+                  {cancelText}
+                </Button>
+              )}
               <Button
                 variant={variant}
                 fullWidth
