@@ -134,7 +134,7 @@ export default function ProviderDashboardClient({
 
   const formatDateTime = (isoString: string) => {
     return new Date(isoString).toLocaleString('en-AU', {
-      timeZone: 'Australia/Brisbane',
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -145,7 +145,7 @@ export default function ProviderDashboardClient({
 
   const formatTime = (isoString: string) => {
     return new Date(isoString).toLocaleString('en-AU', {
-      timeZone: 'Australia/Brisbane',
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       hour: '2-digit',
       minute: '2-digit',
       hour12: true

@@ -48,7 +48,7 @@ export default function PendingAppointmentsClient({
 
   const formatDateTime = (isoString: string) => {
     return new Date(isoString).toLocaleString('en-AU', {
-      timeZone: 'Australia/Brisbane',
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       weekday: 'short',
       year: 'numeric',
       month: 'short',
@@ -245,7 +245,7 @@ export default function PendingAppointmentsClient({
                     <p className="text-sm text-gray-900">
                       {formatDateTime(appointment.resource.start)} - {' '}
                       {new Date(appointment.resource.end).toLocaleString('en-AU', {
-                        timeZone: 'Australia/Brisbane',
+                        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                         hour: '2-digit',
                         minute: '2-digit'
                       })}

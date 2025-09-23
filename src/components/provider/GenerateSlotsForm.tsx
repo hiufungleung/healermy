@@ -134,8 +134,8 @@ export function GenerateSlotsForm({
       const startDate = new Date(formData.startDate);
       const endDate = new Date(formData.endDate);
       const slotsToCreate: Slot[] = [];
+      let skippedPastSlots = 0;
 
-      debugger;
       // Generate slots for each day in the date range
       for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
         const dayOfWeek = date.getDay().toString();
@@ -146,13 +146,17 @@ export function GenerateSlotsForm({
           for (const timeSlot of timeSlots) {
             const [startTime, endTime] = timeSlot.split('-');
             
-            // Use Brisbane timezone for slot creation
+            // Use local timezone for slot creation
             const slotStart = createFHIRDateTime(dateStr, startTime);
             const slotEnd = createFHIRDateTime(dateStr, endTime);
-            
-            // Validate that the slot is in the future (Brisbane time)
-            if (!isFutureTime(slotStart)) {
-              console.warn(`Skipping past slot: ${dateStr} ${startTime} (Brisbane time)`);
+
+            // Validate that the slot is in the future (local time)
+            // Compare using local time directly instead of FHIR UTC time
+            const localSlotDateTime = new Date(`${dateStr}T${startTime}:00`);
+            const nowLocal = new Date();
+
+            if (localSlotDateTime <= nowLocal) {
+              skippedPastSlots++;
               continue;
             }
 
@@ -174,6 +178,10 @@ export function GenerateSlotsForm({
 
       console.log(`Generating ${slotsToCreate.length} slots with overlap validation...`);
 
+      if (skippedPastSlots > 0) {
+        console.log(`Skipped ${skippedPastSlots} past slots that were in the past`);
+      }
+
       // Use batch creation with overlap validation
       const response = await fetch('/api/fhir/slots/batch', {
         method: 'POST',
@@ -190,7 +198,6 @@ export function GenerateSlotsForm({
       }
 
       const result = await response.json();
-      debugger;
       // Show detailed results to user
       if (result.rejected && result.rejected.length > 0) {
         const rejectedCount = result.rejected.length;
@@ -202,14 +209,26 @@ export function GenerateSlotsForm({
         
         // Still show success message but with warning
         if (createdCount > 0) {
-          setError(`Created ${createdCount} slots successfully. ${rejectedCount} slots were skipped due to overlaps or conflicts.`);
+          const pastSlotMessage = skippedPastSlots > 0 ? ` ${skippedPastSlots} past slots were skipped.` : '';
+          setError(`Created ${createdCount} slots successfully. ${rejectedCount} slots were skipped due to overlaps or conflicts.${pastSlotMessage}`);
         } else {
           throw new Error(`All ${rejectedCount} slots were rejected due to overlaps. Please check existing slots and adjust your time ranges.`);
         }
       }
 
-      onSuccess(result.results?.created || []);
-      onClose();
+      // Add notification about skipped past slots even in successful case
+      if (skippedPastSlots > 0 && (!result.rejected || result.rejected.length === 0)) {
+        setError(`Created ${result.created || slotsToCreate.length} slots successfully. ${skippedPastSlots} past slots were automatically skipped.`);
+        // Don't close the modal immediately so user can see the message
+        setTimeout(() => {
+          onSuccess(result.results?.created || []);
+          onClose();
+          setError(null);
+        }, 3000);
+      } else {
+        onSuccess(result.results?.created || []);
+        onClose();
+      }
       
       // Reset form
       setFormData({
