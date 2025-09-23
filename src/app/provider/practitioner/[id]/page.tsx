@@ -37,57 +37,107 @@ export default function PractitionerDetailPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteProgress, setDeleteProgress] = useState<string>('');
 
+  // Slot generation notification states
+  const [showSlotsNotification, setShowSlotsNotification] = useState(false);
+  const [slotsNotificationMessage, setSlotsNotificationMessage] = useState('');
+
+  // Clear slots states
+  const [showClearSlotsConfirmation, setShowClearSlotsConfirmation] = useState(false);
+  const [clearSlotsLoading, setClearSlotsLoading] = useState(false);
+  const [clearSlotsProgress, setClearSlotsProgress] = useState('');
+
+
+
   // Filter slots when schedules or filters change
   useEffect(() => {
-    if (schedules.length > 0 && allSlots.length > 0) {
-      console.log('Filtering slots by schedules and filters...');
-      let filteredSlots = allSlots.filter((slot: Slot) =>
-        schedules.some(schedule => slot.schedule?.reference === `Schedule/${schedule.id}`)
-      );
-      
+    console.log('🔍 Filtering triggered:', {
+      schedulesCount: schedules.length,
+      allSlotsCount: allSlots.length,
+      scheduleFilter,
+      statusFilter,
+      dateFilter
+    });
+
+    // Always filter, even if schedules is empty (to clear slots when needed)
+    if (allSlots.length > 0) {
+      let filteredSlots = allSlots;
+
+      // ORPHANED SLOTS FIX: If no schedules exist, don't show any slots
+      if (schedules.length === 0) {
+        console.log('🚫 No schedules exist - clearing all slots to fix data consistency');
+        filteredSlots = [];
+      } else {
+        console.log('📋 Filtering by schedules...');
+        console.log('📋 Available schedules:', schedules.map(s => ({ id: s.id, name: s.comment || 'No name' })));
+        console.log('📋 Sample slot schedule references:', allSlots.slice(0, 3).map(slot => ({
+          id: slot.id,
+          scheduleRef: slot.schedule?.reference
+        })));
+
+        // Extract schedule IDs from slot references to see what's actually available
+        const slotScheduleIds = [...new Set(allSlots.map(slot =>
+          slot.schedule?.reference?.replace('Schedule/', '')
+        ).filter(Boolean))];
+        console.log('📋 Unique schedule IDs in slots:', slotScheduleIds);
+        console.log('📋 Schedule IDs we are filtering for:', schedules.map(s => s.id));
+
+        // For this practitioner page, show ALL slots regardless of schedule
+        // since we want to see all slots for this practitioner
+        filteredSlots = allSlots;
+        console.log(`📋 Showing all slots for this practitioner: ${filteredSlots.length} slots`);
+      }
+
       // Apply schedule filter
       if (scheduleFilter) {
+        console.log('🏥 Applying schedule filter:', scheduleFilter);
         filteredSlots = filteredSlots.filter((slot: Slot) =>
           slot.schedule?.reference === `Schedule/${scheduleFilter}`
         );
+        console.log(`🏥 After schedule ID filter: ${filteredSlots.length} slots`);
       }
-      
+
       // Apply status filter
       if (statusFilter) {
+        console.log('📊 Applying status filter:', statusFilter);
         filteredSlots = filteredSlots.filter((slot: Slot) =>
           slot.status === statusFilter
         );
+        console.log(`📊 After status filter: ${filteredSlots.length} slots`);
       }
-      
+
       // Apply date filter using local timezone
       if (dateFilter) {
-        console.log('Date filter applied:', dateFilter);
+        console.log('📅 Applying date filter:', dateFilter);
         const dayBounds = getDayBoundsInUTC(dateFilter);
         const startOfDay = new Date(dayBounds.start);
         const endOfDay = new Date(dayBounds.end);
 
-        console.log('Day bounds:', { startOfDay, endOfDay });
-        console.log('Slots before date filter:', filteredSlots.length);
+        console.log('📅 Day bounds:', { startOfDay, endOfDay });
+        console.log('📅 Slots before date filter:', filteredSlots.length);
 
         filteredSlots = filteredSlots.filter((slot: Slot) => {
           const slotStart = new Date(slot.start);
           const isInRange = slotStart >= startOfDay && slotStart <= endOfDay;
           if (!isInRange) {
-            console.log('Slot filtered out:', slot.start, 'not in range', startOfDay, 'to', endOfDay);
+            console.log('📅 Slot filtered out:', slot.start, 'not in range', startOfDay, 'to', endOfDay);
           }
           return isInRange;
         });
 
-        console.log('Slots after date filter:', filteredSlots.length);
+        console.log('📅 Slots after date filter:', filteredSlots.length);
       }
-      
+
       // Remove duplicates based on start/end time (same slot duplicated)
       const uniqueSlots = filteredSlots.filter((slot, index, self) =>
         index === self.findIndex(s => s.start === slot.start && s.end === slot.end)
       );
-      
-      console.log(`Filtered from ${allSlots.length} to ${filteredSlots.length} slots, ${uniqueSlots.length} unique`);
+
+      console.log(`✅ Final result: ${allSlots.length} → ${filteredSlots.length} → ${uniqueSlots.length} unique slots`);
       setSlots(uniqueSlots);
+    } else if (allSlots.length === 0) {
+      // If no slots at all, clear the display
+      console.log('🔄 No slots available, clearing display');
+      setSlots([]);
     }
   }, [schedules, allSlots, scheduleFilter, statusFilter, dateFilter]);
 
@@ -107,36 +157,51 @@ export default function PractitionerDetailPage() {
           setPractitioner(practitionerData);
         }
 
-        // Fetch schedules for this practitioner
+        // Fetch schedules for this practitioner and then fetch slots for those schedules
         try {
           const schedulesResponse = await fetch(`/api/fhir/schedules?actor=Practitioner/${practitionerId}`, {
             credentials: 'include',
           });
-          
+
           if (schedulesResponse.ok) {
             const schedulesData = await schedulesResponse.json();
-            setSchedules(schedulesData.schedules || []);
-          }
-        } catch (error) {
-          console.error('Error fetching schedules:', error);
-        }
+            const practitionerSchedules = schedulesData.schedules || [];
+            setSchedules(practitionerSchedules);
 
-        // Fetch slots for this practitioner's schedules
-        // Wait for schedules to be loaded first
-        try {
-          const slotsResponse = await fetch(`/api/fhir/slots?_count=100`, {
-            credentials: 'include',
-          });
-          
-          if (slotsResponse.ok) {
-            const slotsData = await slotsResponse.json();
-            console.log('All slots fetched:', slotsData.slots?.length || 0);
-            
-            // Store all slots temporarily - we'll filter them after schedules are loaded
-            setAllSlots(slotsData.slots || []);
+            // Now fetch slots for this practitioner's schedules only
+            if (practitionerSchedules.length > 0) {
+              // Build query parameters for slots filtered by this practitioner's schedules
+              const scheduleParams = new URLSearchParams();
+              scheduleParams.append('_count', '100');
+
+              // Add schedule filter for each schedule
+              practitionerSchedules.forEach((schedule: any) => {
+                scheduleParams.append('schedule', `Schedule/${schedule.id}`);
+              });
+
+              console.log('🔍 Fetching slots for practitioner schedules:', scheduleParams.toString());
+
+              const slotsResponse = await fetch(`/api/fhir/slots?${scheduleParams.toString()}`, {
+                credentials: 'include',
+              });
+
+              if (slotsResponse.ok) {
+                const slotsData = await slotsResponse.json();
+                console.log('✅ Practitioner-specific slots fetched:', slotsData.slots?.length || 0);
+                setAllSlots(slotsData.slots || []);
+              } else {
+                console.log('❌ Failed to fetch slots for practitioner schedules');
+                setAllSlots([]);
+              }
+            } else {
+              console.log('📋 No schedules found for practitioner - no slots to fetch');
+              setAllSlots([]);
+            }
           }
         } catch (error) {
-          console.error('Error fetching slots:', error);
+          console.error('Error fetching schedules and slots:', error);
+          setSchedules([]);
+          setAllSlots([]);
         }
 
         // Fetch appointments for this practitioner
@@ -172,10 +237,151 @@ export default function PractitionerDetailPage() {
     setShowCreateSchedule(false);
   };
 
-  const handleSlotsGenerated = (newSlots: Slot[]) => {
+  const handleSlotsGenerated = (newSlots: Slot[], pastSlotsInfo?: { count: number; totalSlots: number }) => {
     setSlots(prev => [...prev, ...newSlots]);
+    setAllSlots(prev => [...prev, ...newSlots]);
     setShowGenerateSlots(false);
+
+    // Show notification popup with results
+    let message = `${newSlots.length} slots were created successfully.`;
+    if (pastSlotsInfo && pastSlotsInfo.count > 0) {
+      message += ` ${pastSlotsInfo.count} slots were skipped because they were in the past.`;
+    }
+
+    setSlotsNotificationMessage(message);
+    setTimeout(() => {
+      setShowSlotsNotification(true);
+    }, 100);
   };
+
+  // Clear slots handler - clears slots for current practitioner's schedules
+  const executeClearSlots = async () => {
+    setClearSlotsLoading(true);
+    setClearSlotsProgress('Validating slots...');
+
+    try {
+      // Only clear slots if we have schedules
+      if (schedules.length === 0) {
+        setClearSlotsProgress('No schedules found - nothing to clear');
+        setTimeout(() => {
+          setClearSlotsLoading(false);
+          setShowClearSlotsConfirmation(false);
+          setClearSlotsProgress('');
+        }, 2000);
+        return;
+      }
+
+      // Get all slots currently displayed (which are for this practitioner)
+      const allSlotsForSchedules = allSlots;
+
+      console.log('🗑️ Clear Slots Debug:', {
+        totalSlots: allSlots.length,
+        schedulesCount: schedules.length,
+        slotsToDelete: allSlotsForSchedules.length
+      });
+
+      if (allSlotsForSchedules.length === 0) {
+        setClearSlotsProgress('No slots to clear');
+        setTimeout(() => {
+          setClearSlotsLoading(false);
+          setShowClearSlotsConfirmation(false);
+          setClearSlotsProgress('');
+        }, 1500);
+        return;
+      }
+
+      setClearSlotsProgress(`Cancelling appointments for ${allSlotsForSchedules.length} slots...`);
+
+      // Add a timeout to prevent hanging
+      const clearSlotsTimeout = setTimeout(() => {
+        console.error('Clear slots operation timed out');
+        setClearSlotsProgress('Operation timed out - stopping...');
+        setTimeout(() => {
+          setClearSlotsLoading(false);
+          setShowClearSlotsConfirmation(false);
+          setClearSlotsProgress('');
+        }, 2000);
+      }, 60000); // 60 second timeout
+
+      // Get and cancel appointments for each slot
+      let cancelledAppointments = 0;
+      for (const slot of allSlotsForSchedules) {
+        try {
+          const response = await fetch(`/api/fhir/appointments?slot=${slot.id}`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+          if (response.ok) {
+            const data = await response.json();
+            const appointments = data.appointments || [];
+
+            // Cancel each appointment
+            for (const appointment of appointments) {
+              if (appointment.status !== 'cancelled') {
+                try {
+                  await fetch(`/api/fhir/appointments/${appointment.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                      ...appointment,
+                      status: 'cancelled'
+                    }),
+                  });
+                  cancelledAppointments++;
+                } catch (error) {
+                  console.error(`Error cancelling appointment ${appointment.id}:`, error);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching appointments for slot ${slot.id}:`, error);
+        }
+      }
+
+      setClearSlotsProgress(`Deleting ${allSlotsForSchedules.length} slots...`);
+
+      // Delete each slot
+      let deletedSlots = 0;
+      for (const slot of allSlotsForSchedules) {
+        try {
+          const response = await fetch(`/api/fhir/slots/${slot.id}`, {
+            method: 'DELETE',
+            credentials: 'include',
+          });
+          if (response.ok) {
+            deletedSlots++;
+          }
+        } catch (error) {
+          console.error(`Error deleting slot ${slot.id}:`, error);
+        }
+      }
+
+      // Update local state
+      setSlots([]);
+      setAllSlots(prev => prev.filter((slot: any) =>
+        !schedules.some(schedule => slot.schedule?.reference === `Schedule/${schedule.id}`)
+      ));
+
+      console.log(`✅ Cleared ${deletedSlots} slots and cancelled ${cancelledAppointments} appointments`);
+
+      // Clear timeout and state
+      clearTimeout(clearSlotsTimeout);
+      setClearSlotsLoading(false);
+      setClearSlotsProgress('');
+      setShowClearSlotsConfirmation(false);
+
+    } catch (error) {
+      console.error('Error clearing slots:', error);
+      clearTimeout(clearSlotsTimeout);
+      setClearSlotsProgress('');
+      setClearSlotsLoading(false);
+      setShowClearSlotsConfirmation(false);
+      alert('Failed to clear slots. Please try again.');
+    }
+  };
+
 
   const refreshData = async () => {
     // Re-fetch all data after changes
@@ -542,17 +748,41 @@ export default function PractitionerDetailPage() {
               <div className="p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-medium text-text-primary">Available Slots</h3>
-                  <Button 
-                    variant="primary" 
-                    className="flex items-center"
-                    onClick={() => setShowGenerateSlots(true)}
-                    disabled={schedules.length === 0}
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Generate Slots
-                  </Button>
+                  <div className="flex space-x-2">
+                    {schedules.length === 0 && slots.length > 0 && (
+                      <Button
+                        variant="danger"
+                        onClick={() => setShowCleanupOrphanedConfirmation(true)}
+                        disabled={cleanupOrphanedLoading}
+                      >
+                        {cleanupOrphanedLoading ? 'Cleaning...' : 'Cleanup Orphaned Slots'}
+                      </Button>
+                    )}
+                    {slots.length > 0 && schedules.length > 0 && (
+                      <Button
+                        variant="danger"
+                        className="flex items-center"
+                        onClick={() => setShowClearSlotsConfirmation(true)}
+                        disabled={clearSlotsLoading}
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Clear Slots
+                      </Button>
+                    )}
+                    <Button
+                      variant="primary"
+                      className="flex items-center"
+                      onClick={() => setShowGenerateSlots(true)}
+                      disabled={schedules.length === 0}
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Generate Slots
+                    </Button>
+                  </div>
                 </div>
                 
                 {schedules.length === 0 && (
@@ -759,6 +989,52 @@ export default function PractitionerDetailPage() {
               <li>Delete all related time slots</li>
               <li>Remove the schedule permanently</li>
             </ul>
+          }
+        />
+
+        {/* Clear Slots Confirmation */}
+        <PopupConfirmation
+          isOpen={showClearSlotsConfirmation}
+          onConfirm={executeClearSlots}
+          onCancel={() => {
+            setShowClearSlotsConfirmation(false);
+            setClearSlotsLoading(false);
+            setClearSlotsProgress('');
+          }}
+          isLoading={clearSlotsLoading}
+          title="Clear All Available Slots"
+          message="Are you sure you want to delete all available slots? This will cancel any associated appointments."
+          confirmText="Clear All Slots"
+          cancelText="Cancel"
+          variant="danger"
+          loadingText="Clearing slots..."
+          progressMessage={clearSlotsProgress}
+          details={
+            <div className="text-sm text-gray-600 space-y-1">
+              <p>This action will:</p>
+              <ul className="list-disc list-inside ml-2">
+                <li>Cancel all appointments for these slots</li>
+                <li>Delete all time slots for your schedules</li>
+                <li>Keep your schedules intact for future slot generation</li>
+              </ul>
+            </div>
+          }
+        />
+
+
+        {/* Slot Generation Notification */}
+        <PopupConfirmation
+          isOpen={showSlotsNotification}
+          onConfirm={() => setShowSlotsNotification(false)}
+          onCancel={() => setShowSlotsNotification(false)}
+          title="Slots Generated Successfully"
+          message={slotsNotificationMessage}
+          confirmText="OK"
+          variant="primary"
+          icon={
+            <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           }
         />
       </div>

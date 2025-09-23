@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
+import { PopupConfirmation } from '@/components/common/PopupConfirmation';
 import { createFHIRDateTime, isFutureTime } from '@/lib/timezone';
 import type { Schedule, Slot } from '@/types/fhir';
 
@@ -10,7 +11,7 @@ interface GenerateSlotsFormProps {
   schedules: Schedule[];
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (slots: Slot[]) => void;
+  onSuccess: (slots: Slot[], pastSlotsInfo?: { count: number; totalSlots: number }) => void;
 }
 
 interface SlotGenerationData {
@@ -54,6 +55,7 @@ export function GenerateSlotsForm({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -211,24 +213,27 @@ export function GenerateSlotsForm({
         if (createdCount > 0) {
           const pastSlotMessage = skippedPastSlots > 0 ? ` ${skippedPastSlots} past slots were skipped.` : '';
           setError(`Created ${createdCount} slots successfully. ${rejectedCount} slots were skipped due to overlaps or conflicts.${pastSlotMessage}`);
+
         } else {
           throw new Error(`All ${rejectedCount} slots were rejected due to overlaps. Please check existing slots and adjust your time ranges.`);
         }
       }
 
-      // Add notification about skipped past slots even in successful case
-      if (skippedPastSlots > 0 && (!result.rejected || result.rejected.length === 0)) {
-        setError(`Created ${result.created || slotsToCreate.length} slots successfully. ${skippedPastSlots} past slots were automatically skipped.`);
-        // Don't close the modal immediately so user can see the message
-        setTimeout(() => {
-          onSuccess(result.results?.created || []);
-          onClose();
-          setError(null);
-        }, 3000);
+      // Call onSuccess with past slots info for parent to handle popup
+      if (skippedPastSlots > 0) {
+        console.log('🔔 Past slots detected! Passing to parent:', {
+          skippedPastSlots,
+          totalCreated: result.created || slotsToCreate.length
+        });
+        onSuccess(result.results?.created || [], {
+          count: skippedPastSlots,
+          totalSlots: result.created || slotsToCreate.length
+        });
       } else {
         onSuccess(result.results?.created || []);
-        onClose();
       }
+      onClose();
+      setError(null);
       
       // Reset form
       setFormData({
@@ -467,6 +472,7 @@ export function GenerateSlotsForm({
           </div>
         </Card>
       </div>
+
     </div>
   );
 }
