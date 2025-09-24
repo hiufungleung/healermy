@@ -132,6 +132,8 @@ export interface Appointment {
 export interface Schedule {
   resourceType: 'Schedule';
   id: string;
+  active?: boolean;
+  comment?: string;
   actor?: Array<{
     reference?: string;
     display?: string;

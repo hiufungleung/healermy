@@ -7,14 +7,15 @@ import { Card } from './Card';
 interface PopupConfirmationProps {
   isOpen: boolean;
   onConfirm: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
   isLoading?: boolean;
   // Extended props for reusability
   title?: string;
   message?: string;
   confirmText?: string;
   cancelText?: string;
-  variant?: 'danger' | 'primary';
+  showCancel?: boolean;
+  variant?: 'danger' | 'primary' | 'warning' | 'success';
   icon?: React.ReactNode;
   details?: React.ReactNode;
   loadingText?: string;
@@ -30,6 +31,7 @@ export function PopupConfirmation({
   message = 'Are you sure you want to log out? You will need to sign in again to access your account.',
   confirmText = 'Logout',
   cancelText = 'Cancel',
+  showCancel = true,
   variant = 'danger',
   icon,
   details,
@@ -107,7 +109,7 @@ export function PopupConfirmation({
 
             {/* Buttons */}
             <div className="flex space-x-3">
-              {cancelText && (
+              {showCancel && onCancel && (
                 <Button
                   variant="outline"
                   fullWidth
