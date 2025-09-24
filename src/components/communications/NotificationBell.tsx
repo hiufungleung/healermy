@@ -49,13 +49,19 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
 
           // Get hidden notifications from localStorage (same as ProviderNotificationsClient)
           let hiddenNotifications = new Set<string>();
+          let readNotifications = new Set<string>();
           try {
-            const stored = localStorage.getItem('healermy-provider-hidden-notifications');
-            if (stored) {
-              hiddenNotifications = new Set(JSON.parse(stored));
+            const storedHidden = localStorage.getItem('healermy-provider-hidden-notifications');
+            if (storedHidden) {
+              hiddenNotifications = new Set(JSON.parse(storedHidden));
+            }
+
+            const storedRead = localStorage.getItem('healermy-provider-read-notifications');
+            if (storedRead) {
+              readNotifications = new Set(JSON.parse(storedRead));
             }
           } catch (error) {
-            console.error('Error loading hidden notifications:', error);
+            console.error('Error loading notifications from localStorage:', error);
           }
 
           // Fetch communications with same parameters as ProviderNotificationsClient
@@ -140,7 +146,7 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
 
                 return {
                   id: notificationId,
-                  read: appointment.status !== 'pending', // pending appointments are unread
+                  read: readNotifications.has(notificationId) || appointment.status !== 'pending', // Check localStorage read status
                   appointmentStatus: appointment.status
                 };
               })

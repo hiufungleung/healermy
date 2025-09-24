@@ -90,6 +90,9 @@ export default function ProviderNotificationsClient({
   // State to track provider-hidden notifications
   const [hiddenNotifications, setHiddenNotifications] = useState<Set<string>>(new Set());
 
+  // State to track provider-read notifications
+  const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
+
   // Loading state for better UX
   const [isLoading, setIsLoading] = useState(true);
 
@@ -285,13 +288,15 @@ export default function ProviderNotificationsClient({
               const appointmentDate = new Date(appointment.start).toLocaleDateString();
               const appointmentTime = new Date(appointment.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
+              const notificationId = `apt-${appointment.id}`;
+
               return {
-                id: `apt-${appointment.id}`,
+                id: notificationId,
                 type: 'appointment_request',
                 title: getNotificationTitle(appointment.status),
                 message: getNotificationMessage(appointment.status, `Patient ${patientId}`, appointmentDate, appointmentTime),
                 timestamp: appointment.meta?.lastUpdated || appointment.created || new Date().toISOString(),
-                read: appointment.status !== 'pending',
+                read: readNotifications.has(notificationId) || appointment.status !== 'pending',
                 actionRequired: appointment.status === 'pending',
                 priority: appointment.status === 'pending' ? 'high' : 'medium',
                 patientName: `Patient ${patientId}`, // Placeholder name
@@ -374,7 +379,7 @@ export default function ProviderNotificationsClient({
     };
 
     fetchAppointmentNotifications();
-  }, []);
+  }, [readNotifications]); // Add readNotifications dependency to re-run when localStorage data is loaded
 
   // Optimized periodic refresh - less frequent updates
   useEffect(() => {
@@ -432,14 +437,15 @@ export default function ProviderNotificationsClient({
 
                   // Check if this notification already exists and preserve its read status
                   const existingNotif = providerNotifications.find((n: ProviderNotification) => n.appointmentId === appointment.id);
+                  const notificationId = `apt-${appointment.id}`;
 
                   return {
-                    id: `apt-${appointment.id}`,
+                    id: notificationId,
                     type: 'appointment_request',
                     title: getNotificationTitle(appointment.status),
                     message: getNotificationMessage(appointment.status, patientName, appointmentDate, appointmentTime),
                     timestamp: appointment.meta?.lastUpdated || appointment.created || new Date().toISOString(),
-                    read: existingNotif?.read || (appointment.status !== 'pending'),
+                    read: readNotifications.has(notificationId) || existingNotif?.read || (appointment.status !== 'pending'),
                     actionRequired: appointment.status === 'pending',
                     priority: appointment.status === 'pending' ? 'high' : 'medium',
                     patientName: patientName,
@@ -460,19 +466,24 @@ export default function ProviderNotificationsClient({
     }, 60000); // Check every 60 seconds (less frequent)
 
     return () => clearInterval(interval);
-  }, [providerNotifications, patientNames]);
+  }, [providerNotifications, patientNames, readNotifications]); // Add readNotifications dependency
 
   // This useEffect is no longer needed as we now regenerate notifications immediately after fetching patient names
 
-  // Load hidden notifications from localStorage on mount
+  // Load hidden notifications and read status from localStorage on mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('healermy-provider-hidden-notifications');
-      if (stored) {
-        setHiddenNotifications(new Set(JSON.parse(stored)));
+      const storedHidden = localStorage.getItem('healermy-provider-hidden-notifications');
+      if (storedHidden) {
+        setHiddenNotifications(new Set(JSON.parse(storedHidden)));
+      }
+
+      const storedRead = localStorage.getItem('healermy-provider-read-notifications');
+      if (storedRead) {
+        setReadNotifications(new Set(JSON.parse(storedRead)));
       }
     } catch (error) {
-      console.error('Error loading hidden notifications from localStorage:', error);
+      console.error('Error loading notifications from localStorage:', error);
     }
   }, []);
 
@@ -536,16 +547,23 @@ export default function ProviderNotificationsClient({
 
   // Function to mark provider notification as read
   const markProviderNotificationAsRead = (id: string) => {
-    // Update local state immediately
-    setProviderNotifications(prev =>
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
+    try {
+      // Update local state immediately
+      setProviderNotifications(prev =>
+        prev.map(n => n.id === id ? { ...n, read: true } : n)
+      );
 
-    // For appointment-based notifications, we just update the local state
-    // No need to sync with FHIR since it's just UI state
+      // Persist read status to localStorage
+      const newReadNotifications = new Set([...readNotifications, id]);
+      setReadNotifications(newReadNotifications);
+      localStorage.setItem('healermy-provider-read-notifications',
+        JSON.stringify(Array.from(newReadNotifications)));
 
-    // Dispatch event to update notification bell
-    window.dispatchEvent(new CustomEvent('messageUpdate'));
+      // Dispatch event to update notification bell
+      window.dispatchEvent(new CustomEvent('messageUpdate'));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
   };
 
   // Function to hide notification for provider (provider-specific hiding)
@@ -809,31 +827,45 @@ export default function ProviderNotificationsClient({
   const totalCount = visibleCommunications.length + visibleProviderNotifications.length;
 
   const markAllAsRead = () => {
-    // Mark all communications as read
-    const unreadMessages = localCommunications.filter(comm => !isMessageRead(comm));
-    setLocalCommunications(prev =>
-      prev.map(comm => ({
-        ...comm,
-        extension: [
-          ...(comm.extension || []),
-          {
-            url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
-            valueDateTime: new Date().toISOString()
-          }
-        ]
-      }))
-    );
+    try {
+      // Mark all communications as read
+      const unreadMessages = localCommunications.filter(comm => !isMessageRead(comm));
+      setLocalCommunications(prev =>
+        prev.map(comm => ({
+          ...comm,
+          extension: [
+            ...(comm.extension || []),
+            {
+              url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
+              valueDateTime: new Date().toISOString()
+            }
+          ]
+        }))
+      );
 
-    // Mark all provider notifications as read
-    setProviderNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      // Mark all provider notifications as read and persist to localStorage
+      const unreadProviderNotifications = providerNotifications.filter(n => !n.read);
+      const allNotificationIds = new Set([
+        ...readNotifications,
+        ...unreadProviderNotifications.map(n => n.id)
+      ]);
 
-    // Mark all as read on server using existing API
-    unreadMessages.forEach(comm => {
-      if (comm.id) markAsRead(comm.id);
-    });
+      setReadNotifications(allNotificationIds);
+      localStorage.setItem('healermy-provider-read-notifications',
+        JSON.stringify(Array.from(allNotificationIds)));
 
-    // Dispatch event to update notification bell
-    window.dispatchEvent(new CustomEvent('messageUpdate'));
+      setProviderNotifications(prev => prev.map(n => ({ ...n, read: true })));
+
+      // Mark all as read on server using existing API
+      unreadMessages.forEach(comm => {
+        if (comm.id) markAsRead(comm.id);
+      });
+
+      // Dispatch event to update notification bell
+      window.dispatchEvent(new CustomEvent('messageUpdate'));
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
   };
 
   return (
