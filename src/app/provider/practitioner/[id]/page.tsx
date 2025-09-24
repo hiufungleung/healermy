@@ -22,6 +22,7 @@ export default function PractitionerDetailPage() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [communications, setCommunications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'schedules' | 'slots' | 'appointments'>('overview');
   const [showCreateSchedule, setShowCreateSchedule] = useState(false);
@@ -127,7 +128,7 @@ export default function PractitionerDetailPage() {
       try {
         console.log('🔍 Starting parallel data fetching for practitioner:', practitionerId);
 
-        // Start all API calls in parallel instead of sequential
+        // Start all API calls in parallel instead of sequential (except communications)
         const [practitionerResponse, schedulesResponse, slotsResponse, appointmentsResponse] = await Promise.all([
           // Fetch practitioner details
           fetch(`/api/fhir/practitioners/${practitionerId}`, {
@@ -209,6 +210,46 @@ export default function PractitionerDetailPage() {
 
     fetchPractitionerData();
   }, [practitionerId]);
+
+  // Separate useEffect for communications - loads after page renders
+  useEffect(() => {
+    const fetchCommunications = async () => {
+      if (!practitionerId || loading) return; // Wait for page to load first
+
+      try {
+        console.log('💬 Fetching communications for practitioner:', practitionerId);
+
+        const communicationsResponse = await fetch(`/api/fhir/communications?sender=Practitioner/${practitionerId}`, {
+          credentials: 'include',
+        });
+
+        if (communicationsResponse.ok) {
+          const communicationsData = await communicationsResponse.json();
+          const comms = communicationsData.communications || [];
+          console.log('💬 Communications found:', comms.length);
+
+          // Log unread/read counts
+          const unreadCount = comms.filter((comm: any) => comm.status !== 'completed').length;
+          const readCount = comms.filter((comm: any) => comm.status === 'completed').length;
+          console.log('💬 Unread communications:', unreadCount);
+          console.log('💬 Read communications:', readCount);
+
+          setCommunications(comms);
+        } else {
+          console.log('❌ Communications API failed with status:', communicationsResponse.status);
+          setCommunications([]);
+        }
+      } catch (error) {
+        console.error('Error fetching communications:', error);
+        setCommunications([]);
+      }
+    };
+
+    // Only fetch communications after the main page data is loaded
+    if (!loading && practitionerId) {
+      fetchCommunications();
+    }
+  }, [practitionerId, loading]); // Depends on practitionerId and loading state
 
   const handleBack = () => {
     router.back();
@@ -674,7 +715,7 @@ export default function PractitionerDetailPage() {
 
         {/* Tab Content */}
         {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
             <Card>
               <div className="p-4">
                 <div className="flex items-center">
@@ -738,6 +779,34 @@ export default function PractitionerDetailPage() {
                   <div className="ml-3">
                     <p className="text-sm font-medium text-text-secondary">Appointments</p>
                     <p className="text-2xl font-semibold text-text-primary">{appointments.length}</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card>
+              <div className="p-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg className="w-8 h-8 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-text-secondary">Communications</p>
+                    <div className="flex items-center space-x-2">
+                      <p className="text-2xl font-semibold text-text-primary">{communications.length}</p>
+                      {communications.length > 0 && (
+                        <div className="flex space-x-1 text-xs">
+                          <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full">
+                            {communications.filter((comm: any) => comm.status !== 'completed').length} unread
+                          </span>
+                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                            {communications.filter((comm: any) => comm.status === 'completed').length} read
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
