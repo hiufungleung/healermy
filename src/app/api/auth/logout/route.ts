@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { decrypt } from '@/library/auth/encryption';
 import { AuthSession, TokenData, SessionData } from '@/types/auth';
 import { SESSION_COOKIE_NAME, TOKEN_COOKIE_NAME } from '@/library/auth/config';
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const cookieStore = await cookies();
     const tokenCookie = cookieStore.get(TOKEN_COOKIE_NAME);
@@ -22,11 +22,12 @@ export async function POST(request: NextRequest) {
         const sessionMetadata: SessionData = JSON.parse(decryptedSessionString);
         
         // Combine for backward compatibility
+        // sessionData is extracted but not used for logout logic
         sessionData = {
           ...tokenData,
           ...sessionMetadata
         };
-      } catch (error) {
+      } catch {
         console.warn('Failed to decrypt session cookies for logout, proceeding with cookie deletion only');
       }
     }

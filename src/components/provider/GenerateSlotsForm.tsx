@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
-import { PopupConfirmation } from '@/components/common/PopupConfirmation';
-import { createFHIRDateTime, isFutureTime } from '@/lib/timezone';
+import { createFHIRDateTime } from '@/lib/timezone';
 import type { Schedule, Slot } from '@/types/fhir';
 
 interface GenerateSlotsFormProps {
@@ -75,7 +74,7 @@ export function GenerateSlotsForm({
         }
       }
     }
-  }, [formData.startDate, formData.endDate, formData.scheduleId]);
+  }, [formData.startDate, formData.endDate, formData.scheduleId, formData.daysOfWeek, getDaysInDateRange, getScheduleAllowedDays]);
 
   // Helper function to get minimum allowed time for a given date
   const getMinTimeForDate = (dateStr: string): string => {

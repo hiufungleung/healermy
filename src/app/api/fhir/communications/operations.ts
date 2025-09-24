@@ -1,4 +1,5 @@
 import { FHIRClient } from '../client';
+import type { Communication, Bundle } from '../../../../types/fhir';
 
 /**
  * Search communications by various parameters
@@ -17,7 +18,7 @@ export async function searchCommunications(
     _count?: number;
     _sort?: string;          // -sent (descending by sent date)
   }
-): Promise<any> {
+): Promise<Bundle<Communication>> {
   const queryParams = new URLSearchParams();
   
   if (searchOptions) {
@@ -40,7 +41,7 @@ export async function getCommunication(
   token: string,
   fhirBaseUrl: string,
   communicationId: string
-): Promise<any> {
+): Promise<Communication> {
   const url = `${fhirBaseUrl}/Communication/${communicationId}`;
   const response = await FHIRClient.fetchWithAuth(url, token);
   return response.json();
@@ -52,8 +53,8 @@ export async function getCommunication(
 export async function createCommunication(
   token: string,
   fhirBaseUrl: string,
-  communicationData: any
-): Promise<any> {
+  communicationData: Partial<Communication>
+): Promise<Communication> {
   const url = `${fhirBaseUrl}/Communication`;
   const response = await FHIRClient.fetchWithAuth(url, token, {
     method: 'POST',
@@ -69,8 +70,8 @@ export async function updateCommunication(
   token: string,
   fhirBaseUrl: string,
   communicationId: string,
-  communicationData: any
-): Promise<any> {
+  communicationData: Partial<Communication>
+): Promise<Communication> {
   const url = `${fhirBaseUrl}/Communication/${communicationId}`;
   const response = await FHIRClient.fetchWithAuth(url, token, {
     method: 'PUT',
@@ -86,7 +87,7 @@ export async function deleteCommunication(
   token: string,
   fhirBaseUrl: string,
   communicationId: string
-): Promise<any> {
+): Promise<{ success: boolean } | Communication> {
   const url = `${fhirBaseUrl}/Communication/${communicationId}`;
   const response = await FHIRClient.fetchWithAuth(url, token, {
     method: 'DELETE',
@@ -111,8 +112,8 @@ export async function createStatusUpdateMessage(
   practitionerRef: string,
   statusMessage: string,
   sender: 'system' | 'patient' | 'practitioner' = 'system'
-): Promise<any> {
-  const communication = {
+): Promise<Communication> {
+  const communication: Partial<Communication> = {
     resourceType: 'Communication',
     status: 'completed',
     category: [{
@@ -149,8 +150,8 @@ export async function createManualMessage(
   message: string,
   appointmentId?: string,
   subject?: string
-): Promise<any> {
-  const communication = {
+): Promise<Communication> {
+  const communication: Partial<Communication> = {
     resourceType: 'Communication',
     status: 'completed',
     category: [{
@@ -182,12 +183,12 @@ export async function markCommunicationAsRead(
   fhirBaseUrl: string,
   communicationId: string,
   readerRef: string
-): Promise<any> {
+): Promise<Communication> {
   // Get the existing communication
   const communication = await getCommunication(token, fhirBaseUrl, communicationId);
 
   // Check if already marked as read by this user
-  const existingReadExtension = communication.extension?.find((ext: any) =>
+  const existingReadExtension = communication.extension?.find((ext) =>
     ext.url === 'http://hl7.org/fhir/StructureDefinition/communication-read-status'
   );
 
@@ -212,11 +213,11 @@ export async function markCommunicationAsRead(
 /**
  * Check if a communication has been read
  */
-export function isCommunicationRead(communication: any): boolean {
+export function isCommunicationRead(communication: Communication): boolean {
   if (!communication.extension) return false;
 
   // Check for read status extension
-  const readExtension = communication.extension.find((ext: any) =>
+  const readExtension = communication.extension?.find((ext) =>
     ext.url === 'http://hl7.org/fhir/StructureDefinition/communication-read-status'
   );
 
@@ -241,7 +242,7 @@ export async function getUnreadCommunicationsCount(
   if (!communications.entry) return 0;
   
   let unreadCount = 0;
-  for (const entry of communications.entry) {
+  for (const entry of communications.entry || []) {
     if (!isCommunicationRead(entry.resource)) {
       unreadCount++;
     }

@@ -1,4 +1,5 @@
 import { FHIRClient } from '../client';
+import type { Practitioner, Bundle } from '../../../../types/fhir';
 
 /**
  * Search practitioners by various parameters
@@ -18,7 +19,7 @@ export async function searchPractitioners(
     _count?: number;
     _getpages?: string;
   }
-): Promise<any> {
+): Promise<Bundle<Practitioner>> {
   const queryParams = new URLSearchParams();
 
   if (searchOptions) {
@@ -41,7 +42,7 @@ export async function getPractitioner(
   token: string,
   fhirBaseUrl: string,
   practitionerId: string
-): Promise<any> {
+): Promise<Practitioner> {
   const url = `${fhirBaseUrl}/Practitioner/${practitionerId}`;
   const response = await FHIRClient.fetchWithAuth(url, token);
   return response.json();
@@ -53,8 +54,8 @@ export async function getPractitioner(
 export async function createPractitioner(
   token: string,
   fhirBaseUrl: string,
-  practitionerData: any
-): Promise<any> {
+  practitionerData: Partial<Practitioner>
+): Promise<Practitioner> {
   const url = `${fhirBaseUrl}/Practitioner`;
   const response = await FHIRClient.fetchWithAuth(url, token, {
     method: 'POST',

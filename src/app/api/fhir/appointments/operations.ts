@@ -1,5 +1,6 @@
 import { FHIRClient } from '../client';
 import { manageSlotStatusForAppointment } from '../slots/operations';
+import type { Appointment, Bundle } from '../../../../types/fhir';
 
 /**
  * Search appointments by various parameters
@@ -18,7 +19,7 @@ export async function searchAppointments(
   },
   dateFrom?: string,
   dateTo?: string
-): Promise<any> {
+): Promise<Bundle<Appointment>> {
   const queryParams = new URLSearchParams();
   
   if (patientId) queryParams.append('patient', patientId);
@@ -79,14 +80,15 @@ export async function searchAppointments(
   // Return the full FHIR Bundle structure
   // Some callers expect `result.entry`, others expect the resources directly
   if (bundle.resourceType === 'Bundle') {
-    return bundle;
+    return bundle as Bundle<Appointment>;
   }
   
   // Fallback to empty Bundle if no valid bundle structure
   return {
     resourceType: 'Bundle',
+    type: 'searchset',
     entry: []
-  };
+  } as Bundle<Appointment>;
 }
 
 /**
@@ -95,15 +97,15 @@ export async function searchAppointments(
 export async function createAppointment(
   token: string,
   fhirBaseUrl: string,
-  appointmentData: any
-): Promise<any> {
+  appointmentData: Partial<Appointment>
+): Promise<Appointment> {
   const url = `${fhirBaseUrl}/Appointment`;
   const response = await FHIRClient.fetchWithAuth(url, token, {
     method: 'POST',
     body: JSON.stringify(appointmentData),
   });
-  
-  const result = await response.json();
+
+  const result: Appointment = await response.json();
   
   // Automatically manage slot status based on appointment status
   if (response.ok) {
@@ -125,16 +127,16 @@ export async function updateAppointment(
   token: string,
   fhirBaseUrl: string,
   appointmentId: string,
-  appointmentData: any,
+  appointmentData: Partial<Appointment>,
   oldStatus?: string
-): Promise<any> {
+): Promise<Appointment> {
   const url = `${fhirBaseUrl}/Appointment/${appointmentId}`;
   const response = await FHIRClient.fetchWithAuth(url, token, {
     method: 'PUT',
     body: JSON.stringify(appointmentData),
   });
-  
-  const result = await response.json();
+
+  const result: Appointment = await response.json();
   
   // Automatically manage slot status based on appointment status changes
   if (response.ok) {

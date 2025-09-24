@@ -4,6 +4,7 @@ import { updateAppointment } from '../operations';
 import { createStatusUpdateMessage } from '../../communications/operations';
 import { FHIRClient } from '../../client';
 import { manageSlotStatusForAppointment } from '../../slots/operations';
+import type { Appointment } from '../../../../../types/fhir';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -36,7 +37,7 @@ export async function GET(
       );
     }
     
-    const appointment = await response.json();
+    const appointment: Appointment = await response.json();
     return NextResponse.json(appointment);
   } catch (error) {
     console.error(`Error in GET /api/fhir/appointments/${id}:`, error);
@@ -69,7 +70,11 @@ export async function PATCH(
     const session = await getSessionFromHeaders();
     
     const token = prepareToken(session.accessToken);
-    const patchOperations = await request.json();
+    const patchOperations: Array<{
+      op: string;
+      path: string;
+      value: unknown;
+    }> = await request.json();
     
     // Validate patch operations based on user role
     if (session.role === 'patient') {
@@ -77,7 +82,7 @@ export async function PATCH(
       const allowedPatientOperations = ['cancelled', 'proposed'];
       
       for (const op of patchOperations) {
-        if (op.path === '/status' && !allowedPatientOperations.includes(op.value)) {
+        if (op.path === '/status' && !allowedPatientOperations.includes(op.value as string)) {
           return NextResponse.json(
             { error: `Patients can only cancel appointments or propose reschedules. Status '${op.value}' not allowed.` },
             { status: 403 }
@@ -106,16 +111,16 @@ export async function PATCH(
       token
     );
     
-    let currentAppointment = null;
-    let oldStatus = null;
+    let currentAppointment: Appointment | null = null;
+    let oldStatus: string | null = null;
     
     if (currentAppointmentResponse.ok) {
-      currentAppointment = await currentAppointmentResponse.json();
+      currentAppointment = await currentAppointmentResponse.json() as Appointment;
       oldStatus = currentAppointment.status;
       
       // Additional validation for patients - they can only modify their own appointments
       if (session.role === 'patient') {
-        const patientParticipant = currentAppointment.participant?.find((p: any) => 
+        const patientParticipant = currentAppointment.participant?.find((p) =>
           p.actor?.reference?.startsWith('Patient/')
         );
         
@@ -164,10 +169,10 @@ export async function PATCH(
     if (currentAppointment) {
       try {
         // Check if status is being changed
-        const statusPatch = patchOperations.find((op: any) => op.path === '/status');
-        
+        const statusPatch = patchOperations.find((op) => op.path === '/status');
+
         if (statusPatch) {
-          const newStatus = statusPatch.value;
+          const newStatus = statusPatch.value as string;
           
           // Automatically manage slot status for any status change
           await manageSlotStatusForAppointment(token, session.fhirBaseUrl, currentAppointment, oldStatus, newStatus);
@@ -181,14 +186,14 @@ export async function PATCH(
     // Send notification message for status changes
     if (currentAppointment) {
       try {
-        const statusPatch = patchOperations.find((op: any) => op.path === '/status');
-        
+        const statusPatch = patchOperations.find((op) => op.path === '/status');
+
         if (statusPatch) {
-          const newStatus = statusPatch.value;
-          const patientParticipant = currentAppointment.participant?.find((p: any) => 
+          const newStatus = statusPatch.value as string;
+          const patientParticipant = currentAppointment.participant?.find((p) =>
             p.actor?.reference?.startsWith('Patient/')
           );
-          const practitionerParticipant = currentAppointment.participant?.find((p: any) => 
+          const practitionerParticipant = currentAppointment.participant?.find((p) =>
             p.actor?.reference?.startsWith('Practitioner/')
           );
           
@@ -247,8 +252,8 @@ export async function PATCH(
               token,
               session.fhirBaseUrl,
               id,
-              patientParticipant.actor.reference,
-              practitionerParticipant.actor.reference,
+              patientParticipant?.actor?.reference ?? '',
+              practitionerParticipant?.actor?.reference ?? '',
               statusMessage,
               sender
             );
@@ -314,7 +319,7 @@ export async function PUT(
       );
     }
     
-    const appointment = await currentAppointmentResponse.json();
+    const appointment: Appointment = await currentAppointmentResponse.json();
     
     // Update appointment status
     const updatedAppointment = {
@@ -323,13 +328,13 @@ export async function PUT(
     };
     
     // Update participant statuses if provided
-    if (updateData.participantUpdates) {
-      updateData.participantUpdates.forEach((update: any) => {
-        const participant = updatedAppointment.participant.find((p: any) => 
-          p.actor.reference === update.reference
+    if (updateData.participantUpdates && updatedAppointment.participant) {
+      updateData.participantUpdates.forEach((update: { reference: string; status: string }) => {
+        const participant = updatedAppointment.participant!.find((p) =>
+          p.actor?.reference === update.reference
         );
         if (participant) {
-          participant.status = update.status;
+          participant.status = update.status as 'accepted' | 'declined' | 'tentative' | 'needs-action';
         }
       });
     }
@@ -340,11 +345,11 @@ export async function PUT(
     
     // Send status notification
     try {
-      const patientParticipant = updatedAppointment.participant.find((p: any) => 
-        p.actor.reference.startsWith('Patient/')
+      const patientParticipant = updatedAppointment.participant?.find((p) =>
+        p.actor?.reference?.startsWith('Patient/')
       );
-      const practitionerParticipant = updatedAppointment.participant.find((p: any) => 
-        p.actor.reference.startsWith('Practitioner/')
+      const practitionerParticipant = updatedAppointment.participant?.find((p) =>
+        p.actor?.reference?.startsWith('Practitioner/')
       );
       
       if (patientParticipant && practitionerParticipant) {
@@ -386,8 +391,8 @@ export async function PUT(
           token,
           session.fhirBaseUrl,
           id,
-          patientParticipant.actor.reference,
-          practitionerParticipant.actor.reference,
+          patientParticipant?.actor?.reference ?? '',
+          practitionerParticipant?.actor?.reference ?? '',
           statusMessage,
           'practitioner'
         );

@@ -25,7 +25,7 @@ export async function enhanceAppointmentsWithPractitionerDetails(
     // Extract unique practitioner IDs
     const practitionerIds = new Set<string>();
     appointments.forEach((appointment) => {
-      const practitionerParticipant = appointment.participant?.find((p: any) =>
+      const practitionerParticipant = appointment.participant?.find((p) =>
         p.actor?.reference?.startsWith('Practitioner/')
       );
       if (practitionerParticipant?.actor?.reference) {
@@ -63,7 +63,7 @@ export async function enhanceAppointmentsWithPractitionerDetails(
 
     // Add practitioner details to appointments
     const enhancedAppointments = appointments.map((appointment): AppointmentWithPractitionerDetails => {
-      const practitionerParticipant = appointment.participant?.find((p: any) =>
+      const practitionerParticipant = appointment.participant?.find((p) =>
         p.actor?.reference?.startsWith('Practitioner/')
       );
 

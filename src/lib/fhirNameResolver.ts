@@ -93,7 +93,7 @@ export async function fetchPractitionerData(practitionerIds: Set<string>) {
 /**
  * Extract full name from FHIR name object
  */
-export function extractFullName(nameObj: any): string | null {
+export function extractFullName(nameObj: { name?: Array<{ given?: string[]; family?: string }> }): string | null {
   if (!nameObj?.name?.[0]) return null;
 
   const name = nameObj.name[0];
@@ -106,8 +106,8 @@ export function extractFullName(nameObj: any): string | null {
  */
 export function updateAppointmentNames(
   appointments: Appointment[],
-  patientsMap: Map<string, any>,
-  practitionersMap: Map<string, any>
+  patientsMap: Map<string, Patient>,
+  practitionersMap: Map<string, Practitioner>
 ): Appointment[] {
   return appointments.map((appointment) => {
     const updatedAppointment = { ...appointment };

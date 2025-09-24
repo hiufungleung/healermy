@@ -120,7 +120,7 @@ export default function PractitionerManagement() {
     
     // This will run when search filters change (not on initial mount)
     fetchPractitioners(1, true);
-  }, [searchFilters.givenName, searchFilters.familyName, searchFilters.phone, searchFilters.addressCity, searchFilters.addressState, searchFilters.addressPostalCode, searchFilters.addressCountry, searchFilters.practitionerId, isInitialMount]);
+  }, [searchFilters.givenName, searchFilters.familyName, searchFilters.phone, searchFilters.addressCity, searchFilters.addressState, searchFilters.addressPostalCode, searchFilters.addressCountry, searchFilters.practitionerId, isInitialMount, fetchPractitioners]);
 
   // Handle search filter changes
   const handleFiltersChange = useCallback((filters: {
@@ -448,7 +448,7 @@ export default function PractitionerManagement() {
             {!loading && !searchFilters.givenName && !searchFilters.familyName && !searchFilters.phone && !searchFilters.addressCity && !searchFilters.addressState && !searchFilters.addressPostalCode && !searchFilters.addressCountry && !searchFilters.practitionerId && (
               <div className="space-y-2">
                 <p className="text-sm text-text-secondary">
-                  Try searching for "Dr" or a specific practitioner name
+                  Try searching for &quot;Dr&quot; or a specific practitioner name
                 </p>
                 <Button
                   variant="primary"

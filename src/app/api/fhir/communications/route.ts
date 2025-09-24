@@ -7,6 +7,7 @@ import {
   getUnreadCommunicationsCount,
   isCommunicationRead
 } from './operations';
+import type { Communication } from '../../../../types/fhir';
 
 /**
  * GET /api/fhir/communications - Search communications
@@ -179,7 +180,7 @@ export async function POST(request: NextRequest) {
       );
     } else {
       // Create custom communication
-      const communicationData = {
+      const communicationData: Partial<Communication> = {
         resourceType: 'Communication',
         status: 'completed',
         category: [{

@@ -3,7 +3,6 @@
 import React, { useState, useMemo } from 'react';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
-import { Badge } from '@/components/common/Badge';
 import { SlotCalendarDisplay } from '@/components/common/SlotDisplay';
 import { formatDateForDisplay } from '@/lib/timezone';
 import type { Slot } from '@/types/fhir';

@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { AuthSession } from '@/types/auth';
 import { decrypt } from '@/library/auth/encryption';
 import { SESSION_COOKIE_NAME } from '@/library/auth/config';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const cookieStore = await cookies();
     

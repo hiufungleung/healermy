@@ -135,7 +135,7 @@ export async function DELETE(
     const token = prepareToken(session.accessToken);
 
     // Delete the communication from FHIR
-    const result = await deleteCommunication(token, session.fhirBaseUrl, id);
+    await deleteCommunication(token, session.fhirBaseUrl, id);
 
     return NextResponse.json({ success: true, message: 'Communication deleted successfully' });
 

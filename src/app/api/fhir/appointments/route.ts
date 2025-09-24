@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, validateRole, prepareToken } from '../utils/auth';
+import { getSessionFromHeaders, prepareToken } from '../utils/auth';
 import { searchAppointments, createAppointment } from './operations';
 import { createStatusUpdateMessage } from '../communications/operations';
+import type { Appointment } from '../../../../types/fhir';
 
 /**
  * GET /api/fhir/appointments - Search appointments
@@ -25,7 +26,10 @@ export async function GET(request: NextRequest) {
     const _count = searchParams.get('_count');
     
     // Build options object
-    const options: any = {};
+    const options: {
+      status?: string;
+      _count?: number;
+    } = {};
     if (status) options.status = status;
     if (_count) options._count = parseInt(_count);
     
@@ -50,7 +54,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Extract appointments from FHIR Bundle structure
-    const appointments = result?.entry?.map((entry: any) => entry.resource).filter(Boolean) || [];
+    const appointments: Appointment[] = result?.entry?.map((entry) => entry.resource).filter(Boolean) || [];
     return NextResponse.json({ appointments });
   } catch (error) {
     console.error('Error in GET /api/fhir/appointments:', error);
@@ -82,22 +86,22 @@ export async function POST(request: NextRequest) {
     // Patients create with status "pending", providers can create "booked"
     
     // Parse request body
-    const appointmentData = await request.json();
+    const appointmentData: Partial<Appointment> = await request.json();
     
     // If patient is creating, ensure status is "pending"
     if (session.role === 'patient') {
       appointmentData.status = 'pending';
       
       // Ensure patient is in participants with status "accepted"
-      const patientParticipant = appointmentData.participant?.find((p: any) => 
+      const patientParticipant = appointmentData.participant?.find((p) =>
         p.actor?.reference?.startsWith('Patient/')
       );
       if (patientParticipant) {
         patientParticipant.status = 'accepted';
       }
-      
+
       // Ensure practitioner is in participants with status "needs-action"
-      const practitionerParticipant = appointmentData.participant?.find((p: any) => 
+      const practitionerParticipant = appointmentData.participant?.find((p) =>
         p.actor?.reference?.startsWith('Practitioner/')
       );
       if (practitionerParticipant) {
@@ -114,10 +118,10 @@ export async function POST(request: NextRequest) {
       console.log(`[APPOINTMENT] Created appointment ${result.id}, attempting to send notification...`);
       try {
         // Extract patient and practitioner references from participants
-        const patientParticipant = appointmentData.participant?.find((p: any) =>
+        const patientParticipant = appointmentData.participant?.find((p) =>
           p.actor?.reference?.startsWith('Patient/')
         );
-        const practitionerParticipant = appointmentData.participant?.find((p: any) =>
+        const practitionerParticipant = appointmentData.participant?.find((p) =>
           p.actor?.reference?.startsWith('Practitioner/')
         );
 
@@ -135,8 +139,8 @@ export async function POST(request: NextRequest) {
               token,
               session.fhirBaseUrl,
               result.id,
-              patientParticipant.actor.reference,
-              practitionerParticipant.actor.reference,
+              patientParticipant.actor!.reference,
+              practitionerParticipant.actor!.reference,
               statusMessage,
               'practitioner'
             );

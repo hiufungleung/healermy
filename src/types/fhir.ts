@@ -144,7 +144,7 @@ export interface Schedule {
   };
 }
 
-export interface Bundle<T = any> {
+export interface Bundle<T = unknown> {
   resourceType: 'Bundle';
   type: string;
   total?: number;
@@ -191,6 +191,11 @@ export interface Communication {
   resourceType: 'Communication';
   id: string;
   status: 'preparation' | 'in-progress' | 'not-done' | 'on-hold' | 'stopped' | 'completed' | 'entered-in-error' | 'unknown';
+  extension?: Array<{
+    url: string;
+    valueDateTime?: string;
+    [key: string]: unknown;
+  }>;
   category?: Array<{
     coding?: Array<{
       system?: string;

@@ -2,52 +2,39 @@
 
 import React, { useState, useEffect } from 'react';
 
-const SPECIALTIES = [
-  'General Practice',
-  'Internal Medicine',
-  'Cardiology',
-  'Dermatology',
-  'Emergency Medicine',
-  'Family Medicine',
-  'Gastroenterology',
-  'Neurology',
-  'Oncology',
-  'Pediatrics',
-  'Psychiatry',
-  'Radiology',
-  'Surgery',
-  'Orthopedics',
-  'Ophthalmology',
-  'Anesthesiology',
-  'Pathology',
-  'Obstetrics and Gynecology',
-  'Urology',
-  'Endocrinology',
-];
+// Reserved for future use
+// const SPECIALTIES = [
+//   'General Practice', 'Internal Medicine', 'Cardiology', 'Dermatology',
+//   'Emergency Medicine', 'Family Medicine', 'Gastroenterology', 'Neurology',
+//   'Oncology', 'Pediatrics', 'Psychiatry', 'Radiology', 'Surgery',
+//   'Orthopedics', 'Ophthalmology', 'Anesthesiology', 'Pathology',
+//   'Obstetrics and Gynecology', 'Urology', 'Endocrinology'
+// ];
 
-const LANGUAGES = [
-  { code: 'en', name: 'English' },
-  { code: 'zh', name: 'Chinese (Mandarin)' },
-  { code: 'yue', name: 'Chinese (Cantonese)' },
-  { code: 'ar', name: 'Arabic' },
-  { code: 'vi', name: 'Vietnamese' },
-  { code: 'it', name: 'Italian' },
-  { code: 'es', name: 'Spanish' },
-  { code: 'hi', name: 'Hindi' },
-  { code: 'fr', name: 'French' },
-  { code: 'de', name: 'German' },
-  { code: 'ja', name: 'Japanese' },
-  { code: 'ko', name: 'Korean' },
-  { code: 'pt', name: 'Portuguese' },
-  { code: 'ru', name: 'Russian' },
-  { code: 'th', name: 'Thai' },
-  { code: 'tr', name: 'Turkish' },
-  { code: 'pl', name: 'Polish' },
-  { code: 'nl', name: 'Dutch' },
-  { code: 'sv', name: 'Swedish' },
-  { code: 'da', name: 'Danish' },
-  { code: 'no', name: 'Norwegian' },
-];
+// Reserved for future use
+// const LANGUAGES = [
+//   { code: 'en', name: 'English' },
+//   { code: 'zh', name: 'Chinese (Mandarin)' },
+//   { code: 'yue', name: 'Chinese (Cantonese)' },
+//   { code: 'ar', name: 'Arabic' },
+//   { code: 'vi', name: 'Vietnamese' },
+//   { code: 'it', name: 'Italian' },
+//   { code: 'es', name: 'Spanish' },
+//   { code: 'hi', name: 'Hindi' },
+//   { code: 'fr', name: 'French' },
+//   { code: 'de', name: 'German' },
+//   { code: 'ja', name: 'Japanese' },
+//   { code: 'ko', name: 'Korean' },
+//   { code: 'pt', name: 'Portuguese' },
+//   { code: 'ru', name: 'Russian' },
+//   { code: 'th', name: 'Thai' },
+//   { code: 'tr', name: 'Turkish' },
+//   { code: 'pl', name: 'Polish' },
+//   { code: 'nl', name: 'Dutch' },
+//   { code: 'sv', name: 'Swedish' },
+//   { code: 'da', name: 'Danish' },
+//   { code: 'no', name: 'Norwegian' }
+// ];
 
 interface SearchFilters {
   givenName: string;
@@ -111,7 +98,7 @@ export function PractitionerSearch({
     return () => {
       if (timeout) clearTimeout(timeout);
     };
-  }, [givenName, familyName, phone, addressCity, addressState, addressPostalCode, addressCountry, practitionerId, onFiltersChange]);
+  }, [givenName, familyName, phone, addressCity, addressState, addressPostalCode, addressCountry, practitionerId, onFiltersChange, searchTimeout]);
 
   const handleClearSearch = () => {
     setGivenName('');
@@ -138,7 +125,7 @@ export function PractitionerSearch({
           <h3 className="text-lg font-medium text-gray-900">Find Your Doctor</h3>
         </div>
         <p className="text-gray-600 text-sm">
-          Search by doctor's name, location, or practitioner ID. Use multiple fields to narrow your results.
+          Search by doctor&apos;s name, location, or practitioner ID. Use multiple fields to narrow your results.
         </p>
       </div>
 
@@ -151,7 +138,7 @@ export function PractitionerSearch({
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
                 Given Name
-                <span className="text-xs text-gray-500 ml-1">(Doctor's first name)</span>
+                <span className="text-xs text-gray-500 ml-1">(Doctor&apos;s first name)</span>
               </label>
               <input
                 type="text"
@@ -166,7 +153,7 @@ export function PractitionerSearch({
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
                 Family Name
-                <span className="text-xs text-gray-500 ml-1">(Doctor's last name)</span>
+                <span className="text-xs text-gray-500 ml-1">(Doctor&apos;s last name)</span>
               </label>
               <input
                 type="text"

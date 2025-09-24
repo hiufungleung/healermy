@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import type { AuthSession } from '@/types/auth';
+import type { AuthSession } from '../../../../types/auth';
 
 /**
  * Extract session from middleware headers
