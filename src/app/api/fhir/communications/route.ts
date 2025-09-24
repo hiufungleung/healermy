@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromHeaders, prepareToken } from '../utils/auth';
-import { 
-  searchCommunications, 
+import {
+  searchCommunications,
   createCommunication,
   createManualMessage,
-  getUnreadCommunicationsCount
+  getUnreadCommunicationsCount,
+  isCommunicationRead
 } from './operations';
 
 /**
@@ -20,18 +21,37 @@ export async function GET(request: NextRequest) {
     const unreadOnly = searchParams.get('unread') === 'true';
     const count = parseInt(searchParams.get('_count') || '50');
     
-    // Determine user reference based on role
-    const userRef = session.role === 'patient' 
-      ? `Patient/${session.patient}` 
-      : `Practitioner/${session.fhirUser || session.patient}`;
+    // For providers, we need to query differently since we don't have a specific practitioner ID
+    // Providers should see all communications in the system (clinic-wide view)
+    const isProvider = session.role === 'provider' || session.role !== 'patient';
     
     if (unreadOnly) {
       // Return unread count
-      const unreadCount = await getUnreadCommunicationsCount(
-        token,
-        session.fhirBaseUrl,
-        userRef
-      );
+      let unreadCount = 0;
+
+      if (isProvider) {
+        // For providers, get all communications and count unread ones
+        const allCommunications = await searchCommunications(token, session.fhirBaseUrl, {
+          _count: 100,
+          _sort: '-sent'
+        });
+
+        if (allCommunications.entry) {
+          for (const entry of allCommunications.entry) {
+            if (!isCommunicationRead(entry.resource)) {
+              unreadCount++;
+            }
+          }
+        }
+      } else {
+        // For patients, use the existing function with patient reference
+        const patientRef = `Patient/${session.patient}`;
+        unreadCount = await getUnreadCommunicationsCount(
+          token,
+          session.fhirBaseUrl,
+          patientRef
+        );
+      }
       
       return NextResponse.json({ 
         total: unreadCount,
@@ -39,40 +59,57 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    // Search parameters - user can be either recipient or sender
+    // Search parameters
     const searchOptions: any = {
       _count: count,
       _sort: '-sent'
     };
-    
+
     // Add appointment filter if specified
     if (appointmentId) {
       searchOptions.about = `Appointment/${appointmentId}`;
     }
-    
-    // Get communications where user is recipient
-    const result = await searchCommunications(token, session.fhirBaseUrl, {
-      ...searchOptions,
-      recipient: userRef
-    });
-    
-    // Also get communications where user is sender
-    const sentResult = await searchCommunications(token, session.fhirBaseUrl, {
-      ...searchOptions,
-      sender: userRef
-    });
-    
-    // Merge and deduplicate results
-    const allCommunications = [
-      ...(result.entry || []),
-      ...(sentResult.entry || [])
-    ];
+
+    let allCommunications: any[] = [];
+
+    if (isProvider) {
+      // For providers, get all communications (clinic-wide view)
+      const result = await searchCommunications(token, session.fhirBaseUrl, searchOptions);
+      allCommunications = result.entry || [];
+    } else {
+      // For patients, get communications where patient is recipient or sender
+      const patientRef = `Patient/${session.patient}`;
+
+      const result = await searchCommunications(token, session.fhirBaseUrl, {
+        ...searchOptions,
+        recipient: patientRef
+      });
+
+      const sentResult = await searchCommunications(token, session.fhirBaseUrl, {
+        ...searchOptions,
+        sender: patientRef
+      });
+
+      // Merge and deduplicate results
+      allCommunications = [
+        ...(result.entry || []),
+        ...(sentResult.entry || [])
+      ];
+    }
     
     // Remove duplicates and sort by sent date
-    const uniqueCommunications = allCommunications
-      .filter((comm, index, arr) => 
-        arr.findIndex(c => c.resource.id === comm.resource.id) === index
-      )
+    let uniqueCommunications = allCommunications;
+
+    if (!isProvider) {
+      // Only deduplicate for patients (who get both sent and received messages)
+      uniqueCommunications = allCommunications
+        .filter((comm, index, arr) =>
+          arr.findIndex(c => c.resource.id === comm.resource.id) === index
+        );
+    }
+
+    // Sort by sent date (newest first)
+    uniqueCommunications = uniqueCommunications
       .sort((a, b) => new Date(b.resource.sent || 0).getTime() - new Date(a.resource.sent || 0).getTime());
     
     return NextResponse.json({

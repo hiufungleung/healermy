@@ -51,6 +51,7 @@ export default function NotificationsClient({
   const [localCommunications, setLocalCommunications] = useState<Communication[]>(communications);
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
   const [selectedMessage, setSelectedMessage] = useState<Communication | null>(null);
+  const [displayCount, setDisplayCount] = useState(10); // Show 10 notifications initially
 
   // Check URL parameters on mount and set filter accordingly
   useEffect(() => {
@@ -258,6 +259,10 @@ export default function NotificationsClient({
   };
 
   const deleteNotification = async (id: string) => {
+    // Store original data for potential rollback
+    const originalCommunications = [...localCommunications];
+    const originalSelectedMessage = selectedMessage;
+
     // Immediately update local state for instant UI feedback
     setLocalCommunications(prev => prev.filter(n => n.id !== id));
     if (selectedMessage?.id === id) {
@@ -272,15 +277,34 @@ export default function NotificationsClient({
       });
 
       if (!response.ok) {
-        console.error('Failed to delete communication on server');
-        // Could potentially revert local state here if needed
+        console.error('Failed to delete communication on server, status:', response.status);
+
+        // Revert local state if server deletion failed
+        setLocalCommunications(originalCommunications);
+        if (originalSelectedMessage?.id === id) {
+          setSelectedMessage(originalSelectedMessage);
+        }
+
+        // Show error message to user
+        alert('Failed to delete message. Please try again.');
+        return;
       }
+
+      console.log('Communication deleted successfully from server');
 
       // Dispatch event to update notification bell
       window.dispatchEvent(new CustomEvent('messageUpdate'));
     } catch (error) {
       console.error('Failed to delete communication:', error);
-      // Could potentially revert local state here if needed
+
+      // Revert local state on error
+      setLocalCommunications(originalCommunications);
+      if (originalSelectedMessage?.id === id) {
+        setSelectedMessage(originalSelectedMessage);
+      }
+
+      // Show error message to user
+      alert('Failed to delete message. Please check your connection and try again.');
     }
   };
 
@@ -530,6 +554,15 @@ export default function NotificationsClient({
     return new Date(timeB || 0).getTime() - new Date(timeA || 0).getTime();
   });
 
+  // Limit displayed items to displayCount
+  const displayedItems = allFilteredItems.slice(0, displayCount);
+  const hasMoreItems = allFilteredItems.length > displayCount;
+
+  // Load more function
+  const loadMoreItems = () => {
+    setDisplayCount(prev => prev + 10); // Load 10 more items each time
+  };
+
   // Combined counts for both dynamic and static data
   const unreadCount = localCommunications.filter(comm => !isMessageRead(comm)).length +
                      staticNotifications.filter(notif => !notif.read).length;
@@ -642,7 +675,7 @@ export default function NotificationsClient({
             <p className="text-text-secondary">No notifications found</p>
           </Card>
         ) : (
-          allFilteredItems.map((item) => {
+          displayedItems.map((item) => {
             if (item.type === 'communication') {
               const comm = item.data;
               const appointmentInfo = getAppointmentInfo(comm);
@@ -887,11 +920,14 @@ export default function NotificationsClient({
       </div>
 
       {/* Load More */}
-      {allFilteredItems.length > 0 && (
+      {hasMoreItems && (
         <div className="text-center mt-8">
-          <Button variant="outline">
+          <Button variant="outline" onClick={loadMoreItems}>
             Load More Notifications
           </Button>
+          <p className="text-text-secondary text-sm mt-2">
+            Showing {displayedItems.length} of {allFilteredItems.length} notifications
+          </p>
         </div>
       )}
     </div>

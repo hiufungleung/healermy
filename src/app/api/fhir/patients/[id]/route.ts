@@ -8,15 +8,18 @@ import { getPatient } from '../operations';
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  let id = '';
+  let patientId: string = 'unknown';
+
   try {
     // Extract session from middleware headers
     const session = await getSessionFromHeaders();
 
     // Await params in Next.js 15
-    const resolvedParams = await params;
-    id = resolvedParams.id;
+    const { id } = await params;
+    patientId = id;
 
     // Call FHIR operations
     const token = prepareToken(session.accessToken);
@@ -24,11 +27,12 @@ export async function GET(
       token,
       session.fhirBaseUrl,
       id
+      id
     );
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error(`Error in GET /api/fhir/patients/${id}:`, error);
+    console.error(`Error in GET /api/fhir/patients/${patientId || 'unknown'}:`, error);
     
     // Handle specific error types
     if (error instanceof Error && error.message.includes('session')) {

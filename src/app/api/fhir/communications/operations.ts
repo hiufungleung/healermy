@@ -126,9 +126,8 @@ export async function createStatusUpdateMessage(
     subject: { reference: patientRef },
     about: [{ reference: `Appointment/${appointmentId}` }],
     recipient: [{ reference: patientRef }],
-    sender: { 
-      reference: sender === 'system' ? 'Organization/healermy-system' : 
-                sender === 'patient' ? patientRef : practitionerRef 
+    sender: {
+      reference: sender === 'system' || sender === 'practitioner' ? practitionerRef : patientRef
     },
     sent: new Date().toISOString(),
     payload: [{
