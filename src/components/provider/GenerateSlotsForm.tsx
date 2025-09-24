@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
+import { PopupConfirmation } from '@/components/common/PopupConfirmation';
 import { createFHIRDateTime, isFutureTime } from '@/lib/timezone';
 import type { Schedule, Slot } from '@/types/fhir';
 
@@ -10,7 +11,7 @@ interface GenerateSlotsFormProps {
   schedules: Schedule[];
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (slots: Slot[]) => void;
+  onSuccess: (slots: Slot[], pastSlotsInfo?: { count: number; totalSlots: number }) => void;
 }
 
 interface SlotGenerationData {
@@ -55,8 +56,255 @@ export function GenerateSlotsForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Auto-update selected days when date range changes
+  useEffect(() => {
+    if (formData.startDate && formData.endDate && formData.scheduleId) {
+      const daysInRange = getDaysInDateRange();
+      const scheduleAllowedDays = getScheduleAllowedDays();
+
+      // Get intersection of days in range and schedule allowed days
+      const availableDays = daysInRange.filter(day => scheduleAllowedDays.includes(day));
+
+      // Only update if the available days are different from currently selected
+      if (availableDays.length > 0) {
+        const currentSelected = formData.daysOfWeek.sort().join(',');
+        const newSelected = availableDays.sort().join(',');
+
+        if (currentSelected !== newSelected) {
+          setFormData(prev => ({ ...prev, daysOfWeek: availableDays }));
+        }
+      }
+    }
+  }, [formData.startDate, formData.endDate, formData.scheduleId]);
+
+  // Helper function to get minimum allowed time for a given date
+  const getMinTimeForDate = (dateStr: string): string => {
+    if (!dateStr) return '00:00';
+
+    const selectedDate = new Date(dateStr);
+    const today = new Date();
+
+    // Reset time to start of day for comparison
+    selectedDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    // If selected date is today, minimum time is current time + 1 hour buffer
+    if (selectedDate.getTime() === today.getTime()) {
+      const now = new Date();
+      const minTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
+      const hours = minTime.getHours().toString().padStart(2, '0');
+      const minutes = Math.ceil(minTime.getMinutes() / 30) * 30; // Round up to next 30-min interval
+      const adjustedMinutes = minutes >= 60 ? 0 : minutes;
+      const adjustedHours = minutes >= 60 ? (parseInt(hours) + 1).toString().padStart(2, '0') : hours;
+
+      return `${adjustedHours}:${adjustedMinutes.toString().padStart(2, '0')}`;
+    }
+
+    return '00:00'; // For future dates, no time restriction
+  };
+
+  // Check if a time is disabled for the current date selection
+  const isTimeDisabled = (timeStr: string, dateStr: string): boolean => {
+    if (!dateStr) return false;
+
+    const minTime = getMinTimeForDate(dateStr);
+    return timeStr < minTime;
+  };
+
+  // Get the selected schedule's date constraints
+  const getScheduleDateConstraints = () => {
+    if (!formData.scheduleId) return null;
+
+    const selectedSchedule = schedules.find(s => s.id === formData.scheduleId);
+    if (!selectedSchedule?.planningHorizon) return null;
+
+    return {
+      minDate: selectedSchedule.planningHorizon.start,
+      maxDate: selectedSchedule.planningHorizon.end,
+    };
+  };
+
+  // Get effective min/max dates considering both schedule and today's constraints
+  const getEffectiveDateConstraints = () => {
+    const scheduleConstraints = getScheduleDateConstraints();
+    const today = new Date().toISOString().split('T')[0];
+
+    if (!scheduleConstraints) {
+      return { minDate: today, maxDate: undefined };
+    }
+
+    // Use the later of today or schedule start date
+    const minDate = scheduleConstraints.minDate > today ? scheduleConstraints.minDate : today;
+
+    return {
+      minDate,
+      maxDate: scheduleConstraints.maxDate,
+    };
+  };
+
+  // Get allowed days of week for the selected schedule
+  const getScheduleAllowedDays = (): string[] => {
+    if (!formData.scheduleId) return [];
+
+    const selectedSchedule = schedules.find(s => s.id === formData.scheduleId);
+    if (!selectedSchedule) return [];
+
+    // For now, extract days from schedule based on common patterns
+    // This could be enhanced based on actual FHIR Schedule.availableTime structure
+
+    // If schedule has availableTime, use those days
+    if ((selectedSchedule as any).availableTime) {
+      const availableTimes = (selectedSchedule as any).availableTime;
+      const days: string[] = [];
+
+      availableTimes.forEach((time: any) => {
+        if (time.daysOfWeek) {
+          time.daysOfWeek.forEach((day: string) => {
+            // Convert FHIR day codes (mon, tue, wed, etc.) to numbers
+            const dayMapping: { [key: string]: string } = {
+              'mon': '1', 'tue': '2', 'wed': '3', 'thu': '4',
+              'fri': '5', 'sat': '6', 'sun': '0'
+            };
+            if (dayMapping[day.toLowerCase()] && !days.includes(dayMapping[day.toLowerCase()])) {
+              days.push(dayMapping[day.toLowerCase()]);
+            }
+          });
+        }
+      });
+
+      return days.length > 0 ? days : ['1', '2', '3', '4', '5']; // Default to weekdays
+    }
+
+    // Default fallback - assume weekdays for medical schedules
+    return ['1', '2', '3', '4', '5']; // Monday to Friday
+  };
+
+  // Get days that actually occur in the selected date range
+  const getDaysInDateRange = (): string[] => {
+    if (!formData.startDate || !formData.endDate) return [];
+
+    const startDate = new Date(formData.startDate);
+    const endDate = new Date(formData.endDate);
+    const daysInRange = new Set<string>();
+
+    // Iterate through each day in the range
+    for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
+      const dayOfWeek = date.getDay().toString();
+      daysInRange.add(dayOfWeek);
+    }
+
+    return Array.from(daysInRange);
+  };
+
+  // Check if a day is allowed for the current schedule and date range
+  const isDayAllowedForSchedule = (dayValue: string): boolean => {
+    if (!formData.scheduleId) return true; // All days allowed when no schedule selected
+
+    // First check if the day occurs in the selected date range
+    const daysInRange = getDaysInDateRange();
+    if (daysInRange.length > 0 && !daysInRange.includes(dayValue)) {
+      return false; // Day doesn't occur in selected date range
+    }
+
+    // Then check if the day is allowed by the schedule
+    const allowedDays = getScheduleAllowedDays();
+    return allowedDays.includes(dayValue);
+  };
+
+  // Filter schedules to only show non-past ones
+  const getAvailableSchedules = () => {
+    const today = new Date().toISOString().split('T')[0];
+
+    return schedules.filter(schedule => {
+      // Schedule is available if its end date is today or in the future
+      return schedule.planningHorizon?.end && schedule.planningHorizon.end >= today;
+    });
+  };
+
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+
+    // Auto-populate dates when schedule is selected
+    if (name === 'scheduleId') {
+      const selectedSchedule = schedules.find(s => s.id === value);
+      const newFormData: Partial<SlotGenerationData> = { [name]: value };
+
+      if (selectedSchedule?.planningHorizon) {
+        // Set dates to schedule's planning horizon
+        if (selectedSchedule.planningHorizon.start) {
+          newFormData.startDate = selectedSchedule.planningHorizon.start;
+        }
+        if (selectedSchedule.planningHorizon.end) {
+          newFormData.endDate = selectedSchedule.planningHorizon.end;
+        }
+
+        // Auto-select schedule's allowed days
+        const allowedDays = getScheduleAllowedDays();
+        if (allowedDays.length > 0) {
+          newFormData.daysOfWeek = allowedDays;
+        }
+
+        // Auto-adjust times for the new start date if needed
+        const startDateToUse = newFormData.startDate || formData.startDate;
+        if (startDateToUse) {
+          const minTime = getMinTimeForDate(startDateToUse);
+
+          if (isTimeDisabled(formData.startTime, startDateToUse)) {
+            newFormData.startTime = minTime;
+          }
+
+          if (isTimeDisabled(formData.endTime, startDateToUse)) {
+            const minStartTime = new Date(`2000-01-01T${newFormData.startTime || formData.startTime}:00`);
+            const minEndTime = new Date(minStartTime.getTime() + 60 * 60 * 1000);
+            const endHours = minEndTime.getHours().toString().padStart(2, '0');
+            const endMinutes = minEndTime.getMinutes().toString().padStart(2, '0');
+            newFormData.endTime = `${endHours}:${endMinutes}`;
+          }
+        }
+      }
+
+      setFormData(prev => ({ ...prev, ...newFormData }));
+      return;
+    }
+
+    // Auto-adjust times and days when start date changes
+    if (name === 'startDate') {
+      const minTime = getMinTimeForDate(value);
+      const newFormData: Partial<SlotGenerationData> = { [name]: value };
+
+      // If current start time is before minimum allowed time, update it
+      if (isTimeDisabled(formData.startTime, value)) {
+        newFormData.startTime = minTime;
+      }
+
+      // If current end time is before minimum allowed time, set it to at least 1 hour after start
+      if (isTimeDisabled(formData.endTime, value)) {
+        const minStartTime = new Date(`2000-01-01T${newFormData.startTime || formData.startTime}:00`);
+        const minEndTime = new Date(minStartTime.getTime() + 60 * 60 * 1000); // 1 hour later
+        const endHours = minEndTime.getHours().toString().padStart(2, '0');
+        const endMinutes = minEndTime.getMinutes().toString().padStart(2, '0');
+        newFormData.endTime = `${endHours}:${endMinutes}`;
+      }
+
+      setFormData(prev => ({ ...prev, ...newFormData }));
+      return;
+    }
+
+    // Auto-adjust days when end date changes
+    if (name === 'endDate') {
+      setFormData(prev => ({ ...prev, [name]: value }));
+      return;
+    }
+
+    // Validate time inputs for current date
+    if ((name === 'startTime' || name === 'endTime') && formData.startDate) {
+      if (isTimeDisabled(value, formData.startDate)) {
+        // Show warning but don't prevent the change - let the HTML min attribute handle it
+        console.warn(`Time ${value} is in the past for selected date ${formData.startDate}`);
+      }
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: name === 'slotDuration' ? parseInt(value) : value
@@ -64,6 +312,11 @@ export function GenerateSlotsForm({
   };
 
   const handleDayChange = (dayValue: string) => {
+    // Don't allow changes for disabled days
+    if (formData.scheduleId && !isDayAllowedForSchedule(dayValue)) {
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       daysOfWeek: prev.daysOfWeek.includes(dayValue)
@@ -134,8 +387,8 @@ export function GenerateSlotsForm({
       const startDate = new Date(formData.startDate);
       const endDate = new Date(formData.endDate);
       const slotsToCreate: Slot[] = [];
+      let skippedPastSlots = 0;
 
-      debugger;
       // Generate slots for each day in the date range
       for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
         const dayOfWeek = date.getDay().toString();
@@ -146,13 +399,17 @@ export function GenerateSlotsForm({
           for (const timeSlot of timeSlots) {
             const [startTime, endTime] = timeSlot.split('-');
             
-            // Use Brisbane timezone for slot creation
+            // Use local timezone for slot creation
             const slotStart = createFHIRDateTime(dateStr, startTime);
             const slotEnd = createFHIRDateTime(dateStr, endTime);
-            
-            // Validate that the slot is in the future (Brisbane time)
-            if (!isFutureTime(slotStart)) {
-              console.warn(`Skipping past slot: ${dateStr} ${startTime} (Brisbane time)`);
+
+            // Validate that the slot is in the future (local time)
+            // Compare using local time directly instead of FHIR UTC time
+            const localSlotDateTime = new Date(`${dateStr}T${startTime}:00`);
+            const nowLocal = new Date();
+
+            if (localSlotDateTime <= nowLocal) {
+              skippedPastSlots++;
               continue;
             }
 
@@ -172,7 +429,20 @@ export function GenerateSlotsForm({
         }
       }
 
-      console.log(`Generating ${slotsToCreate.length} slots with overlap validation...`);
+      console.log(`Generated ${slotsToCreate.length} potential slots with overlap validation...`);
+
+      if (skippedPastSlots > 0) {
+        console.log(`Skipped ${skippedPastSlots} past slots that were in the past`);
+      }
+
+      // Check if we have any slots to create
+      if (slotsToCreate.length === 0) {
+        if (skippedPastSlots > 0) {
+          throw new Error(`All ${skippedPastSlots} generated slots were in the past and have been skipped. Please select future dates and times.`);
+        } else {
+          throw new Error('No slots were generated. Please check your date range and time settings.');
+        }
+      }
 
       // Use batch creation with overlap validation
       const response = await fetch('/api/fhir/slots/batch', {
@@ -190,26 +460,59 @@ export function GenerateSlotsForm({
       }
 
       const result = await response.json();
-      debugger;
+
       // Show detailed results to user
       if (result.rejected && result.rejected.length > 0) {
         const rejectedCount = result.rejected.length;
-        const createdCount = result.created;
+        const createdCount = result.created || 0;
+
+        // Log detailed rejection reasons for debugging
         console.warn(`${rejectedCount} slots were rejected due to overlaps:`);
         result.rejected.forEach((rejection: any, index: number) => {
           console.warn(`${index + 1}. ${rejection.reason}`);
         });
-        
-        // Still show success message but with warning
+
+        // Create detailed error message with specific conflicts
+        let conflictDetails = '';
+        if (result.rejected.length > 0) {
+          const conflicts = result.rejected.slice(0, 5).map((rejection: any, index: number) =>
+            `${index + 1}. ${rejection.slot?.start ? new Date(rejection.slot.start).toLocaleString() : 'Unknown time'} - ${rejection.reason}`
+          );
+          conflictDetails = '\n\nConflicts found:\n' + conflicts.join('\n');
+          if (result.rejected.length > 5) {
+            conflictDetails += `\n... and ${result.rejected.length - 5} more conflicts`;
+          }
+        }
+
+        // Provide different messages based on success/failure
         if (createdCount > 0) {
-          setError(`Created ${createdCount} slots successfully. ${rejectedCount} slots were skipped due to overlaps or conflicts.`);
+          const pastSlotMessage = skippedPastSlots > 0 ? ` ${skippedPastSlots} past slots were also skipped.` : '';
+          const successMessage = `✅ Created ${createdCount} slots successfully.\n⚠️ ${rejectedCount} slots were skipped due to overlaps or conflicts.${pastSlotMessage}${conflictDetails}`;
+
+          setError(successMessage);
+          // Continue to onSuccess call below
         } else {
-          throw new Error(`All ${rejectedCount} slots were rejected due to overlaps. Please check existing slots and adjust your time ranges.`);
+          // All slots were rejected
+          const pastSlotMessage = skippedPastSlots > 0 ? ` Additionally, ${skippedPastSlots} slots were skipped for being in the past.` : '';
+          throw new Error(`❌ All ${rejectedCount} slots were rejected due to overlaps or conflicts.${pastSlotMessage}${conflictDetails}\n\n💡 Tip: Check existing slots and adjust your time ranges to avoid conflicts.`);
         }
       }
 
-      onSuccess(result.results?.created || []);
+      // Call onSuccess with past slots info for parent to handle popup
+      if (skippedPastSlots > 0) {
+        console.log('🔔 Past slots detected! Passing to parent:', {
+          skippedPastSlots,
+          totalCreated: result.created || slotsToCreate.length
+        });
+        onSuccess(result.results?.created || [], {
+          count: skippedPastSlots,
+          totalSlots: result.created || slotsToCreate.length
+        });
+      } else {
+        onSuccess(result.results?.created || []);
+      }
       onClose();
+      setError(null);
       
       // Reset form
       setFormData({
@@ -273,74 +576,164 @@ export function GenerateSlotsForm({
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   >
                     <option value="">Select a schedule</option>
-                    {schedules.map((schedule) => (
+                    {getAvailableSchedules().map((schedule) => (
                       <option key={schedule.id} value={schedule.id}>
                         Schedule {schedule.id} ({schedule.planningHorizon?.start} - {schedule.planningHorizon?.end})
                       </option>
                     ))}
                   </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {getAvailableSchedules().length === 0
+                      ? 'No active schedules available (all schedules are in the past)'
+                      : `${getAvailableSchedules().length} active schedule(s) available`
+                    }
+                  </p>
                 </div>
 
                 {/* Date Range */}
                 <div>
                   <label htmlFor="startDate" className="block text-sm font-medium text-text-primary mb-1">
                     Start Date <span className="text-red-500">*</span>
+                    {formData.scheduleId && (
+                      <span className="text-blue-600 text-xs ml-2">
+                        (Auto-set from schedule)
+                      </span>
+                    )}
                   </label>
                   <input
                     type="date"
                     id="startDate"
                     name="startDate"
                     value={formData.startDate}
+                    min={getEffectiveDateConstraints().minDate}
+                    max={getEffectiveDateConstraints().maxDate}
                     onChange={handleInputChange}
+                    disabled={!formData.scheduleId}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
+                      !formData.scheduleId
+                        ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : formData.scheduleId
+                        ? 'border-blue-300 bg-blue-50'
+                        : 'border-gray-300'
+                    }`}
                   />
+                  {formData.scheduleId && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      Schedule allows: {getScheduleDateConstraints()?.minDate} to {getScheduleDateConstraints()?.maxDate}
+                    </p>
+                  )}
+                  {!formData.scheduleId && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Select a schedule first to see available date range
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label htmlFor="endDate" className="block text-sm font-medium text-text-primary mb-1">
                     End Date <span className="text-red-500">*</span>
+                    {formData.scheduleId && (
+                      <span className="text-blue-600 text-xs ml-2">
+                        (Auto-set from schedule)
+                      </span>
+                    )}
                   </label>
                   <input
                     type="date"
                     id="endDate"
                     name="endDate"
                     value={formData.endDate}
+                    min={formData.startDate || getEffectiveDateConstraints().minDate}
+                    max={getEffectiveDateConstraints().maxDate}
                     onChange={handleInputChange}
+                    disabled={!formData.scheduleId}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
+                      !formData.scheduleId
+                        ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : formData.scheduleId
+                        ? 'border-blue-300 bg-blue-50'
+                        : 'border-gray-300'
+                    }`}
                   />
+                  {formData.scheduleId && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      Must be within schedule range and after start date
+                    </p>
+                  )}
+                  {!formData.scheduleId && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Select a schedule first to enable date selection
+                    </p>
+                  )}
                 </div>
 
                 {/* Time Settings */}
                 <div>
                   <label htmlFor="startTime" className="block text-sm font-medium text-text-primary mb-1">
                     Daily Start Time <span className="text-red-500">*</span>
+                    {formData.startDate && isTimeDisabled(formData.startTime, formData.startDate) && (
+                      <span className="text-orange-600 text-xs ml-2">
+                        (Auto-adjusted to avoid past times)
+                      </span>
+                    )}
                   </label>
                   <input
                     type="time"
                     id="startTime"
                     name="startTime"
                     value={formData.startTime}
+                    min={formData.startDate ? getMinTimeForDate(formData.startDate) : undefined}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
+                      formData.startDate && isTimeDisabled(formData.startTime, formData.startDate)
+                        ? 'border-orange-300 bg-orange-50 text-orange-700'
+                        : 'border-gray-300'
+                    }`}
                   />
+                  {formData.startDate && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formData.startDate === new Date().toISOString().split('T')[0]
+                        ? `Minimum time for today: ${getMinTimeForDate(formData.startDate)}`
+                        : 'Future date selected - all times available'
+                      }
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label htmlFor="endTime" className="block text-sm font-medium text-text-primary mb-1">
                     Daily End Time <span className="text-red-500">*</span>
+                    {formData.startDate && isTimeDisabled(formData.endTime, formData.startDate) && (
+                      <span className="text-orange-600 text-xs ml-2">
+                        (Auto-adjusted to avoid past times)
+                      </span>
+                    )}
                   </label>
                   <input
                     type="time"
                     id="endTime"
                     name="endTime"
                     value={formData.endTime}
+                    min={formData.startDate ? getMinTimeForDate(formData.startDate) : undefined}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
+                      formData.startDate && isTimeDisabled(formData.endTime, formData.startDate)
+                        ? 'border-orange-300 bg-orange-50 text-orange-700'
+                        : 'border-gray-300'
+                    }`}
                   />
+                  {formData.startDate && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Must be after start time
+                      {formData.startDate === new Date().toISOString().split('T')[0] &&
+                        ` and after ${getMinTimeForDate(formData.startDate)}`
+                      }
+                    </p>
+                  )}
                 </div>
 
                 {/* Slot Duration */}
@@ -375,8 +768,13 @@ export function GenerateSlotsForm({
                     id="breakStartTime"
                     name="breakStartTime"
                     value={formData.breakStartTime}
+                    min={formData.startDate ? getMinTimeForDate(formData.startDate) : undefined}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
+                      formData.startDate && formData.breakStartTime && isTimeDisabled(formData.breakStartTime, formData.startDate)
+                        ? 'border-orange-300 bg-orange-50 text-orange-700'
+                        : 'border-gray-300'
+                    }`}
                   />
                 </div>
 
@@ -389,8 +787,13 @@ export function GenerateSlotsForm({
                     id="breakEndTime"
                     name="breakEndTime"
                     value={formData.breakEndTime}
+                    min={formData.startDate ? getMinTimeForDate(formData.startDate) : undefined}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
+                      formData.startDate && formData.breakEndTime && isTimeDisabled(formData.breakEndTime, formData.startDate)
+                        ? 'border-orange-300 bg-orange-50 text-orange-700'
+                        : 'border-gray-300'
+                    }`}
                   />
                 </div>
               </div>
@@ -399,20 +802,67 @@ export function GenerateSlotsForm({
               <div className="mt-4">
                 <label className="block text-sm font-medium text-text-primary mb-2">
                   Days of Week <span className="text-red-500">*</span>
+                  {formData.scheduleId && (
+                    <span className="text-blue-600 text-xs ml-2">
+                      (Based on schedule availability)
+                    </span>
+                  )}
                 </label>
-                <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
-                  {DAYS_OF_WEEK.map((day) => (
-                    <label key={day.value} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={formData.daysOfWeek.includes(day.value)}
-                        onChange={() => handleDayChange(day.value)}
-                        className="mr-2"
-                      />
-                      <span className="text-sm">{day.label}</span>
-                    </label>
-                  ))}
+                <div className="grid grid-cols-4 md:grid-cols-7 gap-4">
+                  {DAYS_OF_WEEK.map((day) => {
+                    const isAllowed = isDayAllowedForSchedule(day.value);
+                    const isDisabled = formData.scheduleId && !isAllowed;
+
+                    return (
+                      <label
+                        key={day.value}
+                        className={`flex items-center cursor-pointer ${
+                          isDisabled ? 'cursor-not-allowed' : ''
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.daysOfWeek.includes(day.value)}
+                          onChange={() => handleDayChange(day.value)}
+                          disabled={isDisabled}
+                          className={`mr-2 ${
+                            isDisabled
+                              ? 'text-gray-300 cursor-not-allowed'
+                              : 'text-primary cursor-pointer'
+                          }`}
+                        />
+                        <span className={`text-sm ${
+                          isDisabled
+                            ? 'text-gray-400'
+                            : formData.scheduleId && isAllowed
+                            ? 'text-blue-700 font-medium'
+                            : 'text-text-primary'
+                        }`}>
+                          {day.label}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
+                {formData.scheduleId && formData.startDate && formData.endDate && (
+                  <p className="text-xs text-blue-600 mt-2">
+                    ✓ Available days in selected date range: {getDaysInDateRange().filter(day =>
+                      getScheduleAllowedDays().includes(day)
+                    ).map(day =>
+                      DAYS_OF_WEEK.find(d => d.value === day)?.label
+                    ).join(', ') || 'None'}
+                  </p>
+                )}
+                {formData.scheduleId && (!formData.startDate || !formData.endDate) && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    Select start and end dates to see available days in that range
+                  </p>
+                )}
+                {!formData.scheduleId && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    Select a schedule first to see available days for slot generation
+                  </p>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -448,6 +898,7 @@ export function GenerateSlotsForm({
           </div>
         </Card>
       </div>
+
     </div>
   );
 }

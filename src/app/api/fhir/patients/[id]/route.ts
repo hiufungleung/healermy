@@ -9,6 +9,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+
   let patientId: string = 'unknown';
 
   try {
@@ -16,6 +17,7 @@ export async function GET(
     const session = await getSessionFromHeaders();
 
     // Await params in Next.js 15
+
     const { id } = await params;
     patientId = id;
 

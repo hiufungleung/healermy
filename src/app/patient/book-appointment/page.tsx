@@ -140,7 +140,7 @@ export default function BookAppointment() {
     fetchPractitioners(1, false); // page 1, not a search
   }, [fetchPractitioners]);
 
-  // Timezone-aware slot fetching for next 7 days using Brisbane timezone
+  // Timezone-aware slot fetching for next 7 days using local timezone
   const fetchSlotsForPractitioner = async (practitionerId: string) => {
     try {
       console.log('Fetching 7-day schedules for practitioner:', practitionerId);

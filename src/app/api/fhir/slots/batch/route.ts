@@ -74,10 +74,10 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // Validate time is in the future using Brisbane timezone
+      // Validate time is in the future using local timezone
       if (!isFutureTime(slot.start)) {
         return NextResponse.json(
-          { error: `Invalid slot data at index ${i}: start time must be in the future (Brisbane timezone)` },
+          { error: `Invalid slot data at index ${i}: start time must be in the future (local timezone)` },
           { status: 400 }
         );
       }

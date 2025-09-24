@@ -194,7 +194,7 @@ export async function PATCH(
           
           if (patientParticipant && practitionerParticipant) {
             let statusMessage = '';
-            let sender = session.role === 'patient' ? 'patient' : 'practitioner';
+            const sender: 'system' | 'patient' | 'practitioner' = session.role === 'patient' ? 'patient' : 'practitioner';
             
             // Different messages based on who initiated the change
             if (session.role === 'patient') {

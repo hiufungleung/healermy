@@ -231,9 +231,9 @@ export default function DashboardClient({
     `${patientAddress.line?.join(', ') || ''} ${patientAddress.city || ''} ${patientAddress.state || ''} ${patientAddress.postalCode || ''}`.trim() : null;
   
   // Filter appointments for upcoming section: confirmed/pending within next 3 days
-  const nowBrisbane = getNowInAppTimezone();
-  const threeDaysFromNow = new Date(nowBrisbane);
-  threeDaysFromNow.setDate(nowBrisbane.getDate() + 3);
+  const nowLocal = getNowInAppTimezone();
+  const threeDaysFromNow = new Date(nowLocal);
+  threeDaysFromNow.setDate(nowLocal.getDate() + 3);
   threeDaysFromNow.setHours(23, 59, 59, 999); // End of the 3rd day
 
   const displayAppointments = (Array.isArray(appointments) ? appointments : []).filter((appointment) => {
@@ -242,9 +242,9 @@ export default function DashboardClient({
       return false;
     }
 
-    // Only show appointments within next 3 days (using Brisbane timezone)
+    // Only show appointments within next 3 days (using local timezone)
     const appointmentDate = appointment.start ? new Date(appointment.start) : null;
-    if (!appointmentDate || appointmentDate < nowBrisbane || appointmentDate > threeDaysFromNow) {
+    if (!appointmentDate || appointmentDate < nowLocal || appointmentDate > threeDaysFromNow) {
       return false;
     }
 
