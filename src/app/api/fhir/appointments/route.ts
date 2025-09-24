@@ -111,39 +111,49 @@ export async function POST(request: NextRequest) {
 
     // Send notification message after successful creation
     if (result.id) {
+      console.log(`[APPOINTMENT] Created appointment ${result.id}, attempting to send notification...`);
       try {
         // Extract patient and practitioner references from participants
-        const patientParticipant = appointmentData.participant?.find((p: any) => 
+        const patientParticipant = appointmentData.participant?.find((p: any) =>
           p.actor?.reference?.startsWith('Patient/')
         );
-        const practitionerParticipant = appointmentData.participant?.find((p: any) => 
+        const practitionerParticipant = appointmentData.participant?.find((p: any) =>
           p.actor?.reference?.startsWith('Practitioner/')
         );
-        
+
+        console.log(`[APPOINTMENT] Found participants - Patient: ${patientParticipant?.actor?.reference}, Practitioner: ${practitionerParticipant?.actor?.reference}`);
+
         if (patientParticipant && practitionerParticipant) {
-          let statusMessage = '';
-          
-          if (session.role === 'patient') {
-            statusMessage = 'Your appointment request has been submitted and is pending approval from the provider.';
+          // Only send notification when provider creates appointments
+          // Patients no longer receive automatic booking confirmation notifications
+          if (session.role === 'provider') {
+            const statusMessage = 'A new appointment has been scheduled.';
+            console.log(`[APPOINTMENT] Creating notification message: "${statusMessage}"`);
+
+            // Create status update message
+            const notificationResult = await createStatusUpdateMessage(
+              token,
+              session.fhirBaseUrl,
+              result.id,
+              patientParticipant.actor.reference,
+              practitionerParticipant.actor.reference,
+              statusMessage,
+              'practitioner'
+            );
+
+            console.log(`[APPOINTMENT] Notification created successfully:`, notificationResult.id);
           } else {
-            statusMessage = 'A new appointment has been scheduled.';
+            console.log(`[APPOINTMENT] Patient booking - no automatic notification sent`);
           }
-          
-          // Create status update message
-          await createStatusUpdateMessage(
-            token,
-            session.fhirBaseUrl,
-            result.id,
-            patientParticipant.actor.reference,
-            practitionerParticipant.actor.reference,
-            statusMessage,
-            session.role === 'patient' ? 'system' : 'practitioner'
-          );
+        } else {
+          console.log(`[APPOINTMENT] Missing participants - cannot send notification`);
         }
       } catch (messageError) {
         // Don't fail the appointment creation if messaging fails
         console.warn('Failed to send appointment notification:', messageError);
       }
+    } else {
+      console.log(`[APPOINTMENT] No appointment ID returned, cannot send notification`);
     }
 
     return NextResponse.json(result, { status: 201 });
