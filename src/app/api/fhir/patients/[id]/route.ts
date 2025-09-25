@@ -24,7 +24,7 @@ export async function GET(
     const result = await getPatient(
       token,
       session.fhirBaseUrl,
-      id
+      patientId
     );
 
     return NextResponse.json(result);
