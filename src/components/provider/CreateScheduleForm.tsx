@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import type { Schedule } from '@/types/fhir';
@@ -11,6 +11,36 @@ interface CreateScheduleFormProps {
   onClose: () => void;
   onSuccess: (schedule: Schedule) => void;
 }
+
+// Service Category and Type business rules
+const SERVICE_RULES: Record<string, Array<{value: string, label: string, description?: string}>> = {
+  "outpatient": [
+    { value: "consultation", label: "Consultation", description: "General medical consultation" },
+    { value: "follow-up", label: "Follow-up", description: "Follow-up appointment" },
+    { value: "screening", label: "Screening", description: "Health screening and checkups" },
+    { value: "vaccination", label: "Vaccination", description: "Immunization services" },
+    { value: "minor-procedure", label: "Minor Procedure", description: "Small procedures and treatments" }
+  ],
+
+  "home-health": [
+    { value: "consultation", label: "Home Consultation", description: "Medical consultation at patient's home" },
+    { value: "follow-up", label: "Home Follow-up", description: "Follow-up visit at home" },
+    { value: "vaccination", label: "Home Vaccination", description: "Vaccination service at home" },
+    { value: "wound-care", label: "Wound Care", description: "Home wound care and dressing" }
+  ],
+
+  "telehealth": [
+    { value: "consultation", label: "Virtual Consultation", description: "Online medical consultation" },
+    { value: "follow-up", label: "Virtual Follow-up", description: "Online follow-up appointment" },
+    { value: "mental-health", label: "Mental Health Consultation", description: "Virtual mental health session" }
+  ],
+
+  "wellness": [
+    { value: "screening", label: "Preventive Screening", description: "Preventive health screening" },
+    { value: "consultation", label: "Wellness Consultation", description: "Preventive care consultation" },
+    { value: "vaccination", label: "Preventive Vaccination", description: "Preventive immunization" }
+  ]
+};
 
 interface ScheduleFormData {
   serviceCategory: string;
@@ -37,6 +67,23 @@ export function CreateScheduleForm({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [availableServiceTypes, setAvailableServiceTypes] = useState<Array<{value: string, label: string, description?: string}>>([]);
+
+  // Update available service types when service category changes
+  useEffect(() => {
+    if (formData.serviceCategory) {
+      const serviceTypes = SERVICE_RULES[formData.serviceCategory] || [];
+      setAvailableServiceTypes(serviceTypes);
+
+      // Reset service type if current selection is not available in new category
+      if (formData.serviceType && !serviceTypes.find(type => type.value === formData.serviceType)) {
+        setFormData(prev => ({ ...prev, serviceType: '' }));
+      }
+    } else {
+      setAvailableServiceTypes([]);
+      setFormData(prev => ({ ...prev, serviceType: '' }));
+    }
+  }, [formData.serviceCategory, formData.serviceType]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -176,12 +223,11 @@ export function CreateScheduleForm({
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   >
-                    <option value="">Select category</option>
-                    <option value="outpatient">Outpatient</option>
-                    <option value="inpatient">Inpatient</option>
-                    <option value="emergency">Emergency</option>
-                    <option value="home-health">Home Health</option>
-                    <option value="wellness">Wellness</option>
+                    <option value="">Select service category</option>
+                    <option value="outpatient">Outpatient Consultation (In-clinic visits)</option>
+                    <option value="home-health">Home Visit (At patient's home)</option>
+                    <option value="telehealth">Telehealth (Virtual appointments)</option>
+                    <option value="wellness">Preventive Care/Wellness</option>
                   </select>
                 </div>
 
@@ -195,15 +241,30 @@ export function CreateScheduleForm({
                     name="serviceType"
                     value={formData.serviceType}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    disabled={!formData.serviceCategory}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
+                      !formData.serviceCategory
+                        ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'border-gray-300'
+                    }`}
                   >
-                    <option value="">Select service type</option>
-                    <option value="consultation">Consultation</option>
-                    <option value="follow-up">Follow-up</option>
-                    <option value="procedure">Procedure</option>
-                    <option value="screening">Screening</option>
-                    <option value="vaccination">Vaccination</option>
+                    <option value="">
+                      {!formData.serviceCategory
+                        ? 'Select service category first'
+                        : 'Select service type'}
+                    </option>
+                    {availableServiceTypes.map((serviceType) => (
+                      <option key={serviceType.value} value={serviceType.value}>
+                        {serviceType.label}
+                        {serviceType.description ? ` - ${serviceType.description}` : ''}
+                      </option>
+                    ))}
                   </select>
+                  {formData.serviceCategory && availableServiceTypes.length > 0 && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      ✓ {availableServiceTypes.length} service types available for {formData.serviceCategory}
+                    </p>
+                  )}
                 </div>
 
                 {/* Specialty */}

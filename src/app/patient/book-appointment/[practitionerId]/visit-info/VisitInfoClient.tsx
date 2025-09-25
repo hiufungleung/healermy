@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { ContentContainer } from '@/components/common/ContentContainer';
@@ -34,9 +34,25 @@ export default function VisitInfoClient({
   const [symptoms, setSymptoms] = useState('');
   const [duration, setDuration] = useState('');
   const [patientInstruction, setPatientInstruction] = useState('');
-  const [priority, setPriority] = useState('routine'); // routine, urgent, asap
+  const [priority, setPriority] = useState('urgent'); // urgent, routine
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Helper functions
   const convertTo24Hour = (time12h: string): string => {
@@ -203,15 +219,54 @@ export default function VisitInfoClient({
           <label className="block text-sm font-medium text-text-primary mb-2">
             Priority
           </label>
-          <select
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-          >
-            <option value="routine">Routine</option>
-            <option value="urgent">Urgent</option>
-            <option value="asap">ASAP</option>
-          </select>
+          <div className="relative" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="w-full p-3 text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white cursor-pointer text-text-primary flex items-center justify-between hover:border-gray-400 transition-colors"
+            >
+              <span className="capitalize">
+                {priority === 'urgent' ? 'Urgent' : 'Routine'}
+              </span>
+              <svg
+                className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+              </svg>
+            </button>
+
+            {isDropdownOpen && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPriority('urgent');
+                    setIsDropdownOpen(false);
+                  }}
+                  className={`w-full p-3 text-left hover:bg-gray-50 transition-colors first:rounded-t-lg ${
+                    priority === 'urgent' ? 'bg-blue-50 text-primary font-medium' : 'text-text-primary'
+                  }`}
+                >
+                  Urgent
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPriority('routine');
+                    setIsDropdownOpen(false);
+                  }}
+                  className={`w-full p-3 text-left hover:bg-gray-50 transition-colors last:rounded-b-lg ${
+                    priority === 'routine' ? 'bg-blue-50 text-primary font-medium' : 'text-text-primary'
+                  }`}
+                >
+                  Routine
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mb-6">

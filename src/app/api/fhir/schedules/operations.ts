@@ -10,6 +10,7 @@ export async function searchSchedules(
     actor?: string;   // Practitioner/{id}
     date?: string;    // Date range with ge/le comparators
     specialty?: string;
+    serviceCategory?: string;
     _count?: number;
   }
 ): Promise<any> {

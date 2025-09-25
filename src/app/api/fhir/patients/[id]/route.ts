@@ -8,8 +8,6 @@ import { getPatient } from '../operations';
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
 ) {
   let patientId: string = 'unknown';
 
@@ -26,7 +24,6 @@ export async function GET(
     const result = await getPatient(
       token,
       session.fhirBaseUrl,
-      id
       id
     );
 

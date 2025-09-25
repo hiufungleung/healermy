@@ -143,10 +143,9 @@ export default function BookAppointment() {
   // Timezone-aware slot fetching for next 7 days using local timezone
   const fetchSlotsForPractitioner = async (practitionerId: string) => {
     try {
-      console.log('Fetching 7-day schedules for practitioner:', practitionerId);
+      console.log('Fetching schedules for practitioner:', practitionerId);
 
-      // Get all schedules for this practitioner (no date filter)
-      // We'll filter dates on client side using patient's local timezone
+      // Get all schedules for this practitioner, then filter for patient-bookable ones
       const schedulesResponse = await fetch(
         `/api/fhir/schedules?actor=Practitioner/${practitionerId}`,
         {
@@ -167,25 +166,81 @@ export default function BookAppointment() {
         return {};
       }
 
-      const scheduleIds = schedulesData.schedules.map((s: any) => s.id);
-      console.log('Schedule IDs:', scheduleIds);
+      // Filter schedules for patient booking - improved logic for legacy schedules
+      const patientBookableSchedules = schedulesData.schedules.filter((schedule: any) => {
+        // Check if schedule has serviceCategory
+        const serviceCategories = schedule.serviceCategory;
 
-      // Note: Date range filtering now happens client-side in slot organization
-      // This allows us to respect patient's local timezone properly
-      console.log('Fetching all slots for practitioner (client-side date filtering)');
+        if (!serviceCategories || !Array.isArray(serviceCategories)) {
+          // Legacy schedule without service category - check serviceType instead
+          const serviceTypes = schedule.serviceType;
 
-      // Build direct FHIR slot query - matching your successful Postman approach
-      // First try with just the first schedule ID to test basic connectivity
-      const testScheduleId = scheduleIds[0];
-      console.log('Testing with single schedule ID:', testScheduleId);
+          if (!serviceTypes || !Array.isArray(serviceTypes)) {
+            // Very old schedule with no categories or types - allow for maximum compatibility
+            console.log('Legacy schedule with no category/type, allowing:', schedule.id);
+            return true;
+          }
 
-      const slotParams = new URLSearchParams({
-        schedule: `Schedule/${testScheduleId}`,
-        status: 'free',
-        _count: '50'
+          // For legacy schedules, assume patient-bookable if service type is consultation-like
+          const hasPatientBookableType = serviceTypes.some((type: any) => {
+            const typeCode = type.coding?.[0]?.code || type.coding?.[0]?.display || '';
+            const patientBookableTypes = ['consultation', 'follow-up', 'screening', 'vaccination'];
+            const isBookable = patientBookableTypes.includes(typeCode.toLowerCase());
+
+            if (!isBookable) {
+              console.log('Legacy schedule filtered out by service type:', schedule.id, 'Type:', typeCode);
+            }
+
+            return isBookable;
+          });
+
+          if (hasPatientBookableType) {
+            console.log('Legacy schedule allowed by service type:', schedule.id);
+          }
+
+          return hasPatientBookableType;
+        }
+
+        // Modern schedule with service category - check if "outpatient"
+        const hasOutpatientService = serviceCategories.some((category: any) => {
+          const categoryCode = category.coding?.[0]?.code || category.coding?.[0]?.display;
+          return categoryCode === 'outpatient';
+        });
+
+        if (!hasOutpatientService) {
+          console.log('Modern schedule filtered out - not outpatient:', schedule.id,
+            'Service categories:', serviceCategories.map((c: any) => c.coding?.[0]?.code || c.coding?.[0]?.display));
+        } else {
+          console.log('Modern schedule allowed - outpatient category:', schedule.id);
+        }
+
+        return hasOutpatientService;
       });
 
-      console.log('Fetching slots with simplified params:', slotParams.toString());
+      console.log(`Filtered schedules: ${patientBookableSchedules.length} patient-bookable out of ${schedulesData.schedules.length} total`);
+
+      if (patientBookableSchedules.length === 0) {
+        console.log('No patient-bookable schedules found (all schedules are for Home Visit, Telehealth, or other non-outpatient services)');
+        return {};
+      }
+
+      const scheduleIds = patientBookableSchedules.map((s: any) => s.id);
+      console.log('Patient-bookable Schedule IDs:', scheduleIds);
+
+      console.log('Fetching slots without server-side date filtering (FHIR server time filtering has issues)');
+
+      // Build FHIR slot query without date filtering - filter client-side instead
+      const slotParams = new URLSearchParams({
+        status: 'free',
+        _count: '100'  // Increased count since we're not filtering server-side
+      });
+
+      // Add all schedule IDs for this practitioner
+      scheduleIds.forEach((scheduleId: string) => {
+        slotParams.append('schedule', `Schedule/${scheduleId}`);
+      });
+
+      console.log('Fetching slots with date filtering:', slotParams.toString());
       console.log('Full slot API URL:', `/api/fhir/slots?${slotParams.toString()}`);
 
       const response = await fetch(`/api/fhir/slots?${slotParams.toString()}`, {
@@ -194,7 +249,6 @@ export default function BookAppointment() {
       });
 
       console.log('Slots response status:', response.status);
-      console.log('Slots response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -204,63 +258,28 @@ export default function BookAppointment() {
       }
 
       const result = await response.json();
-      console.log('Raw slots API response structure:', {
-        hasSlots: !!result.slots,
-        slotsLength: result.slots?.length || 0,
-        total: result.total,
-        keys: Object.keys(result)
+      console.log('Slots API response:', {
+        slotsFound: result.slots?.length || 0,
+        total: result.total
       });
 
-      if (result.slots && result.slots.length > 0) {
-        console.log('Sample slot data:', result.slots[0]);
-      }
-
       const allSlots = result.slots || [];
-      console.log('Total slots from API:', allSlots.length);
+      console.log('Server-filtered slots (next 7 days, free status):', allSlots.length);
 
-      // If no slots found with first schedule, try with all schedule IDs
-      if (allSlots.length === 0 && scheduleIds.length > 1) {
-        console.log('No slots found with first schedule, trying all schedules...');
-
-        const allScheduleParams = new URLSearchParams({
-          status: 'free',
-          _count: '50'
-        });
-
-        scheduleIds.forEach((scheduleId: string) => {
-          allScheduleParams.append('schedule', `Schedule/${scheduleId}`);
-        });
-
-        console.log('Retrying with all schedule params:', allScheduleParams.toString());
-
-        const retryResponse = await fetch(`/api/fhir/slots?${allScheduleParams.toString()}`, {
-          method: 'GET',
-          credentials: 'include',
-        });
-
-        if (retryResponse.ok) {
-          const retryResult = await retryResponse.json();
-          console.log('Retry response - slots found:', retryResult.slots?.length || 0);
-          const retrySlots = retryResult.slots || [];
-
-          if (retrySlots.length > 0) {
-            // Use retry results
-            allSlots.push(...retrySlots);
-            console.log('Using retry results, total slots:', allSlots.length);
-          }
-        }
-      }
-
-      // Filter and organize slots using patient's local timezone
+      // Client-side filtering and organization by patient's local date
       const slotsByDate: Record<string, any[]> = {};
+      const now = new Date();
+      const sevenDaysFromNow = new Date();
+      sevenDaysFromNow.setDate(now.getDate() + 7);
+
+      console.log('Client-side filtering for next 7 days:', now.toISOString(), 'to', sevenDaysFromNow.toISOString());
 
       allSlots.forEach((slot: any) => {
         // Convert UTC slot time to patient's local timezone
         const localSlotTime = new Date(slot.start);
-        const now = new Date();
 
-        // Check if slot is in the future using local timezone
-        if (slot.status === 'free' && localSlotTime > now) {
+        // Client-side filtering: only show slots in next 7 days and in the future
+        if (localSlotTime > now && localSlotTime <= sevenDaysFromNow) {
           // Use patient's local date for grouping (YYYY-MM-DD format)
           const dateKey = localSlotTime.toLocaleDateString('en-CA');
 
@@ -271,7 +290,7 @@ export default function BookAppointment() {
         }
       });
 
-      console.log('Slots organized by patient local timezone dates:',
+      console.log('Client organized slots by date:',
         Object.keys(slotsByDate).map(date => `${date}: ${slotsByDate[date].length} slots`)
       );
       return slotsByDate;

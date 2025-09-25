@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
       actor?: string;
       date?: string;
       specialty?: string;
+      serviceCategory?: string;
       _count?: number;
     } = {};
 
@@ -32,6 +33,9 @@ export async function GET(request: NextRequest) {
     }
     if (searchParams.get('specialty')) {
       searchOptions.specialty = searchParams.get('specialty')!;
+    }
+    if (searchParams.get('serviceCategory')) {
+      searchOptions.serviceCategory = searchParams.get('serviceCategory')!;
     }
     if (searchParams.get('_count')) {
       searchOptions._count = parseInt(searchParams.get('_count')!);
