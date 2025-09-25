@@ -35,7 +35,12 @@ export async function GET(request: NextRequest) {
     if (addressCountry) searchOptions['address-country'] = addressCountry;
     if (practitionerId) searchOptions._id = practitionerId;
     if (count) searchOptions._count = parseInt(count);
-    if (page) searchOptions._getpages = page;
+
+    // Use proper FHIR pagination with offset
+    if (page && parseInt(page) > 1) {
+      const offset = (parseInt(page) - 1) * (parseInt(count || '10') || 10);
+      searchOptions._getpagesoffset = offset;
+    }
 
     // Call FHIR operations
     const token = prepareToken(session.accessToken);

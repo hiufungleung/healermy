@@ -213,12 +213,20 @@ export default function ProviderDashboardClient({
     <>
       {/* Welcome Section */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-text-primary mb-2">
-          Good {greeting}, {providerName}
-        </h1>
-        <p className="text-text-secondary">
-          Here's what's happening in your practice today
-        </p>
+        <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl p-6 border border-primary/20">
+          <div className="flex items-center mb-3">
+            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center mr-3">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-text-primary">
+                Welcome to HealerMy
+              </h1>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -355,7 +363,7 @@ export default function ProviderDashboardClient({
                   <div className="flex justify-between items-start mb-2">
                     <div className="font-medium text-sm">{getPatientFromAppointment(appointment)}</div>
                     <div className="text-xs text-text-secondary">
-                      {appointment.meta?.lastUpdated ? formatDateTime(appointment.meta.lastUpdated) : ''}
+                      {appointment.status && `Status: ${appointment.status}`}
                     </div>
                   </div>
                   <p className="text-sm text-text-secondary mb-2">

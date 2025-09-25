@@ -4,7 +4,6 @@ import React, { useState, useMemo } from 'react';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { SlotCalendarDisplay } from '@/components/common/SlotDisplay';
-import { formatDateForDisplay } from '@/lib/timezone';
 import type { Slot } from '@/types/fhir';
 
 interface SlotCalendarProps {
@@ -121,10 +120,7 @@ export function SlotCalendar({ slots }: SlotCalendarProps) {
       <div className="flex justify-between items-center">
         <div className="flex items-center space-x-4">
           <h3 className="text-lg font-semibold text-text-primary">
-            {viewMode === 'week'
-              ? `Week of ${formatDateForDisplay(getFirstDayOfWeek(currentDate))} - ${formatDateForDisplay(new Date(getFirstDayOfWeek(currentDate).getTime() + 6 * 24 * 60 * 60 * 1000))}`
-              : `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`
-            }
+            {viewMode === 'month' ? `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}` : ''}
           </h3>
           <div className="flex items-center space-x-2">
             <Button

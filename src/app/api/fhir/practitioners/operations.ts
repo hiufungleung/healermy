@@ -17,7 +17,7 @@ export async function searchPractitioners(
     'address-country'?: string;
     _id?: string;
     _count?: number;
-    _getpages?: string;
+    _getpagesoffset?: number;
   }
 ): Promise<Bundle<Practitioner>> {
   const queryParams = new URLSearchParams();

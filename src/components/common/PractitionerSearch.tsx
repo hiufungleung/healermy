@@ -50,17 +50,13 @@ interface SearchFilters {
 interface PractitionerSearchProps {
   onFiltersChange: (filters: SearchFilters) => void;
   loading?: boolean;
-  resultsCount?: number;
-  totalCount?: number | undefined;
   showAdvancedFilters?: boolean;
   showOracleIdField?: boolean;
 }
 
-export function PractitionerSearch({ 
-  onFiltersChange, 
-  loading = false, 
-  resultsCount = 0, 
-  totalCount,
+export function PractitionerSearch({
+  onFiltersChange,
+  loading = false,
   showAdvancedFilters = true,
   showOracleIdField = false
 }: PractitionerSearchProps) {
@@ -307,21 +303,6 @@ export function PractitionerSearch({
         </div>
       )}
 
-      {/* Results Summary */}
-      {!loading && (
-        <div className="text-sm text-text-secondary">
-          {hasActiveFilters ? (
-            <span>
-              Showing {resultsCount} results with {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''}
-            </span>
-          ) : (
-            <span>
-              Showing {resultsCount} practitioners
-              {totalCount ? ` (${totalCount} total)` : ''}
-            </span>
-          )}
-        </div>
-      )}
     </div>
   );
 }

@@ -6,10 +6,76 @@ import { Layout } from '@/components/common/Layout';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
+import { SkeletonCard, Skeleton } from '@/components/common/LoadingSpinner';
 import { PractitionerSearch } from '@/components/common/PractitionerSearch';
 import { CreatePractitionerForm } from '@/components/provider/CreatePractitionerForm';
 import { ViewPractitionerDetails } from '@/components/provider/ViewPractitionerDetails';
 import type { Practitioner } from '@/types/fhir';
+
+// Custom skeleton component for practitioner cards - matches exact layout
+function PractitionerSkeleton() {
+  return (
+    <Card className="animate-pulse">
+      <div className="flex justify-between items-start">
+        <div className="flex space-x-4 flex-1">
+          {/* Avatar skeleton */}
+          <div className="w-16 h-16 bg-gray-200 rounded-lg flex-shrink-0"></div>
+
+          <div className="flex-1 min-w-0">
+            {/* Name and qualifications skeleton */}
+            <div className="mb-2">
+              <Skeleton className="h-6 w-48 mb-2" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+
+            {/* Address skeleton */}
+            <div className="flex items-start mb-2">
+              <div className="w-4 h-4 bg-gray-200 rounded mr-2 mt-0.5 flex-shrink-0"></div>
+              <Skeleton className="h-4 w-64" />
+            </div>
+
+            {/* Contact info skeleton */}
+            <div className="flex items-center gap-4 mb-3">
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-gray-200 rounded mr-1"></div>
+                <Skeleton className="h-4 w-24" />
+              </div>
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-gray-200 rounded mr-1"></div>
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+
+            {/* Professional info skeleton */}
+            <div className="flex items-center gap-4 mb-3">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+
+            {/* Gender badge skeleton */}
+            <div className="mb-3">
+              <Skeleton className="h-6 w-16 rounded-full" />
+            </div>
+
+            {/* Resource info skeleton */}
+            <div className="mt-4 pt-3 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action buttons skeleton */}
+        <div className="ml-4 flex-shrink-0 flex flex-col space-y-2">
+          <Skeleton className="h-8 w-24 rounded-md" />
+          <Skeleton className="h-8 w-32 rounded-md" />
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 export default function PractitionerManagement() {
   const router = useRouter();
@@ -25,13 +91,11 @@ export default function PractitionerManagement() {
   });
   const [practitioners, setPractitioners] = useState<Practitioner[]>([]);
   const [loading, setLoading] = useState(true);
-  const [totalPractitioners, setTotalPractitioners] = useState<number | undefined>();
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedPractitioner, setSelectedPractitioner] = useState<Practitioner | null>(null);
   const [showViewDetails, setShowViewDetails] = useState(false);
-  const [isInitialMount, setIsInitialMount] = useState(true);
 
   const fetchPractitioners = useCallback(async (page = 1, isSearch = false) => {
     if (isSearch || page === 1) {
@@ -67,8 +131,8 @@ export default function PractitionerManagement() {
         params.append('practitionerId', searchFilters.practitionerId);
       }
       
-      // Add pagination - 30 practitioners per page
-      params.append('count', '30');
+      // Add pagination - 10 practitioners per page for faster loading
+      params.append('count', '10');
       if (page > 1) {
         params.append('page', page.toString());
       }
@@ -98,7 +162,6 @@ export default function PractitionerManagement() {
         setPractitioners(prev => [...prev, ...(result.practitioners || [])]);
       }
       
-      setTotalPractitioners(result.total);
       setHasNextPage(!!result.nextUrl);
       setCurrentPage(page);
       
@@ -112,15 +175,10 @@ export default function PractitionerManagement() {
     }
   }, [searchFilters.givenName, searchFilters.familyName, searchFilters.phone, searchFilters.addressCity, searchFilters.addressState, searchFilters.addressPostalCode, searchFilters.addressCountry, searchFilters.practitionerId]);
 
-  // Prevent search filter useEffect from running on initial mount
+  // Load practitioners when search filters change
   useEffect(() => {
-    if (isInitialMount) {
-      return; // Skip the search filter effect on initial mount
-    }
-    
-    // This will run when search filters change (not on initial mount)
     fetchPractitioners(1, true);
-  }, [searchFilters.givenName, searchFilters.familyName, searchFilters.phone, searchFilters.addressCity, searchFilters.addressState, searchFilters.addressPostalCode, searchFilters.addressCountry, searchFilters.practitionerId, isInitialMount, fetchPractitioners]);
+  }, [searchFilters.givenName, searchFilters.familyName, searchFilters.phone, searchFilters.addressCity, searchFilters.addressState, searchFilters.addressPostalCode, searchFilters.addressCountry, searchFilters.practitionerId, fetchPractitioners]);
 
   // Handle search filter changes
   const handleFiltersChange = useCallback((filters: {
@@ -135,51 +193,7 @@ export default function PractitionerManagement() {
   }) => {
     setSearchFilters(filters);
     setCurrentPage(1);
-    // Don't call fetchPractitioners here - let the useEffect handle it
   }, []);
-
-
-  // Load all practitioners on mount - runs only once
-  useEffect(() => {
-    const loadInitialPractitioners = async () => {
-      setLoading(true);
-      
-      try {
-        const params = new URLSearchParams();
-        params.append('count', '30');
-        
-        const response = await fetch(`/api/fhir/practitioners?${params.toString()}`, {
-          method: 'GET',
-          credentials: 'include',
-        });
-        
-        if (!response.ok) {
-          if (response.status === 401) {
-            console.log('Authentication required, middleware will redirect');
-            return;
-          }
-          throw new Error(`Failed to fetch practitioners: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        console.log('Initial practitioners loaded:', result);
-        
-        setPractitioners(result.practitioners || []);
-        setTotalPractitioners(result.total);
-        setHasNextPage(!!result.nextUrl);
-        setCurrentPage(1);
-        
-      } catch (error) {
-        console.error('Error loading initial practitioners:', error);
-        setPractitioners([]);
-      } finally {
-        setLoading(false);
-        setIsInitialMount(false); // Mark that initial mount is complete
-      }
-    };
-    
-    loadInitialPractitioners();
-  }, []); // Empty dependency array - runs only once on mount
 
   const handleNextPage = () => {
     if (hasNextPage && !loading) {
@@ -213,15 +227,10 @@ export default function PractitionerManagement() {
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-3xl font-bold text-text-primary mb-2">
-                Practitioner Management
-              </h1>
-              <p className="text-text-secondary">
-                Create and manage healthcare practitioners in the system
-              </p>
-            </div>
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold text-text-primary">
+              Practitioner
+            </h1>
             <Button
               variant="primary"
               onClick={handleCreateNew}
@@ -239,17 +248,16 @@ export default function PractitionerManagement() {
         <PractitionerSearch
           onFiltersChange={handleFiltersChange}
           loading={loading}
-          resultsCount={practitioners.length}
-          totalCount={totalPractitioners}
           showAdvancedFilters={true}
           showOracleIdField={true}
         />
 
         {/* Practitioner List */}
         {loading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <p className="mt-2 text-text-secondary">Loading practitioners...</p>
+          <div className="space-y-4">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <PractitionerSkeleton key={index} />
+            ))}
           </div>
         ) : practitioners.length > 0 ? (
           <>
@@ -311,16 +319,11 @@ export default function PractitionerManagement() {
                               <p className="text-sm text-primary font-medium">{qualifications.join(', ')}</p>
                             )}
                           </div>
-                          <div className="flex items-center space-x-2 ml-4">
-                            {practitioner.active ? (
-                              <Badge variant="success" size="sm">Active</Badge>
-                            ) : (
-                              <Badge variant="danger" size="sm">Inactive</Badge>
-                            )}
-                            {isAppCreated && (
+                          {isAppCreated && (
+                            <div className="ml-4">
                               <Badge variant="info" size="sm">App Created</Badge>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                         
                         {/* Location */}
@@ -379,9 +382,8 @@ export default function PractitionerManagement() {
                         
                         {/* Resource Information */}
                         <div className="mt-4 pt-3 border-t border-gray-100">
-                          <div className="flex items-center justify-between text-xs text-text-secondary">
+                          <div className="text-xs text-text-secondary">
                             <span>ID: {practitioner.id}</span>
-                            <span>Resource: Practitioner</span>
                           </div>
                         </div>
                       </div>
@@ -413,7 +415,7 @@ export default function PractitionerManagement() {
               })}
             </div>
             
-            {/* Pagination */}
+            {/* Load More Button */}
             {hasNextPage && (
               <div className="mt-8 text-center">
                 <Button
@@ -421,7 +423,7 @@ export default function PractitionerManagement() {
                   onClick={handleNextPage}
                   disabled={loading}
                 >
-                  {loading ? 'Loading...' : `Load More (${practitioners.length} of ${totalPractitioners || '???'})`}
+                  {loading ? 'Loading...' : 'Load More'}
                 </Button>
               </div>
             )}
