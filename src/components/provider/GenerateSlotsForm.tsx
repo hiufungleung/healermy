@@ -74,7 +74,7 @@ export function GenerateSlotsForm({
         }
       }
     }
-  }, [formData.startDate, formData.endDate, formData.scheduleId, formData.daysOfWeek, getDaysInDateRange, getScheduleAllowedDays]);
+  }, [formData.startDate, formData.endDate, formData.scheduleId]);
 
   // Helper function to get minimum allowed time for a given date
   const getMinTimeForDate = (dateStr: string): string => {

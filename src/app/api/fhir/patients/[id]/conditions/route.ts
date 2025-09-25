@@ -21,7 +21,9 @@ export async function GET(
       params.id
     );
 
-    return NextResponse.json({ conditions: result });
+    // Extract conditions from FHIR Bundle structure
+    const conditions = result?.entry?.map((entry: any) => entry.resource).filter(Boolean) || [];
+    return NextResponse.json({ conditions });
   } catch (error) {
     console.error(`Error in GET /api/fhir/patients/${params?.id}/conditions:`, error);
     

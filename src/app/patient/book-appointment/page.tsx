@@ -30,6 +30,7 @@ export default function BookAppointment() {
   });
   const [practitioners, setPractitioners] = useState<Practitioner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [totalPractitioners, setTotalPractitioners] = useState<number | undefined>();
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
@@ -45,7 +46,9 @@ export default function BookAppointment() {
     if (isSearch || page === 1) {
       setLoading(true);
     }
-    
+
+    setError(null); // Clear previous errors
+
     try {
       const params = new URLSearchParams();
       
@@ -111,6 +114,8 @@ export default function BookAppointment() {
       
     } catch (error) {
       console.error('Error fetching practitioners:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load practitioners';
+      setError(errorMessage);
       if (page === 1) {
         setPractitioners([]);
       }
@@ -367,6 +372,22 @@ export default function BookAppointment() {
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             <p className="mt-2 text-text-secondary">Loading practitioners...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <div className="flex items-center justify-center text-red-600 mb-4">
+              <svg className="w-8 h-8 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h3 className="text-lg font-semibold">Unable to Load Practitioners</h3>
+            </div>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <button
+              onClick={() => fetchPractitioners(1)}
+              className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              Try Again
+            </button>
           </div>
         ) : practitioners.length > 0 ? (
           <>

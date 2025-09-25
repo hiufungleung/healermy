@@ -98,7 +98,7 @@ export function PractitionerSearch({
     return () => {
       if (timeout) clearTimeout(timeout);
     };
-  }, [givenName, familyName, phone, addressCity, addressState, addressPostalCode, addressCountry, practitionerId, onFiltersChange, searchTimeout]);
+  }, [givenName, familyName, phone, addressCity, addressState, addressPostalCode, addressCountry, practitionerId, onFiltersChange]);
 
   const handleClearSearch = () => {
     setGivenName('');

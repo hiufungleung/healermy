@@ -37,6 +37,8 @@ export default function DashboardClient({
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loadingPatient, setLoadingPatient] = useState(true);
   const [loadingAppointments, setLoadingAppointments] = useState(true);
+  const [patientError, setPatientError] = useState<string | null>(null);
+  const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
   const [cancellingAppointments, setCancellingAppointments] = useState<Set<string>>(new Set());
   const [reschedulingAppointments, setReschedulingAppointments] = useState<Set<string>>(new Set());
 
@@ -44,31 +46,38 @@ export default function DashboardClient({
   useEffect(() => {
     const fetchPatientData = async () => {
       try {
+        setPatientError(null); // Clear previous errors
         const response = await fetch(`/api/fhir/patients/${session.patient}`, {
           credentials: 'include'
         });
-        if (response.ok) {
-          const patientData = await response.json();
-          setPatient(patientData);
 
-          // Extract real patient name from FHIR data
-          if (patientData?.name?.[0]) {
-            const givenNames = patientData.name[0]?.given || [];
-            const family = patientData.name[0]?.family || '';
-            const givenNamesString = givenNames.join(' ');
-            const fullName = `${givenNamesString} ${family}`.trim();
-            const firstNameOnly = givenNames[0] || 'Patient';
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Failed to load patient data (${response.status})`);
+        }
 
-            if (fullName) {
-              setPatientName(fullName);
-              setFirstName(firstNameOnly);
-              // Update the parent component (Layout) with the real patient name
-              onPatientNameUpdate?.(fullName);
-            }
+        const patientData = await response.json();
+        setPatient(patientData);
+
+        // Extract real patient name from FHIR data
+        if (patientData?.name?.[0]) {
+          const givenNames = patientData.name[0]?.given || [];
+          const family = patientData.name[0]?.family || '';
+          const givenNamesString = givenNames.join(' ');
+          const fullName = `${givenNamesString} ${family}`.trim();
+          const firstNameOnly = givenNames[0] || 'Patient';
+
+          if (fullName) {
+            setPatientName(fullName);
+            setFirstName(firstNameOnly);
+            // Update the parent component (Layout) with the real patient name
+            onPatientNameUpdate?.(fullName);
           }
         }
       } catch (error) {
         console.error('Error fetching patient data:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load patient information';
+        setPatientError(errorMessage);
       } finally {
         setLoadingPatient(false);
       }
@@ -76,20 +85,27 @@ export default function DashboardClient({
 
     const fetchAppointments = async () => {
       try {
+        setAppointmentsError(null); // Clear previous errors
         const response = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
           credentials: 'include'
         });
-        if (response.ok) {
-          const data = await response.json();
-          const appointments = data.appointments || [];
 
-          // Use the reusable appointment enhancement utility
-          const { enhanceAppointmentsWithPractitionerDetails } = await import('@/lib/appointmentDetailInfo');
-          const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
-          setAppointments(enhancedAppointments);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Failed to load appointments (${response.status})`);
         }
+
+        const data = await response.json();
+        const appointments = data.appointments || [];
+
+        // Use the reusable appointment enhancement utility
+        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/lib/appointmentDetailInfo');
+        const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
+        setAppointments(enhancedAppointments);
       } catch (error) {
         console.error('Error fetching appointments:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load appointments';
+        setAppointmentsError(errorMessage);
       } finally {
         setLoadingAppointments(false);
       }
@@ -290,6 +306,22 @@ export default function DashboardClient({
       {/* Patient Information Card */}
       {loadingPatient ? (
         <PatientInfoSkeleton className="mb-8" />
+      ) : patientError ? (
+        <div className="bg-white rounded-lg border border-red-200 p-6 mb-8">
+          <div className="flex items-center text-red-600 mb-2">
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h2 className="text-xl font-semibold">Unable to Load Patient Information</h2>
+          </div>
+          <p className="text-gray-600 mb-4">{patientError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+          >
+            Try Again
+          </button>
+        </div>
       ) : patient ? (
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Patient Information</h2>
@@ -425,6 +457,22 @@ export default function DashboardClient({
             <div className="space-y-4">
               {loadingAppointments ? (
                 <AppointmentSkeleton count={2} />
+              ) : appointmentsError ? (
+                <div className="text-center py-8">
+                  <div className="flex items-center justify-center text-red-600 mb-4">
+                    <svg className="w-8 h-8 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h3 className="text-lg font-semibold">Unable to Load Appointments</h3>
+                  </div>
+                  <p className="text-gray-600 mb-4">{appointmentsError}</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    Try Again
+                  </button>
+                </div>
               ) : displayAppointments.map((appointment) => {
                 // Extract FHIR appointment data with practitioner details
                 const appointmentStatus = appointment.status;
