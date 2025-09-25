@@ -9,7 +9,6 @@ import type { Slot } from '@/types/fhir';
 
 interface SlotCalendarProps {
   slots: Slot[];
-  onDeleteSlot: (slotId: string) => void;
 }
 
 interface CalendarDay {
@@ -20,7 +19,7 @@ interface CalendarDay {
   isCurrentMonth: boolean;
 }
 
-export function SlotCalendar({ slots, onDeleteSlot }: SlotCalendarProps) {
+export function SlotCalendar({ slots }: SlotCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'week'>('week');
 
@@ -223,7 +222,6 @@ export function SlotCalendar({ slots, onDeleteSlot }: SlotCalendarProps) {
                 {/* Slots for this day */}
                 <SlotCalendarDisplay
                   slots={day.slots}
-                  onSlotDelete={onDeleteSlot}
                   maxDisplay={viewMode === 'week' ? 8 : 3}
                 />
               </div>

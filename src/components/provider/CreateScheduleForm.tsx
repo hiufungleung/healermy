@@ -301,10 +301,14 @@ export function CreateScheduleForm({
                     id="planningHorizonStart"
                     name="planningHorizonStart"
                     value={formData.planningHorizonStart}
+                    min={new Date().toISOString().split('T')[0]}
                     onChange={handleInputChange}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Cannot select dates before today
+                  </p>
                 </div>
 
                 {/* Planning Horizon End */}
@@ -317,10 +321,14 @@ export function CreateScheduleForm({
                     id="planningHorizonEnd"
                     name="planningHorizonEnd"
                     value={formData.planningHorizonEnd}
+                    min={formData.planningHorizonStart || new Date().toISOString().split('T')[0]}
                     onChange={handleInputChange}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Must be after or equal to start date
+                  </p>
                 </div>
               </div>
 

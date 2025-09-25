@@ -24,7 +24,8 @@ export default function PractitionerDetailPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [communications, setCommunications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'schedules' | 'slots' | 'appointments'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'schedules' | 'slots'>('overview');
+  const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
   const [showCreateSchedule, setShowCreateSchedule] = useState(false);
   const [showGenerateSlots, setShowGenerateSlots] = useState(false);
   const [allSlots, setAllSlots] = useState<Slot[]>([]); // Store all slots before filtering
@@ -42,14 +43,6 @@ export default function PractitionerDetailPage() {
   const [showSlotsNotification, setShowSlotsNotification] = useState(false);
   const [slotsNotificationMessage, setSlotsNotificationMessage] = useState('');
 
-  // Clear slots states
-  const [showClearSlotsConfirmation, setShowClearSlotsConfirmation] = useState(false);
-  const [clearSlotsLoading, setClearSlotsLoading] = useState(false);
-  const [clearSlotsProgress, setClearSlotsProgress] = useState('');
-
-  // Add missing state variables for cleanup orphaned slots
-  const [showCleanupOrphanedConfirmation, setShowCleanupOrphanedConfirmation] = useState(false);
-  const [cleanupOrphanedLoading, setCleanupOrphanedLoading] = useState(false);
 
   // Filter slots when schedules or filters change
   useEffect(() => {
@@ -276,265 +269,14 @@ export default function PractitionerDetailPage() {
     }, 100);
   };
 
-  // Clear slots handler - clears slots for current practitioner's schedules
-  const executeClearSlots = async () => {
-    setClearSlotsLoading(true);
-    setClearSlotsProgress('Validating slots...');
-    try {
-      // Only clear slots if we have schedules
-      if (schedules.length === 0) {
-        setClearSlotsProgress('No schedules found - nothing to clear');
-        setTimeout(() => {
-          setClearSlotsLoading(false);
-          setShowClearSlotsConfirmation(false);
-          setClearSlotsProgress('');
-        }, 2000);
-        return;
-      }
 
-      // Get all slots currently displayed (which are for this practitioner)
-      const allSlotsForSchedules = allSlots;
-
-      console.log('🗑️ Clear Slots Debug:', {
-        totalSlots: allSlots.length,
-        schedules: schedules.length
-      });
-
-      if (allSlotsForSchedules.length === 0) {
-        setClearSlotsProgress('No slots found to clear');
-        setTimeout(() => {
-          setClearSlotsLoading(false);
-          setShowClearSlotsConfirmation(false);
-          setClearSlotsProgress('');
-        }, 2000);
-        return;
-      }
-
-      setClearSlotsProgress(`Found ${allSlotsForSchedules.length} slots to clear. Starting deletion...`);
-
-      // Delete slots in batches of 10 to avoid overwhelming the server
-      const batchSize = 10;
-      let deletedCount = 0;
-      let errors = 0;
-
-      for (let i = 0; i < allSlotsForSchedules.length; i += batchSize) {
-        const batch = allSlotsForSchedules.slice(i, i + batchSize);
-        setClearSlotsProgress(`Deleting batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(allSlotsForSchedules.length / batchSize)}... (${deletedCount}/${allSlotsForSchedules.length} deleted)`);
-
-        // Delete slots in parallel within each batch
-        const batchPromises = batch.map(async (slot) => {
-          try {
-            const response = await fetch(`/api/fhir/slots/${slot.id}`, {
-              method: 'DELETE',
-              credentials: 'include',
-            });
-
-            if (response.ok) {
-              return { success: true, slotId: slot.id };
-            } else {
-              console.error(`Failed to delete slot ${slot.id}: ${response.status}`);
-              return { success: false, slotId: slot.id };
-            }
-          } catch (error) {
-            console.error(`Error deleting slot ${slot.id}:`, error);
-            return { success: false, slotId: slot.id };
-          }
-        });
-
-        const batchResults = await Promise.all(batchPromises);
-        const batchSuccesses = batchResults.filter(r => r.success);
-        const batchErrors = batchResults.filter(r => !r.success);
-
-        deletedCount += batchSuccesses.length;
-        errors += batchErrors.length;
-
-        // Small delay between batches to be gentle on the server
-        if (i + batchSize < allSlotsForSchedules.length) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-
-      if (errors === 0) {
-        setClearSlotsProgress(`✅ Successfully deleted all ${deletedCount} slots!`);
-        setAllSlots([]);
-        setSlots([]);
-      } else {
-        setClearSlotsProgress(`⚠️ Deleted ${deletedCount} slots, but ${errors} failed. Check console for details.`);
-        // Refresh slots to get current state
-        try {
-          const response = await fetch(`/api/fhir/slots?schedule.actor=Practitioner/${practitionerId}&_count=100`, {
-            credentials: 'include',
-          });
-          if (response.ok) {
-            const slotsData = await response.json();
-            setAllSlots(slotsData.slots || []);
-          }
-        } catch (error) {
-          console.error('Error refreshing slots after partial clear:', error);
-        }
-      }
-
-      setTimeout(() => {
-        setClearSlotsLoading(false);
-        setShowClearSlotsConfirmation(false);
-        setClearSlotsProgress('');
-      }, 3000);
-
-    } catch (error) {
-      console.error('Error in executeClearSlots:', error);
-      setClearSlotsProgress('❌ Error occurred during slot clearing');
-      setTimeout(() => {
-        setClearSlotsLoading(false);
-        setShowClearSlotsConfirmation(false);
-        setClearSlotsProgress('');
-      }, 3000);
-    }
-  };
-
-  // Execute cleanup of orphaned slots - slots that have no corresponding schedule
-  const executeCleanupOrphaned = async () => {
-    setCleanupOrphanedLoading(true);
-    try {
-      // Find slots with no corresponding schedule
-      const orphanedSlots = allSlots.filter(slot =>
-        !schedules.some(schedule =>
-          slot.schedule?.reference === `Schedule/${schedule.id}`
-        )
-      );
-
-      console.log('🧹 Cleanup Orphaned Debug:', {
-        totalSlots: allSlots.length,
-        schedules: schedules.length,
-        orphanedSlots: orphanedSlots.length,
-        orphanedSlotIds: orphanedSlots.map(s => s.id)
-      });
-
-      if (orphanedSlots.length === 0) {
-        alert('No orphaned slots found to clean up.');
-        setCleanupOrphanedLoading(false);
-        setShowCleanupOrphanedConfirmation(false);
-        return;
-      }
-
-      // Delete orphaned slots
-      let deletedCount = 0;
-      for (const slot of orphanedSlots) {
-        try {
-          const response = await fetch(`/api/fhir/slots/${slot.id}`, {
-            method: 'DELETE',
-            credentials: 'include',
-          });
-
-          if (response.ok) {
-            deletedCount++;
-          }
-        } catch (error) {
-          console.error(`Error deleting orphaned slot ${slot.id}:`, error);
-        }
-      }
-
-      alert(`Cleanup completed! Deleted ${deletedCount} orphaned slots out of ${orphanedSlots.length} found.`);
-
-      // Refresh slots
-      setAllSlots(prev => prev.filter(slot =>
-        schedules.some(schedule =>
-          slot.schedule?.reference === `Schedule/${schedule.id}`
-        )
-      ));
-
-    } catch (error) {
-      console.error('Error in executeCleanupOrphaned:', error);
-      alert('Error occurred during orphaned slot cleanup');
-    } finally {
-      setCleanupOrphanedLoading(false);
-      setShowCleanupOrphanedConfirmation(false);
-    }
-  };
-
-  // Execute schedule deletion
+  // Execute schedule deletion - simplified since slots must be manually deleted first
   const executeDeleteSchedule = async () => {
     if (!scheduleToDelete) return;
     setDeleteLoading(true);
-    setDeleteProgress('Initializing deletion...');
+    setDeleteProgress('Deleting schedule...');
+
     try {
-      console.log('=== DELETE SCHEDULE DEBUG ===');
-      console.log('Deleting schedule:', scheduleToDelete);
-      setDeleteProgress('Finding associated appointments and slots...');
-
-      // Find appointments for this schedule
-      const scheduleAppointments = appointments.filter(appointment =>
-        appointment.slot?.some(slotRef =>
-          allSlots.some(slot =>
-            slot.schedule?.reference === `Schedule/${scheduleToDelete}` &&
-            slotRef.reference === `Slot/${slot.id}`
-          )
-        )
-      );
-
-      // Find slots for this schedule
-      const scheduleSlots = allSlots.filter(slot =>
-        slot.schedule?.reference === `Schedule/${scheduleToDelete}`
-      );
-
-      console.log('Associated data:', {
-        appointments: scheduleAppointments.length,
-        slots: scheduleSlots.length
-      });
-
-      if (scheduleAppointments.length > 0) {
-        setDeleteProgress(`Found ${scheduleAppointments.length} appointments. Cancelling appointments...`);
-
-        // Cancel all appointments first
-        for (let i = 0; i < scheduleAppointments.length; i++) {
-          const appointment = scheduleAppointments[i];
-          try {
-            setDeleteProgress(`Cancelling appointment ${i + 1}/${scheduleAppointments.length}...`);
-
-            const response = await fetch(`/api/fhir/appointments/${appointment.id}`, {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json-patch+json',
-              },
-              credentials: 'include',
-              body: JSON.stringify([
-                { op: 'replace', path: '/status', value: 'cancelled' }
-              ]),
-            });
-
-            if (!response.ok) {
-              console.warn(`Failed to cancel appointment ${appointment.id}: ${response.status}`);
-            }
-          } catch (error) {
-            console.error(`Error cancelling appointment ${appointment.id}:`, error);
-          }
-        }
-      }
-
-      if (scheduleSlots.length > 0) {
-        setDeleteProgress(`Found ${scheduleSlots.length} slots. Deleting slots...`);
-
-        // Delete all slots
-        for (let i = 0; i < scheduleSlots.length; i++) {
-          const slot = scheduleSlots[i];
-          try {
-            setDeleteProgress(`Deleting slot ${i + 1}/${scheduleSlots.length}...`);
-
-            const response = await fetch(`/api/fhir/slots/${slot.id}`, {
-              method: 'DELETE',
-              credentials: 'include',
-            });
-
-            if (!response.ok) {
-              console.warn(`Failed to delete slot ${slot.id}: ${response.status}`);
-            }
-          } catch (error) {
-            console.error(`Error deleting slot ${slot.id}:`, error);
-          }
-        }
-      }
-
-      // Finally delete the schedule
-      setDeleteProgress('Deleting schedule...');
       const response = await fetch(`/api/fhir/schedules/${scheduleToDelete}`, {
         method: 'DELETE',
         credentials: 'include',
@@ -545,14 +287,6 @@ export default function PractitionerDetailPage() {
 
         // Update local state
         setSchedules(prev => prev.filter(s => s.id !== scheduleToDelete));
-        setAllSlots(prev => prev.filter(slot =>
-          slot.schedule?.reference !== `Schedule/${scheduleToDelete}`
-        ));
-        setAppointments(prev => prev.filter(appointment =>
-          !appointment.slot?.some(slotRef =>
-            scheduleSlots.some(slot => slotRef.reference === `Slot/${slot.id}`)
-          )
-        ));
 
         setTimeout(() => {
           setDeleteLoading(false);
@@ -665,28 +399,43 @@ export default function PractitionerDetailPage() {
             </div>
           )}
 
-          <div className="flex space-x-4">
+          <div className="flex flex-col sm:flex-row gap-3">
             <Button
               variant="primary"
               onClick={() => setShowCreateSchedule(true)}
+              className="flex items-center justify-center"
             >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
               Create Schedule
             </Button>
             <Button
               variant="outline"
               onClick={() => setShowGenerateSlots(true)}
               disabled={schedules.length === 0}
+              className="flex items-center justify-center"
+              title={schedules.length === 0 ? 'Create a schedule first to generate slots' : 'Generate time slots for existing schedules'}
             >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
               Generate Slots
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowClearSlotsConfirmation(true)}
-              disabled={allSlots.length === 0}
-            >
-              Clear All Slots
-            </Button>
           </div>
+
+          {schedules.length === 0 && (
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex">
+                <svg className="w-5 h-5 text-blue-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm text-blue-700">
+                  <strong>Getting Started:</strong> Create your first schedule to define your availability periods, then generate time slots for patient bookings.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -695,8 +444,7 @@ export default function PractitionerDetailPage() {
             {[
               { key: 'overview', label: 'Overview' },
               { key: 'schedules', label: 'Schedules' },
-              { key: 'slots', label: 'Slots' },
-              { key: 'appointments', label: 'Appointments' }
+              { key: 'slots', label: 'Slots' }
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -840,39 +588,126 @@ export default function PractitionerDetailPage() {
               </Card>
             ) : (
               <div className="space-y-4">
-                {schedules.map((schedule) => (
-                  <Card key={schedule.id}>
-                    <div className="p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="font-medium text-text-primary">
-                            Schedule {schedule.id}
-                          </h4>
-                          <p className="text-text-secondary text-sm">
-                            {schedule.planningHorizon?.start} - {schedule.planningHorizon?.end}
-                          </p>
-                          {schedule.comment && (
-                            <p className="text-text-secondary text-sm mt-1">
-                              {schedule.comment}
+                {schedules.map((schedule) => {
+                  const scheduleSlots = allSlots.filter(slot =>
+                    slot.schedule?.reference === `Schedule/${schedule.id}`
+                  );
+                  const hasSlotsRemaining = scheduleSlots.length > 0;
+                  const isExpanded = expandedScheduleId === schedule.id;
+                  const freeSlots = scheduleSlots.filter(slot => slot.status === 'free');
+                  const busySlots = scheduleSlots.filter(slot => slot.status === 'busy');
+
+                  return (
+                    <Card key={schedule.id}>
+                      <div className="p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-text-primary">
+                              Schedule {schedule.id}
+                            </h4>
+                            <p className="text-text-secondary text-sm">
+                              {schedule.planningHorizon?.start} - {schedule.planningHorizon?.end}
                             </p>
-                          )}
+                            {schedule.comment && (
+                              <p className="text-text-secondary text-sm mt-1">
+                                {schedule.comment}
+                              </p>
+                            )}
+                            <div className="flex items-center space-x-4 mt-2 text-sm">
+                              <span className="text-green-600">{freeSlots.length} free slots</span>
+                              <span className="text-red-600">{busySlots.length} busy slots</span>
+                              <span className="text-gray-600">({scheduleSlots.length} total slots)</span>
+                            </div>
+                          </div>
+                          <Badge variant={schedule.active !== false ? "success" : "danger"}>
+                            {schedule.active !== false ? "Active" : "Inactive"}
+                          </Badge>
                         </div>
-                        <Badge variant={schedule.active !== false ? "success" : "danger"}>
-                          {schedule.active !== false ? "Active" : "Inactive"}
-                        </Badge>
+
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            {scheduleSlots.length > 0 && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setExpandedScheduleId(isExpanded ? null : schedule.id || '')}
+                              >
+                                {isExpanded ? 'Hide' : 'Show'} Slots ({scheduleSlots.length})
+                              </Button>
+                            )}
+                          </div>
+
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setScheduleToDelete(schedule.id || '')}
+                              disabled={hasSlotsRemaining}
+                              title={hasSlotsRemaining ? 'Delete all slots first before deleting the schedule' : 'Delete this schedule'}
+                            >
+                              Delete Schedule
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Expandable Slots Section */}
+                        {isExpanded && scheduleSlots.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="mb-3">
+                              <h5 className="text-sm font-medium text-text-primary mb-2">
+                                Slots for this Schedule ({scheduleSlots.length})
+                              </h5>
+                              <p className="text-xs text-text-secondary">
+                                You must delete all slots before you can delete the schedule.
+                              </p>
+                            </div>
+
+                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                              {scheduleSlots.map((slot) => (
+                                <div
+                                  key={slot.id}
+                                  className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                                >
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-3">
+                                      <Badge variant={slot.status === 'free' ? 'success' : 'danger'} size="sm">
+                                        {slot.status}
+                                      </Badge>
+                                      <span className="text-sm">
+                                        {slot.start ? new Date(slot.start).toLocaleString() : 'No time'}
+                                      </span>
+                                      {slot.end && (
+                                        <span className="text-xs text-text-secondary">
+                                          - {new Date(slot.end).toLocaleTimeString()}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeleteSlot(slot.id || '')}
+                                    className="text-red-600 hover:text-red-700 hover:border-red-300"
+                                  >
+                                    Delete
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+
+                            {scheduleSlots.length > 0 && (
+                              <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-md">
+                                <p className="text-sm text-orange-800">
+                                  <strong>⚠️ Remaining:</strong> {scheduleSlots.length} slots must be deleted before you can delete this schedule.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setScheduleToDelete(schedule.id || '')}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -880,36 +715,12 @@ export default function PractitionerDetailPage() {
 
         {activeTab === 'slots' && (
           <div>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">Slots</h3>
-              <div className="flex space-x-2">
-                <Button
-                  variant="primary"
-                  onClick={() => setShowGenerateSlots(true)}
-                  disabled={schedules.length === 0}
-                >
-                  Generate Slots
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowClearSlotsConfirmation(true)}
-                  disabled={allSlots.length === 0}
-                >
-                  Clear All
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCleanupOrphanedConfirmation(true)}
-                  disabled={allSlots.length === 0}
-                >
-                  Cleanup Orphaned
-                </Button>
-              </div>
-            </div>
+            {/* Simple Header with Schedule Filter */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-4">
+                <h3 className="text-lg font-medium">Calendar View</h3>
 
-            {/* Filters */}
-            <div className="grid gap-4 mb-6">
-              <div className="flex space-x-4">
+                {/* Schedule Filter */}
                 <select
                   value={scheduleFilter}
                   onChange={(e) => setScheduleFilter(e.target.value)}
@@ -922,82 +733,36 @@ export default function PractitionerDetailPage() {
                     </option>
                   ))}
                 </select>
-
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                >
-                  <option value="">All Statuses</option>
-                  <option value="free">Available</option>
-                  <option value="busy">Busy</option>
-                </select>
-
-                <input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                />
               </div>
 
-              <div className="text-sm text-text-secondary">
-                Showing {slots.length} of {allSlots.length} slots
-                {scheduleFilter && ` (filtered by Schedule ${scheduleFilter})`}
-                {statusFilter && ` (filtered by status: ${statusFilter})`}
-                {dateFilter && ` (filtered by date: ${dateFilter})`}
+              {/* Slot Count Summary */}
+              <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <span className="flex items-center">
+                  <div className="w-3 h-3 bg-green-500 rounded-full mr-1"></div>
+                  {slots.filter(s => s.status === 'free').length} Free
+                </span>
+                <span className="flex items-center">
+                  <div className="w-3 h-3 bg-red-500 rounded-full mr-1"></div>
+                  {slots.filter(s => s.status === 'busy').length} Busy
+                </span>
               </div>
             </div>
 
-            <SlotCalendar
-              slots={slots}
-              onDeleteSlot={handleDeleteSlot}
-            />
-          </div>
-        )}
-
-        {activeTab === 'appointments' && (
-          <div>
-            <h3 className="text-lg font-medium mb-4">Appointments</h3>
-
-            {appointments.length === 0 ? (
-              <Card>
-                <div className="p-8 text-center">
-                  <p className="text-text-secondary">No appointments found</p>
-                </div>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {appointments.map((appointment) => (
-                  <Card key={appointment.id}>
-                    <div className="p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-text-primary">
-                            Appointment {appointment.id}
-                          </h4>
-                          <p className="text-text-secondary text-sm">
-                            {appointment.start ? new Date(appointment.start).toLocaleString() : 'No time specified'}
-                          </p>
-                          <p className="text-text-secondary text-sm">
-                            Status: {appointment.status}
-                          </p>
-                        </div>
-                        <Badge variant={
-                          appointment.status === 'booked' ? 'success' :
-                          appointment.status === 'pending' ? 'warning' :
-                          appointment.status === 'cancelled' ? 'danger' : 'info'
-                        }>
-                          {appointment.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
+            {/* Calendar */}
+            {allSlots.length === 0 ? (
+              <div className="text-center py-16">
+                <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <h3 className="text-xl font-medium text-gray-900 mb-2">No Slots Available</h3>
+                <p className="text-gray-600">Create a schedule and generate slots to see them in the calendar.</p>
               </div>
+            ) : (
+              <SlotCalendar slots={slots} />
             )}
           </div>
         )}
+
 
         {/* Create Schedule Modal */}
         {showCreateSchedule && (
@@ -1024,8 +789,8 @@ export default function PractitionerDetailPage() {
           <PopupConfirmation
             isOpen={true}
             title="Delete Schedule"
-            message="Are you sure you want to delete this schedule? This will also delete all associated slots and cancel any appointments."
-            confirmText={deleteLoading ? deleteProgress || "Deleting..." : "Delete"}
+            message="Are you sure you want to delete this schedule? All slots must be manually deleted first."
+            confirmText={deleteLoading ? deleteProgress || "Deleting..." : "Delete Schedule"}
             onConfirm={executeDeleteSchedule}
             onCancel={() => setScheduleToDelete(null)}
             isLoading={deleteLoading}
@@ -1033,33 +798,6 @@ export default function PractitionerDetailPage() {
           />
         )}
 
-        {/* Clear Slots Confirmation */}
-        {showClearSlotsConfirmation && (
-          <PopupConfirmation
-            isOpen={true}
-            title="Clear All Slots"
-            message={`Are you sure you want to delete all ${allSlots.length} slots for this practitioner? This action cannot be undone.`}
-            confirmText={clearSlotsLoading ? clearSlotsProgress || "Clearing..." : "Clear All Slots"}
-            onConfirm={executeClearSlots}
-            onCancel={() => setShowClearSlotsConfirmation(false)}
-            isLoading={clearSlotsLoading}
-            variant="danger"
-          />
-        )}
-
-        {/* Cleanup Orphaned Slots Confirmation */}
-        {showCleanupOrphanedConfirmation && (
-          <PopupConfirmation
-            isOpen={true}
-            title="Cleanup Orphaned Slots"
-            message="This will delete all slots that have no corresponding schedule. Are you sure?"
-            confirmText={cleanupOrphanedLoading ? "Cleaning up..." : "Cleanup"}
-            onConfirm={executeCleanupOrphaned}
-            onCancel={() => setShowCleanupOrphanedConfirmation(false)}
-            isLoading={cleanupOrphanedLoading}
-            variant="warning"
-          />
-        )}
 
         {/* Slots Notification */}
         {showSlotsNotification && (

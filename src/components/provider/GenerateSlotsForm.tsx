@@ -132,8 +132,9 @@ export function GenerateSlotsForm({
       return { minDate: today, maxDate: undefined };
     }
 
-    // Use the later of today or schedule start date
-    const minDate = scheduleConstraints.minDate > today ? scheduleConstraints.minDate : today;
+    // Allow today if the schedule is still active (end date is today or later)
+    // Users can select today and the slot generation will handle filtering past times
+    const minDate = scheduleConstraints.minDate <= today ? today : scheduleConstraints.minDate;
 
     return {
       minDate,
@@ -230,9 +231,13 @@ export function GenerateSlotsForm({
       const newFormData: Partial<SlotGenerationData> = { [name]: value };
 
       if (selectedSchedule?.planningHorizon) {
-        // Set dates to schedule's planning horizon
+        // Set dates to schedule's planning horizon, but prefer today over past dates
+        const today = new Date().toISOString().split('T')[0];
+
         if (selectedSchedule.planningHorizon.start) {
-          newFormData.startDate = selectedSchedule.planningHorizon.start;
+          // If schedule starts in the past, use today; otherwise use schedule start
+          const effectiveStartDate = selectedSchedule.planningHorizon.start <= today ? today : selectedSchedule.planningHorizon.start;
+          newFormData.startDate = effectiveStartDate;
         }
         if (selectedSchedule.planningHorizon.end) {
           newFormData.endDate = selectedSchedule.planningHorizon.end;
