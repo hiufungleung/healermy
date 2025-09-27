@@ -19,17 +19,23 @@ function LaunchContent() {
       
       const iss = searchParams.get('iss');
       const launchToken = searchParams.get('launch');
-      
+      const requestedRole = searchParams.get('role') as 'patient' | 'provider' | null;
+
+      // Detect standalone vs EHR launch
+      const isStandaloneLaunch = !launchToken;
+
       // Log launch parameters for debugging
       const logData = {
         iss,
         launchToken,
+        requestedRole,
+        isStandaloneLaunch,
         currentUrl: window.location.href,
         referrer: document.referrer,
         allSearchParams: Object.fromEntries(searchParams.entries())
       };
       console.log('🔍 Launch parameters:', logData);
-      
+
       // Send log to server for visibility
       fetch('/api/debug-log', {
         method: 'POST',
@@ -37,9 +43,14 @@ function LaunchContent() {
         body: JSON.stringify({ type: 'launch-params', data: logData })
       }).catch(e => console.warn('Failed to send debug log:', e));
 
-      if (!iss || !launchToken) {
-        setError('Missing launch parameters (ISS or Launch token). Please launch from the EHR.');
+      if (!iss) {
+        setError('Missing ISS parameter (FHIR server URL). Please provide the FHIR server URL.');
         return;
+      }
+
+      // For standalone launch with role specified in URL, use it directly
+      if (isStandaloneLaunch && requestedRole) {
+        setSelectedRole(requestedRole);
       }
 
       // Show role selection for MELD sandbox
@@ -117,16 +128,43 @@ function LaunchContent() {
         
         // Generate random state for CSRF protection
         const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-        
-        // Store state and configuration for callback using launch token as key
-        const stateKey = `oauth_state_${launchToken}`;
-        const tokenUrlKey = `oauth_token_url_${launchToken}`;
-        const revokeUrlKey = `oauth_revoke_url_${launchToken}`;
-        const issKey = `oauth_iss_${launchToken}`;
-        const clientIdKey = `oauth_client_id_${launchToken}`;
-        const clientSecretKey = `oauth_client_secret_${launchToken}`;
-        const redirectUriKey = `oauth_redirect_uri_${launchToken}`;
-        
+
+        // For standalone launch, generate PKCE parameters
+        let codeVerifier: string | undefined;
+        let codeChallenge: string | undefined;
+
+        if (isStandaloneLaunch) {
+          // Generate code verifier for PKCE
+          const array = new Uint8Array(32);
+          crypto.getRandomValues(array);
+          codeVerifier = btoa(String.fromCharCode(...array))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=/g, '');
+
+          // Generate code challenge (SHA256 of verifier)
+          const encoder = new TextEncoder();
+          const data = encoder.encode(codeVerifier);
+          const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          codeChallenge = btoa(String.fromCharCode(...hashArray))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=/g, '');
+        }
+
+        // Store state and configuration for callback
+        // Use launch token as key if available, otherwise use state
+        const sessionKey = launchToken || state;
+        const stateKey = `oauth_state_${sessionKey}`;
+        const tokenUrlKey = `oauth_token_url_${sessionKey}`;
+        const revokeUrlKey = `oauth_revoke_url_${sessionKey}`;
+        const issKey = `oauth_iss_${sessionKey}`;
+        const clientIdKey = `oauth_client_id_${sessionKey}`;
+        const clientSecretKey = `oauth_client_secret_${sessionKey}`;
+        const redirectUriKey = `oauth_redirect_uri_${sessionKey}`;
+        const codeVerifierKey = `oauth_code_verifier_${sessionKey}`;
+
         sessionStorage.setItem(stateKey, state);
         sessionStorage.setItem(tokenUrlKey, tokenUrl);
         sessionStorage.setItem(revokeUrlKey, revokeUrl || ''); // Store revoke URL (may be undefined)
@@ -134,20 +172,34 @@ function LaunchContent() {
         sessionStorage.setItem(clientIdKey, config.clientId);
         sessionStorage.setItem(clientSecretKey, config.clientSecret);
         sessionStorage.setItem(redirectUriKey, config.redirectUri);
-        
-        // Also store with the state as key for callback lookup
-        sessionStorage.setItem(`launch_token_${state}`, launchToken);
-        
-        // Construct authorization URL manually
+
+        if (codeVerifier) {
+          sessionStorage.setItem(codeVerifierKey, codeVerifier);
+        }
+
+        // Store mapping for callback lookup
+        sessionStorage.setItem(`launch_token_${state}`, launchToken || '');
+
+        // Construct authorization URL
         const params = new URLSearchParams({
           response_type: 'code',
           client_id: config.clientId,
           redirect_uri: config.redirectUri,
-          scope: config.scope,
+          scope: isStandaloneLaunch ? `${config.scope} launch/patient` : config.scope, // Add launch/patient for standalone
           state: state,
-          launch: launchToken,
           aud: iss,
         });
+
+        // Add launch parameter only for EHR launch
+        if (launchToken) {
+          params.set('launch', launchToken);
+        }
+
+        // Add PKCE parameters for standalone launch
+        if (isStandaloneLaunch && codeChallenge) {
+          params.set('code_challenge', codeChallenge);
+          params.set('code_challenge_method', 'S256');
+        }
         
         const fullAuthorizeUrl = `${authorizeUrl}?${params.toString()}`;
         

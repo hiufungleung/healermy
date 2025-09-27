@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { code, tokenUrl, clientId, clientSecret, redirectUri } = await request.json();
+    const { code, tokenUrl, clientId, clientSecret, redirectUri, codeVerifier } = await request.json();
 
-    if (!code || !tokenUrl || !clientId || !clientSecret || !redirectUri) {
+    if (!code || !tokenUrl || !clientId || !redirectUri) {
       return NextResponse.json(
         { error: 'Missing required parameters for token exchange' },
         { status: 400 }
@@ -18,15 +18,27 @@ export async function POST(request: NextRequest) {
       redirect_uri: redirectUri,
     });
 
-    // Use Basic Authentication with client credentials
-    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    // Add PKCE code verifier if present (for standalone launch)
+    if (codeVerifier) {
+      tokenParams.set('code_verifier', codeVerifier);
+    }
 
-    const headers = {
+    // For public clients (no secret), include client_id in body
+    // For confidential clients, use Basic Authentication
+    const headers: Record<string, string> = {
       'Content-Type': 'application/x-www-form-urlencoded',
       'Accept': 'application/json',
-      'Authorization': `Basic ${credentials}`,
       'Connection': 'close'
     };
+
+    if (clientSecret) {
+      // Confidential client - use Basic Authentication
+      const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+      headers['Authorization'] = `Basic ${credentials}`;
+    } else {
+      // Public client - include client_id in body
+      tokenParams.set('client_id', clientId);
+    }
 
     console.log('🔄 Server-side token exchange to:', tokenUrl);
 

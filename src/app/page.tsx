@@ -67,7 +67,11 @@ export default function Home() {
               <Button
                 variant="primary"
                 fullWidth
-                onClick={() => router.push('/launch?role=patient&iss=demo&launch=demo')}
+                onClick={() => {
+                  // Standalone launch - no launch parameter
+                  const fhirServerUrl = process.env.NEXT_PUBLIC_FHIR_SERVER_URL || 'https://gw.interop.community/healerMy/data';
+                  router.push(`/launch?role=patient&iss=${encodeURIComponent(fhirServerUrl)}`);
+                }}
               >
                 Access Patient Portal
               </Button>
@@ -89,7 +93,11 @@ export default function Home() {
               <Button
                 variant="primary"
                 fullWidth
-                onClick={() => router.push('/launch?role=provider&iss=demo&launch=demo')}
+                onClick={() => {
+                  // Standalone launch - no launch parameter
+                  const fhirServerUrl = process.env.NEXT_PUBLIC_FHIR_SERVER_URL || 'https://gw.interop.community/healerMy/data';
+                  router.push(`/launch?role=provider&iss=${encodeURIComponent(fhirServerUrl)}`);
+                }}
               >
                 Access Provider Portal
               </Button>

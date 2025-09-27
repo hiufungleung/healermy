@@ -41,22 +41,25 @@ export default function CallbackPage() {
         }
         
         // Verify state to prevent CSRF attacks - lookup launch token using state
-        const launchToken = sessionStorage.getItem(`launch_token_${receivedState}`);
-        const storedState = launchToken ? sessionStorage.getItem(`oauth_state_${launchToken}`) : null;
-        
+        const launchToken = sessionStorage.getItem(`launch_token_${receivedState}`) || '';
+        const sessionKey = launchToken || receivedState; // Use state as key for standalone launch
+        const storedState = sessionStorage.getItem(`oauth_state_${sessionKey}`);
+
         if (!storedState || storedState !== receivedState) {
           throw new Error('Invalid OAuth state - possible CSRF attack');
         }
-        
-        // Get stored OAuth configuration using launch token
-        const tokenUrl = launchToken ? sessionStorage.getItem(`oauth_token_url_${launchToken}`) : null;
-        const revokeUrl = launchToken ? sessionStorage.getItem(`oauth_revoke_url_${launchToken}`) : null;
-        const iss = launchToken ? sessionStorage.getItem(`oauth_iss_${launchToken}`) : null;
-        const clientId = launchToken ? sessionStorage.getItem(`oauth_client_id_${launchToken}`) : null;
-        const clientSecret = launchToken ? sessionStorage.getItem(`oauth_client_secret_${launchToken}`) : null;
-        const redirectUri = launchToken ? sessionStorage.getItem(`oauth_redirect_uri_${launchToken}`) : null;
-        
-        if (!tokenUrl || !iss || !clientId || !clientSecret || !redirectUri) {
+
+        // Get stored OAuth configuration using appropriate key
+        const tokenUrl = sessionStorage.getItem(`oauth_token_url_${sessionKey}`);
+        const revokeUrl = sessionStorage.getItem(`oauth_revoke_url_${sessionKey}`);
+        const iss = sessionStorage.getItem(`oauth_iss_${sessionKey}`);
+        const clientId = sessionStorage.getItem(`oauth_client_id_${sessionKey}`);
+        const clientSecret = sessionStorage.getItem(`oauth_client_secret_${sessionKey}`); // Can be empty for public clients
+        const redirectUri = sessionStorage.getItem(`oauth_redirect_uri_${sessionKey}`);
+        const codeVerifier = sessionStorage.getItem(`oauth_code_verifier_${sessionKey}`);
+
+        // Note: clientSecret can be empty for public clients
+        if (!tokenUrl || !iss || !clientId || !redirectUri) {
           throw new Error('Missing OAuth configuration from session storage');
         }
         
@@ -76,8 +79,9 @@ export default function CallbackPage() {
             code,
             tokenUrl,
             clientId,
-            clientSecret,
-            redirectUri
+            clientSecret: clientSecret || '', // Send empty string for public clients
+            redirectUri,
+            codeVerifier // Include code verifier for PKCE if available
           })
         });
         
@@ -148,16 +152,15 @@ export default function CallbackPage() {
         }
         
         // Clean up OAuth session storage
-        if (launchToken) {
-          sessionStorage.removeItem(`oauth_state_${launchToken}`);
-          sessionStorage.removeItem(`oauth_token_url_${launchToken}`);
-          sessionStorage.removeItem(`oauth_revoke_url_${launchToken}`);
-          sessionStorage.removeItem(`oauth_iss_${launchToken}`);
-          sessionStorage.removeItem(`oauth_client_id_${launchToken}`);
-          sessionStorage.removeItem(`oauth_client_secret_${launchToken}`);
-          sessionStorage.removeItem(`oauth_redirect_uri_${launchToken}`);
-          sessionStorage.removeItem(`launch_token_${receivedState}`);
-        }
+        sessionStorage.removeItem(`oauth_state_${sessionKey}`);
+        sessionStorage.removeItem(`oauth_token_url_${sessionKey}`);
+        sessionStorage.removeItem(`oauth_revoke_url_${sessionKey}`);
+        sessionStorage.removeItem(`oauth_iss_${sessionKey}`);
+        sessionStorage.removeItem(`oauth_client_id_${sessionKey}`);
+        sessionStorage.removeItem(`oauth_client_secret_${sessionKey}`);
+        sessionStorage.removeItem(`oauth_redirect_uri_${sessionKey}`);
+        sessionStorage.removeItem(`oauth_code_verifier_${sessionKey}`);
+        sessionStorage.removeItem(`launch_token_${receivedState}`);
         sessionStorage.removeItem('auth_iss');
         sessionStorage.removeItem('auth_launch');
         sessionStorage.removeItem('auth_role');

@@ -21,10 +21,10 @@ export async function GET(request: NextRequest) {
 
     // Use single client credentials for MELD sandbox
     const clientId = process.env.CLIENT_ID;
-    const clientSecret = process.env.CLIENT_SECRET;
-    
-    if (!clientId || !clientSecret) {
-      throw new Error('Missing client credentials. Ensure CLIENT_ID and CLIENT_SECRET are set');
+    const clientSecret = process.env.CLIENT_SECRET || ''; // Public clients have no secret
+
+    if (!clientId) {
+      throw new Error('Missing client credentials. Ensure CLIENT_ID is set');
     }
 
     // Use role-specific scope
