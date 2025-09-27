@@ -2,16 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { Layout } from '@/components/common/Layout';
-import AppointmentsClient from './AppointmentsClient';
+import NotificationsClient from './NotificationsClient';
 import type { AuthSession } from '@/types/auth';
 
-interface AppointmentsWrapperProps {
+interface NotificationsWrapperProps {
   session: AuthSession;
 }
 
-export default function AppointmentsWrapper({
+export default function NotificationsWrapper({
   session
-}: AppointmentsWrapperProps) {
+}: NotificationsWrapperProps) {
   const [patientName, setPatientName] = useState<string | undefined>(undefined);
 
   // Fetch patient name on client-side for Layout update
@@ -47,9 +47,7 @@ export default function AppointmentsWrapper({
 
   return (
     <Layout patientName={patientName}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <AppointmentsClient session={session} />
-      </div>
+      <NotificationsClient session={session} />
     </Layout>
   );
 }

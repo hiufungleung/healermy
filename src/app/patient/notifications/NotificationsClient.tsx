@@ -35,23 +35,59 @@ interface StaticNotification {
 }
 
 interface NotificationsClientProps {
-  patient: Patient | null;
-  communications: Communication[];
-  patientName: string;
+  session: { patient: string; accessToken: string; fhirBaseUrl: string; [key: string]: any };
 }
 
-export default function NotificationsClient({ 
-  patient, 
-  communications, 
-  patientName 
+export default function NotificationsClient({
+  session
 }: NotificationsClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'action_required'>('all');
-  const [localCommunications, setLocalCommunications] = useState<Communication[]>(communications);
+  const [localCommunications, setLocalCommunications] = useState<Communication[]>([]);
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [loading, setLoading] = useState(true);
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
   const [selectedMessage, setSelectedMessage] = useState<Communication | null>(null);
   const [displayCount, setDisplayCount] = useState(10); // Show 10 notifications initially
+
+  // Fetch patient data and communications on client-side
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+
+        // Fetch patient data
+        const patientResponse = await fetch(`/api/fhir/patients/${session.patient}`, {
+          credentials: 'include',
+        });
+
+        if (patientResponse.ok) {
+          const patientData = await patientResponse.json();
+          setPatient(patientData);
+        }
+
+        // Fetch communications
+        const communicationsResponse = await fetch(`/api/fhir/communications?patient=${session.patient}`, {
+          credentials: 'include',
+        });
+
+        if (communicationsResponse.ok) {
+          const communicationsData = await communicationsResponse.json();
+          const communications = communicationsData.communications || [];
+          setLocalCommunications(communications);
+        }
+      } catch (error) {
+        console.error('Error fetching notifications data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (session?.patient) {
+      fetchData();
+    }
+  }, [session?.patient]);
 
   // Check URL parameters on mount and set filter accordingly
   useEffect(() => {
@@ -598,6 +634,26 @@ export default function NotificationsClient({
     }
     return null;
   };
+
+  // Show loading state while fetching data
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-64 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-96 mb-8"></div>
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="bg-gray-100 rounded-lg p-4">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

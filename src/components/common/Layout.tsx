@@ -102,12 +102,19 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
                     <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold">
                       {session.role === 'patient' ? 'P' : 'D'}
                     </div>
-                    <span className="text-sm font-medium">
-                      {session.role === 'patient' 
-                        ? (patientName || 'Patient')
-                        : (providerName || 'Provider')
-                      }
-                    </span>
+                    {/* Show loading skeleton if no name provided yet */}
+                    {(session.role === 'patient' && !patientName) || (session.role === 'provider' && !providerName) ? (
+                      <div className="animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-20"></div>
+                      </div>
+                    ) : (
+                      <span className="text-sm font-medium">
+                        {session.role === 'patient'
+                          ? (patientName || 'Patient')
+                          : (providerName || 'Provider')
+                        }
+                      </span>
+                    )}
                   </div>
                   
                   <button

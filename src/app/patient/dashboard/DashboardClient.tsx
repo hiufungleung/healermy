@@ -13,7 +13,7 @@ import type { Patient, Appointment } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
 
 interface DashboardClientProps {
-  patientName: string;
+  patientName: string | undefined;
   session: AuthSession;
   onPatientNameUpdate?: (name: string) => void;
 }
@@ -25,10 +25,11 @@ export default function DashboardClient({
 }: DashboardClientProps) {
   const router = useRouter();
   const [patient, setPatient] = useState<Patient | null>(null);
-  const [patientName, setPatientName] = useState(initialPatientName);
+  const [patientName, setPatientName] = useState(initialPatientName || 'Patient');
 
   // Extract first name from initial patient name for immediate display
-  const getFirstName = (fullName: string) => {
+  const getFirstName = (fullName: string | undefined) => {
+    if (!fullName) return 'Patient';
     if (fullName.startsWith('Patient ')) return 'Patient';
     return fullName.split(' ')[0] || 'Patient';
   };

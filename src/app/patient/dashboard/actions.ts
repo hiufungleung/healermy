@@ -6,10 +6,9 @@ import { searchAppointments } from '@/app/api/fhir/appointments/operations';
 import type { Patient, Appointment } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
 
-// Server action that gets session data and real patient name for immediate page render
-export async function getBasicSessionData(): Promise<{
+// Server action that gets session data only (no FHIR API calls for fast page render)
+export async function getSessionOnly(): Promise<{
   session: AuthSession | null;
-  patientName: string;
   error?: string;
 }> {
   try {
@@ -20,7 +19,6 @@ export async function getBasicSessionData(): Promise<{
     if (!sessionHeader) {
       return {
         session: null,
-        patientName: 'Patient',
         error: 'No session found'
       };
     }
@@ -31,41 +29,17 @@ export async function getBasicSessionData(): Promise<{
     if (!session.patient || !session.accessToken || !session.fhirBaseUrl) {
       return {
         session,
-        patientName: 'Patient',
         error: 'Incomplete session data'
       };
     }
 
-    // Fetch real patient name from FHIR API for immediate display
-    let patientName = `Patient ${session.patient}`; // Fallback
-
-    try {
-      console.log('Fetching patient name for immediate display...');
-      const patientData = await getPatient(session.accessToken, session.fhirBaseUrl, session.patient);
-
-      if (patientData?.name?.[0]) {
-        const given = patientData.name[0]?.given?.join(' ') || '';
-        const family = patientData.name[0]?.family || '';
-        const fullName = `${given} ${family}`.trim();
-        if (fullName) {
-          patientName = fullName;
-          console.log('✅ Got real patient name:', fullName);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching patient name (using fallback):', error);
-      // Keep fallback name, don't fail the entire request
-    }
-
     return {
-      session,
-      patientName
+      session
     };
   } catch (error) {
-    console.error('Error getting basic session data:', error);
+    console.error('Error getting session data:', error);
     return {
       session: null,
-      patientName: 'Patient',
       error: 'Failed to get session data'
     };
   }

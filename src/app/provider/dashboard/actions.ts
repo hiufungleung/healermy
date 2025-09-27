@@ -4,6 +4,46 @@ import { headers } from 'next/headers';
 import type { AuthSession } from '@/types/auth';
 import type { Practitioner } from '@/types/fhir';
 
+// Fast session-only function (no FHIR API calls for immediate page render)
+export async function getProviderSessionOnly(): Promise<{
+  session: AuthSession | null;
+  error?: string;
+}> {
+  try {
+    // Get session directly from middleware headers (already decrypted and validated)
+    const headersList = await headers();
+    const sessionHeader = headersList.get('x-session-data');
+
+    if (!sessionHeader) {
+      return {
+        session: null,
+        error: 'No session found'
+      };
+    }
+
+    const session: AuthSession = JSON.parse(sessionHeader);
+
+    // Additional validation for required fields
+    if (!session.accessToken || !session.fhirBaseUrl) {
+      return {
+        session,
+        error: 'Incomplete session data'
+      };
+    }
+
+    return {
+      session
+    };
+  } catch (error) {
+    console.error('Error getting provider session data:', error);
+    return {
+      session: null,
+      error: 'Failed to get session data'
+    };
+  }
+}
+
+// Original function kept for backwards compatibility and direct use
 export async function getProviderDashboardData(): Promise<{
   provider: Practitioner | null;
   session: AuthSession | null;
@@ -14,7 +54,7 @@ export async function getProviderDashboardData(): Promise<{
     // Get session directly from middleware headers (already decrypted and validated)
     const headersList = await headers();
     const sessionHeader = headersList.get('x-session-data');
-    
+
     if (!sessionHeader) {
       return {
         provider: null,
@@ -47,7 +87,7 @@ export async function getProviderDashboardData(): Promise<{
         const practitionerMatch = session.fhirUser.match(/\/Practitioner\/(.+)$/);
         if (practitionerMatch) {
           const practitionerId = practitionerMatch[1];
-          
+
           // Fetch practitioner details from FHIR
           const response = await fetch(`${session.fhirBaseUrl}/Practitioner/${practitionerId}`, {
             headers: {
@@ -55,7 +95,7 @@ export async function getProviderDashboardData(): Promise<{
               'Accept': 'application/fhir+json',
             },
           });
-          
+
           if (response.ok) {
             providerData = await response.json();
             if (providerData?.name && providerData.name.length > 0) {

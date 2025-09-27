@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
@@ -25,21 +25,57 @@ interface Communication {
 }
 
 interface MessagesClientProps {
-  patient: Patient | null;
-  communications: Communication[];
-  patientName: string;
+  session: { patient: string; accessToken: string; fhirBaseUrl: string; [key: string]: any };
 }
 
-export default function MessagesClient({ 
-  patient, 
-  communications, 
-  patientName 
+export default function MessagesClient({
+  session
 }: MessagesClientProps) {
   const router = useRouter();
   const [selectedMessage, setSelectedMessage] = useState<Communication | null>(null);
   const [filter, setFilter] = useState<'all' | 'received' | 'sent'>('all');
-  const [localCommunications, setLocalCommunications] = useState<Communication[]>(communications);
+  const [localCommunications, setLocalCommunications] = useState<Communication[]>([]);
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [loading, setLoading] = useState(true);
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
+
+  // Fetch patient data and communications on client-side
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+
+        // Fetch patient data
+        const patientResponse = await fetch(`/api/fhir/patients/${session.patient}`, {
+          credentials: 'include',
+        });
+
+        if (patientResponse.ok) {
+          const patientData = await patientResponse.json();
+          setPatient(patientData);
+        }
+
+        // Fetch communications
+        const communicationsResponse = await fetch(`/api/fhir/communications?patient=${session.patient}`, {
+          credentials: 'include',
+        });
+
+        if (communicationsResponse.ok) {
+          const communicationsData = await communicationsResponse.json();
+          const communications = communicationsData.communications || [];
+          setLocalCommunications(communications);
+        }
+      } catch (error) {
+        console.error('Error fetching messages data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (session?.patient) {
+      fetchData();
+    }
+  }, [session?.patient]);
 
   // Function to check if message is read (uses local state for immediate updates)
   const isMessageRead = (comm: Communication): boolean => {
@@ -217,6 +253,33 @@ export default function MessagesClient({
     const appointmentId = aboutRef.replace('Appointment/', '');
     return { id: appointmentId };
   };
+
+  // Show loading state while fetching data
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-48 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-80 mb-8"></div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <div className="space-y-4">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="bg-gray-100 rounded-lg p-4">
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="lg:col-span-2">
+              <div className="bg-gray-100 rounded-lg h-96"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
