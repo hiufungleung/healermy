@@ -571,8 +571,28 @@ export default function BookAppointment() {
                           </div>
                         ) : !practitionerSlots[practitioner.id]?.[selectedDates[practitioner.id] || ''] || practitionerSlots[practitioner.id]?.[selectedDates[practitioner.id] || '']?.length === 0 ? (
                           <div className="text-center py-8">
-                            <p className="text-text-secondary">No available time slots for this date.</p>
-                            <p className="text-sm text-text-secondary mt-2">Please try a different date.</p>
+                            {/* Check if no slots exist for any date (schedule has no slots generated) */}
+                            {!practitionerSlots[practitioner.id] || Object.keys(practitionerSlots[practitioner.id]).length === 0 || Object.values(practitionerSlots[practitioner.id]).every(slots => !slots || slots.length === 0) ? (
+                              <div>
+                                <div className="mb-4">
+                                  <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                </div>
+                                <p className="text-gray-600 font-medium mb-2">No appointment slots available</p>
+                                <p className="text-sm text-gray-500 mb-3">
+                                  This practitioner hasn't set up their appointment schedule yet.
+                                </p>
+                                <p className="text-sm text-blue-600">
+                                  Please contact them directly at <a href={`tel:${practitioner.telecom?.find((t: any) => t.system === 'phone')?.value}`} className="font-medium hover:underline">{practitioner.telecom?.find((t: any) => t.system === 'phone')?.value}</a> to schedule an appointment.
+                                </p>
+                              </div>
+                            ) : (
+                              <div>
+                                <p className="text-text-secondary">No available time slots for this date.</p>
+                                <p className="text-sm text-text-secondary mt-2">Please try a different date.</p>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
