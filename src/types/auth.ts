@@ -20,8 +20,9 @@ export interface TokenData {
 export interface SessionData {
   role: UserRole;
   patient?: string;
+  patientName?: string; // Patient display name for UI
   user?: string; // User ID from token response (provider)
-  username?: string; // Username from token response  
+  username?: string; // Username from token response
   encounter?: string;
   needPatientBanner?: boolean;
   need_patient_banner?: boolean; // Keep both snake_case and camelCase for compatibility

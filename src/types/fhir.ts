@@ -302,3 +302,332 @@ export interface MedicationRequest {
     text?: string;
   }>;
 }
+
+export interface AllergyIntolerance {
+  resourceType: 'AllergyIntolerance';
+  id: string;
+  clinicalStatus?: {
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+  };
+  verificationStatus?: {
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+  };
+  type?: 'allergy' | 'intolerance';
+  category?: Array<'food' | 'medication' | 'environment' | 'biologic'>;
+  criticality?: 'low' | 'high' | 'unable-to-assess';
+  code?: {
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  };
+  patient?: {
+    reference?: string;
+  };
+  recordedDate?: string;
+  reaction?: Array<{
+    substance?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    };
+    manifestation?: Array<{
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    }>;
+    severity?: 'mild' | 'moderate' | 'severe';
+    exposureRoute?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    };
+  }>;
+}
+
+export interface Procedure {
+  resourceType: 'Procedure';
+  id: string;
+  status: 'preparation' | 'in-progress' | 'not-done' | 'on-hold' | 'stopped' | 'completed' | 'entered-in-error' | 'unknown';
+  code?: {
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  };
+  subject?: {
+    reference?: string;
+  };
+  performedDateTime?: string;
+  performedPeriod?: {
+    start?: string;
+    end?: string;
+  };
+  performer?: Array<{
+    actor?: {
+      reference?: string;
+      display?: string;
+    };
+  }>;
+  outcome?: {
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  };
+  note?: Array<{
+    text?: string;
+  }>;
+}
+
+export interface FamilyMemberHistory {
+  resourceType: 'FamilyMemberHistory';
+  id: string;
+  status: 'partial' | 'completed' | 'entered-in-error' | 'health-unknown';
+  patient?: {
+    reference?: string;
+  };
+  date?: string;
+  name?: string;
+  relationship?: {
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  };
+  sex?: {
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  };
+  condition?: Array<{
+    code?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    };
+    outcome?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    };
+    contributedToDeath?: boolean;
+    onsetAge?: {
+      value?: number;
+      unit?: string;
+    };
+    onsetString?: string;
+  }>;
+}
+
+export interface DiagnosticReport {
+  resourceType: 'DiagnosticReport';
+  id: string;
+  status: 'registered' | 'partial' | 'preliminary' | 'final' | 'amended' | 'corrected' | 'appended' | 'cancelled' | 'entered-in-error' | 'unknown';
+  category?: Array<{
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  }>;
+  code?: {
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  };
+  subject?: {
+    reference?: string;
+  };
+  effectiveDateTime?: string;
+  effectivePeriod?: {
+    start?: string;
+    end?: string;
+  };
+  issued?: string;
+  performer?: Array<{
+    reference?: string;
+    display?: string;
+  }>;
+  result?: Array<{
+    reference?: string;
+    display?: string;
+  }>;
+  conclusion?: string;
+  conclusionCode?: Array<{
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  }>;
+}
+
+export interface ServiceRequest {
+  resourceType: 'ServiceRequest';
+  id: string;
+  status: 'draft' | 'active' | 'on-hold' | 'revoked' | 'completed' | 'entered-in-error' | 'unknown';
+  intent: 'proposal' | 'plan' | 'directive' | 'order' | 'original-order' | 'reflex-order' | 'filler-order' | 'instance-order' | 'option';
+  category?: Array<{
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  }>;
+  code?: {
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  };
+  subject?: {
+    reference?: string;
+  };
+  authoredOn?: string;
+  requester?: {
+    reference?: string;
+    display?: string;
+  };
+  performer?: Array<{
+    reference?: string;
+    display?: string;
+  }>;
+  reasonCode?: Array<{
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  }>;
+}
+
+export interface Coverage {
+  resourceType: 'Coverage';
+  id: string;
+  identifier?: Array<{
+    use?: string;
+    type?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    };
+    system?: string;
+    value?: string;
+  }>;
+  status: 'active' | 'cancelled' | 'draft' | 'entered-in-error';
+  kind: 'insurance' | 'self-pay' | 'other';
+  policyHolder?: {
+    reference: string;
+    display?: string;
+  };
+  subscriber?: {
+    reference: string;
+    display?: string;
+  };
+  subscriberId?: string;
+  beneficiary: {
+    reference: string;
+    display?: string;
+  };
+  dependent?: string;
+  relationship?: {
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  };
+  period?: {
+    start?: string;
+    end?: string;
+  };
+  payor: Array<{
+    reference: string;
+    display?: string;
+  }>;
+  class?: Array<{
+    type?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    };
+    value?: string;
+    name?: string;
+  }>;
+  order?: number;
+  network?: string;
+  costToBeneficiary?: Array<{
+    type?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    };
+    valueMoney?: {
+      value?: number;
+      currency?: string;
+    };
+    valueQuantity?: {
+      value?: number;
+      unit?: string;
+    };
+  }>;
+  subrogation?: boolean;
+  contract?: Array<{
+    reference: string;
+    display?: string;
+  }>;
+}
