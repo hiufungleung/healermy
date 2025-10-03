@@ -165,7 +165,7 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
         } else {
           // Patient logic - original code
           // Fetch all communications (API already merges received and sent)
-          const commResponse = await fetch(`/api/fhir/communications?_count=100`, {
+          const commResponse = await fetch(`/api/fhir/communications`, {
             credentials: 'include'
           });
 
@@ -177,55 +177,6 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
             // Extract communications from API response
             allCommunications = (commData.entry || []).map((entry: any) => entry.resource);
           }
-
-          // Static notifications (exactly same as in NotificationsClient)
-          const staticNotifications = [
-            {
-              id: 'static-1',
-              type: 'appointment_confirmed',
-              title: 'Appointment Confirmed',
-              message: 'Your appointment with Dr. Sarah Johnson on Jan 15, 2025 at 10:30 AM has been confirmed.',
-              timestamp: '2025-01-12T14:30:00Z',
-              read: false,
-              actionRequired: false
-            },
-            {
-              id: 'static-2',
-              type: 'appointment_reminder',
-              title: 'Appointment Reminder',
-              message: 'You have an upcoming appointment with Dr. Michael Chen tomorrow at 2:15 PM.',
-              timestamp: '2025-01-11T09:00:00Z',
-              read: false,
-              actionRequired: false
-            },
-            {
-              id: 'static-3',
-              type: 'test_results',
-              title: 'New Test Results Available',
-              message: 'Your blood test results from your visit on Jan 8 are now available.',
-              timestamp: '2025-01-10T16:45:00Z',
-              read: true,
-              actionRequired: true
-            },
-            {
-              id: 'static-4',
-              type: 'message',
-              title: 'Message from Dr. Rodriguez',
-              message: 'Please schedule a follow-up appointment to discuss your recent test results.',
-              timestamp: '2025-01-09T11:20:00Z',
-              read: false,
-              actionRequired: true
-            },
-            {
-              id: 'static-5',
-              type: 'system',
-              title: 'System Maintenance',
-              message: 'Scheduled maintenance on Jan 15 from 2:00 AM - 4:00 AM. Some features may be temporarily unavailable.',
-              timestamp: '2025-01-08T10:00:00Z',
-              read: true,
-              actionRequired: false
-            }
-          ];
 
           // Function to check if message is read (same logic as NotificationsClient)
           const isMessageRead = (comm: Communication): boolean => {
@@ -243,16 +194,11 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
           };
 
           // Count unread FHIR communications using same logic as NotificationsClient
-          const fhirUnreadCount = allCommunications.filter((comm: Communication) =>
+          const unreadCount = allCommunications.filter((comm: Communication) =>
             !isMessageRead(comm)
           ).length;
 
-          // Count unread static notifications
-          const staticUnreadCount = staticNotifications.filter(notif => !notif.read).length;
-
-          const totalUnreadCount = fhirUnreadCount + staticUnreadCount;
-
-          setUnreadCount(totalUnreadCount);
+          setUnreadCount(unreadCount);
         }
       } else {
         console.error('🔔 NotificationBell - API call failed');

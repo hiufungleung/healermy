@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const appointmentId = searchParams.get('about');
     const unreadOnly = searchParams.get('unread') === 'true';
-    const count = parseInt(searchParams.get('_count') || '50');
+    const count = parseInt(searchParams.get('_count') || '1000'); // Increased default to fetch all communications
     
     // For providers, we need to query differently since we don't have a specific practitioner ID
     // Providers should see all communications in the system (clinic-wide view)
