@@ -1,5 +1,5 @@
 import { FHIRClient } from '../client';
-import type { Patient, Condition, MedicationRequest, Observation, AllergyIntolerance, Procedure, FamilyMemberHistory, DiagnosticReport, ServiceRequest, Bundle, Encounter } from '../../../../types/fhir';
+import type { Patient, Condition, MedicationRequest, MedicationDispense, Observation, AllergyIntolerance, Procedure, FamilyMemberHistory, DiagnosticReport, ServiceRequest, Bundle, Encounter, ExplanationOfBenefit } from '../../../../types/fhir';
 
 // Inline Coverage type to avoid import issues
 interface Coverage {
@@ -82,6 +82,19 @@ export async function getPatientMedications(
 }
 
 /**
+ * Get patient medication dispenses (actual medication dispensing records)
+ */
+export async function getPatientMedicationDispenses(
+  token: string,
+  fhirBaseUrl: string,
+  patientId: string
+): Promise<Bundle<MedicationDispense>> {
+  const url = `${fhirBaseUrl}/MedicationDispense?patient=${patientId}`;
+  const response = await FHIRClient.fetchWithAuth(url, token);
+  return response.json();
+}
+
+/**
  * Get patient observations
  */
 export async function getPatientObservations(
@@ -102,7 +115,8 @@ export async function getPatientAllergies(
   fhirBaseUrl: string,
   patientId: string
 ): Promise<Bundle<AllergyIntolerance>> {
-  const url = `${fhirBaseUrl}/AllergyIntolerance?patient=${patientId}`;
+  // Use Patient/{id} format as required by FHIR specification
+  const url = `${fhirBaseUrl}/AllergyIntolerance?patient=Patient/${patientId}`;
   const response = await FHIRClient.fetchWithAuth(url, token);
   return response.json();
 }
@@ -211,6 +225,19 @@ export async function getOrganization(
   organizationId: string
 ): Promise<any> {
   const url = `${fhirBaseUrl}/Organization/${organizationId}`;
+  const response = await FHIRClient.fetchWithAuth(url, token);
+  return response.json();
+}
+
+/**
+ * Get ExplanationOfBenefit records for a patient
+ */
+export async function getPatientExplanationOfBenefit(
+  token: string,
+  fhirBaseUrl: string,
+  patientId: string
+): Promise<Bundle<ExplanationOfBenefit>> {
+  const url = `${fhirBaseUrl}/ExplanationOfBenefit?patient=${patientId}`;
   const response = await FHIRClient.fetchWithAuth(url, token);
   return response.json();
 }

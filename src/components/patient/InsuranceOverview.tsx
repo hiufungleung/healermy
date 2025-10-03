@@ -3,7 +3,7 @@
 import React from 'react';
 import { Card } from '@/components/common/Card';
 import { Badge } from '@/components/common/Badge';
-import type { Coverage } from '@/types/fhir';
+import type { Coverage, ExplanationOfBenefit } from '@/types/fhir';
 import type { CoverageDetails } from '@/app/api/fhir/patients/[id]/coverage/operations';
 
 interface Account {
@@ -49,6 +49,7 @@ interface Organization {
 
 interface InsuranceOverviewProps {
   coverage: Coverage[];
+  explanationOfBenefit?: ExplanationOfBenefit[];
   accounts?: Account[];
   organizations?: Record<string, Organization>;
   loading: boolean;
@@ -56,6 +57,7 @@ interface InsuranceOverviewProps {
 
 export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
   coverage,
+  explanationOfBenefit = [],
   accounts = [],
   organizations = {},
   loading
@@ -74,6 +76,11 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
     // Extract insurer name from payor
     if (cov.payor?.[0]?.display) {
       details.insurerName = cov.payor[0].display;
+    }
+
+    // Try to get payor reference for organization lookup
+    if (cov.payor?.[0]?.reference) {
+      details.insurerName = details.insurerName || cov.payor[0].reference;
     }
 
     // Extract plan information from class
@@ -118,6 +125,105 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
 
     return details;
   };
+
+  // Check if coverage is expired
+  const isCoverageExpired = (cov: Coverage): boolean => {
+    if (!cov.period?.end) return false;
+    return new Date(cov.period.end) < new Date();
+  };
+
+  // Get coverage type display name
+  const getCoverageType = (cov: Coverage): string => {
+    return cov.type?.coding?.[0]?.display ||
+           cov.type?.text ||
+           'Insurance Coverage';
+  };
+
+  // Calculate financial summary from EOB data
+  const calculateFinancialSummary = () => {
+    if (!explanationOfBenefit || explanationOfBenefit.length === 0) {
+      return null;
+    }
+
+    let totalBilled = 0;
+    let insurancePaid = 0;
+    let patientPaid = 0;
+    const claimCount = explanationOfBenefit.length;
+
+    // Get current year for filtering
+    const currentYear = new Date().getFullYear();
+
+    // Filter claims from current year
+    const currentYearClaims = explanationOfBenefit.filter(eob => {
+      if (!eob.created) return false;
+      const claimYear = new Date(eob.created).getFullYear();
+      return claimYear === currentYear;
+    });
+
+    currentYearClaims.forEach(eob => {
+      // Calculate from total field
+      if (eob.total) {
+        eob.total.forEach(t => {
+          const code = t.category?.coding?.[0]?.code?.toLowerCase();
+          const amount = t.amount?.value || 0;
+
+          if (code === 'submitted' || code === 'benefit') {
+            totalBilled += amount;
+          } else if (code === 'payment') {
+            insurancePaid += amount;
+          }
+        });
+      }
+
+      // Calculate patient responsibility from payment field
+      if (eob.payment?.amount?.value) {
+        const paymentAmount = eob.payment.amount.value;
+        // If payment type indicates patient payment
+        if (eob.payment.type?.coding?.[0]?.code === 'complete') {
+          insurancePaid += paymentAmount;
+        }
+      }
+
+      // Calculate from items if totals not available
+      if (!eob.total && eob.item) {
+        eob.item.forEach(item => {
+          // Add item net cost to total
+          if (item.net?.value) {
+            totalBilled += item.net.value;
+          }
+
+          // Check adjudication for insurance vs patient costs
+          if (item.adjudication) {
+            item.adjudication.forEach(adj => {
+              const adjCode = adj.category?.coding?.[0]?.code?.toLowerCase();
+              const adjAmount = adj.amount?.value || 0;
+
+              if (adjCode === 'benefit' || adjCode === 'paid') {
+                insurancePaid += adjAmount;
+              } else if (adjCode === 'copay' || adjCode === 'deductible' || adjCode === 'patient') {
+                patientPaid += adjAmount;
+              }
+            });
+          }
+        });
+      }
+    });
+
+    // Calculate patient paid as difference if not explicitly provided
+    if (patientPaid === 0 && totalBilled > 0 && insurancePaid > 0) {
+      patientPaid = totalBilled - insurancePaid;
+    }
+
+    return {
+      claimCount: currentYearClaims.length,
+      totalBilled,
+      insurancePaid,
+      patientPaid,
+      year: currentYear
+    };
+  };
+
+  const financialSummary = calculateFinancialSummary();
 
   const activeCoverage = coverage.filter(cov => cov.status === 'active');
   const primaryCoverage = activeCoverage.sort((a, b) => {
@@ -193,6 +299,66 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
         </Card>
       ) : (
         <div className="space-y-4">
+          {/* Financial Summary from EOB */}
+          {financialSummary && (
+            <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
+              <div className="mb-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M6,16.5L3,19.44V11H6M11,14.66L9.43,13.32L8,14.64V7H11M16,13L13,16V3H16M18.81,12.81L17,11H22V16L20.21,14.21L13,21.36L9.53,18.34L5.75,22H3L9.47,15.66L13,18.64"/>
+                    </svg>
+                    {financialSummary.year} Financial Summary
+                  </h3>
+                  <Badge variant="success" size="sm">
+                    {financialSummary.claimCount} {financialSummary.claimCount === 1 ? 'Claim' : 'Claims'}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Total Billed */}
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="text-sm font-medium text-gray-600 mb-1">Total Billed</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    ${financialSummary.totalBilled.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    All medical services
+                  </div>
+                </div>
+
+                {/* Insurance Paid */}
+                <div className="bg-white rounded-lg p-4 border border-green-200">
+                  <div className="text-sm font-medium text-green-700 mb-1">Insurance Paid</div>
+                  <div className="text-2xl font-bold text-green-600">
+                    ${financialSummary.insurancePaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-xs text-green-600 mt-1">
+                    {financialSummary.totalBilled > 0 ?
+                      `${Math.round((financialSummary.insurancePaid / financialSummary.totalBilled) * 100)}% covered` :
+                      '0% covered'
+                    }
+                  </div>
+                </div>
+
+                {/* You Paid */}
+                <div className="bg-white rounded-lg p-4 border border-orange-200">
+                  <div className="text-sm font-medium text-orange-700 mb-1">You Paid</div>
+                  <div className="text-2xl font-bold text-orange-600">
+                    ${financialSummary.patientPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-xs text-orange-600 mt-1">
+                    {financialSummary.totalBilled > 0 ?
+                      `${Math.round((financialSummary.patientPaid / financialSummary.totalBilled) * 100)}% responsibility` :
+                      '0% responsibility'
+                    }
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* Primary Coverage Summary */}
           {primaryCoverage && (
             <Card className="border-blue-200 bg-blue-50">
@@ -212,79 +378,252 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
 
               {(() => {
                 const details = extractCoverageDetails(primaryCoverage);
+                const isExpired = isCoverageExpired(primaryCoverage);
+                const coverageType = getCoverageType(primaryCoverage);
+                const planNumber = primaryCoverage.identifier?.[0]?.value;
+
                 return (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                      <h4 className="font-medium text-gray-800 mb-2">Insurance Company</h4>
-                      <p className="text-sm text-gray-600">
-                        {details.insurerName || 'Not specified'}
-                      </p>
-                    </div>
-
-                    <div>
-                      <h4 className="font-medium text-gray-800 mb-2">Plan Name</h4>
-                      <p className="text-sm text-gray-600">
-                        {details.planName || 'Not specified'}
-                      </p>
-                    </div>
-
-                    <div>
-                      <h4 className="font-medium text-gray-800 mb-2">Member ID</h4>
-                      <p className="text-sm text-gray-600 font-mono">
-                        {details.subscriberId || 'Not specified'}
-                      </p>
-                    </div>
-
-                    {details.groupNumber && (
-                      <div>
-                        <h4 className="font-medium text-gray-800 mb-2">Group Number</h4>
-                        <p className="text-sm text-gray-600 font-mono">
-                          {details.groupNumber}
-                        </p>
-                      </div>
-                    )}
-
-                    {details.network && (
-                      <div>
-                        <h4 className="font-medium text-gray-800 mb-2">Network</h4>
-                        <p className="text-sm text-gray-600">
-                          {details.network}
-                        </p>
-                      </div>
-                    )}
-
-                    {details.effectivePeriod && (
-                      <div>
-                        <h4 className="font-medium text-gray-800 mb-2">Coverage Period</h4>
-                        <p className="text-sm text-gray-600">
-                          {details.effectivePeriod.start ?
-                            new Date(details.effectivePeriod.start).toLocaleDateString() :
-                            'Not specified'
-                          }
-                          {details.effectivePeriod.end ?
-                            ` - ${new Date(details.effectivePeriod.end).toLocaleDateString()}` :
-                            ' - Ongoing'
-                          }
-                        </p>
-                      </div>
-                    )}
-
-                    {(details.copay || details.deductible) && (
-                      <div className="md:col-span-2 lg:col-span-3">
-                        <h4 className="font-medium text-gray-800 mb-2">Cost Information</h4>
-                        <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                          {details.copay && (
-                            <span>Copay: {details.copay}</span>
-                          )}
-                          {details.deductible && (
-                            <span>Deductible: {details.deductible}</span>
-                          )}
+                  <>
+                    {/* Expiration Warning */}
+                    {isExpired && (
+                      <div className="mb-4 p-3 bg-orange-100 border border-orange-300 rounded-lg">
+                        <div className="flex items-center text-orange-800">
+                          <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12,2L1,21H23M12,6L19.53,19H4.47M11,10V14H13V10M11,16V18H13V16" />
+                          </svg>
+                          <span className="font-medium">This coverage expired on {new Date(primaryCoverage.period?.end!).toLocaleDateString()}</span>
                         </div>
                       </div>
                     )}
-                  </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {/* Insurance Type */}
+                      <div>
+                        <h4 className="font-medium text-gray-800 mb-2">Insurance Type</h4>
+                        <p className="text-sm text-gray-600">
+                          {coverageType}
+                        </p>
+                      </div>
+
+                      {/* Insurance Company */}
+                      <div>
+                        <h4 className="font-medium text-gray-800 mb-2">Insurance Company</h4>
+                        <p className="text-sm text-gray-600">
+                          {details.insurerName || 'Not specified'}
+                        </p>
+                      </div>
+
+                      {/* Plan Number */}
+                      {planNumber && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Plan Number</h4>
+                          <p className="text-sm text-gray-600 font-mono">
+                            {planNumber}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Policy Holder */}
+                      {primaryCoverage.policyHolder?.display && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Policy Holder</h4>
+                          <p className="text-sm text-gray-600">
+                            {primaryCoverage.policyHolder.display}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Subscriber */}
+                      {primaryCoverage.subscriber?.display && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Subscriber</h4>
+                          <p className="text-sm text-gray-600">
+                            {primaryCoverage.subscriber.display}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Relationship */}
+                      {primaryCoverage.relationship?.coding?.[0]?.display && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Relationship</h4>
+                          <p className="text-sm text-gray-600">
+                            {primaryCoverage.relationship.coding[0].display}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Coverage Period */}
+                      {details.effectivePeriod && (
+                        <div className="md:col-span-2 lg:col-span-3">
+                          <h4 className="font-medium text-gray-800 mb-2">Coverage Period</h4>
+                          <p className="text-sm text-gray-600">
+                            {details.effectivePeriod.start ?
+                              new Date(details.effectivePeriod.start).toLocaleDateString() :
+                              'Not specified'
+                            }
+                            {details.effectivePeriod.end ?
+                              ` - ${new Date(details.effectivePeriod.end).toLocaleDateString()}` :
+                              ' - Ongoing'
+                            }
+                            {isExpired && (
+                              <span className="ml-2 text-orange-600 font-medium">(Expired)</span>
+                            )}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Member ID */}
+                      {details.subscriberId && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Member ID</h4>
+                          <p className="text-sm text-gray-600 font-mono">
+                            {details.subscriberId}
+                          </p>
+                        </div>
+                      )}
+
+                      {details.groupNumber && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Group Number</h4>
+                          <p className="text-sm text-gray-600 font-mono">
+                            {details.groupNumber}
+                          </p>
+                        </div>
+                      )}
+
+                      {details.network && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Network</h4>
+                          <p className="text-sm text-gray-600">
+                            {details.network}
+                          </p>
+                        </div>
+                      )}
+
+                      {details.planName && (
+                        <div>
+                          <h4 className="font-medium text-gray-800 mb-2">Plan Name</h4>
+                          <p className="text-sm text-gray-600">
+                            {details.planName}
+                          </p>
+                        </div>
+                      )}
+
+                      {(details.copay || details.deductible) && (
+                        <div className="md:col-span-2 lg:col-span-3">
+                          <h4 className="font-medium text-gray-800 mb-2">Cost Information</h4>
+                          <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+                            {details.copay && (
+                              <span>Copay: {details.copay}</span>
+                            )}
+                            {details.deductible && (
+                              <span>Deductible: {details.deductible}</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 );
               })()}
+            </Card>
+          )}
+
+          {/* Recent Claims */}
+          {explanationOfBenefit && explanationOfBenefit.length > 0 && (
+            <Card>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center justify-between">
+                <span>Recent Claims</span>
+                {explanationOfBenefit.length > 5 && (
+                  <span className="text-sm font-normal text-gray-500">
+                    Showing latest 5 of {explanationOfBenefit.length}
+                  </span>
+                )}
+              </h3>
+              <div className="space-y-3">
+                {explanationOfBenefit
+                  .sort((a, b) => {
+                    const dateA = a.created ? new Date(a.created).getTime() : 0;
+                    const dateB = b.created ? new Date(b.created).getTime() : 0;
+                    return dateB - dateA;
+                  })
+                  .slice(0, 5)
+                  .map((eob, index) => {
+                    // Get claim amount
+                    const totalAmount = eob.total?.find(t =>
+                      t.category?.coding?.[0]?.code?.toLowerCase() === 'submitted' ||
+                      t.category?.coding?.[0]?.code?.toLowerCase() === 'benefit'
+                    )?.amount?.value || 0;
+
+                    const insurancePaid = eob.total?.find(t =>
+                      t.category?.coding?.[0]?.code?.toLowerCase() === 'payment'
+                    )?.amount?.value || eob.payment?.amount?.value || 0;
+
+                    const patientPaid = totalAmount - insurancePaid;
+
+                    // Get service description
+                    const serviceDescription = eob.type?.coding?.[0]?.display ||
+                                              eob.type?.text ||
+                                              eob.item?.[0]?.productOrService?.text ||
+                                              'Medical Service';
+
+                    const outcomeVariant = eob.outcome === 'complete' ? 'success' :
+                                          eob.outcome === 'error' ? 'danger' :
+                                          eob.outcome === 'partial' ? 'warning' : 'info';
+
+                    return (
+                      <div
+                        key={eob.id}
+                        className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-white transition-colors"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium text-gray-900">{serviceDescription}</h4>
+                              {eob.outcome && (
+                                <Badge variant={outcomeVariant} size="sm">
+                                  {eob.outcome}
+                                </Badge>
+                              )}
+                            </div>
+                            {eob.created && (
+                              <p className="text-sm text-gray-600 mt-1">
+                                {new Date(eob.created).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            )}
+                            {eob.provider?.display && (
+                              <p className="text-sm text-gray-500 mt-1">
+                                Provider: {eob.provider.display}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right ml-4">
+                            {totalAmount > 0 && (
+                              <>
+                                <div className="text-lg font-bold text-gray-900">
+                                  ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </div>
+                                <div className="text-xs text-green-600">
+                                  Insurance: ${insurancePaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </div>
+                                {patientPaid > 0 && (
+                                  <div className="text-xs text-orange-600">
+                                    You paid: ${patientPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
             </Card>
           )}
 
@@ -298,21 +637,29 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
                 {coverage.map((cov, index) => {
                   const details = extractCoverageDetails(cov);
                   const isPrimary = cov.id === primaryCoverage?.id;
+                  const isExpired = isCoverageExpired(cov);
+                  const coverageType = getCoverageType(cov);
+                  const planNumber = cov.identifier?.[0]?.value;
 
                   return (
                     <div
                       key={cov.id}
                       className={`p-4 rounded-lg border ${
-                        isPrimary ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'
+                        isPrimary ? 'border-blue-200 bg-blue-50' :
+                        isExpired ? 'border-gray-300 bg-gray-100' :
+                        'border-gray-200 bg-gray-50'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center">
                           {getKindIcon(cov.kind)}
                           <span className="ml-2 font-medium text-gray-900">
-                            {details.insurerName || `Coverage ${index + 1}`}
+                            {coverageType}
                             {isPrimary && (
                               <Badge variant="info" size="sm" className="ml-2">Primary</Badge>
+                            )}
+                            {isExpired && (
+                              <Badge variant="warning" size="sm" className="ml-2">Expired</Badge>
                             )}
                           </span>
                         </div>
@@ -321,16 +668,35 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
                         </Badge>
                       </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-gray-600">
-                        <span>Type: {cov.kind}</span>
-                        {details.subscriberId && (
-                          <span>ID: {details.subscriberId}</span>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
+                        {cov.policyHolder?.display && (
+                          <div>
+                            <span className="font-medium">Policy Holder:</span> {cov.policyHolder.display}
+                          </div>
                         )}
-                        {details.planName && (
-                          <span>Plan: {details.planName}</span>
+                        {cov.subscriber?.display && (
+                          <div>
+                            <span className="font-medium">Subscriber:</span> {cov.subscriber.display}
+                          </div>
                         )}
-                        {cov.order && (
-                          <span>Order: {cov.order}</span>
+                        {planNumber && (
+                          <div>
+                            <span className="font-medium">Plan #:</span> <span className="font-mono">{planNumber}</span>
+                          </div>
+                        )}
+                        {cov.relationship?.coding?.[0]?.display && (
+                          <div>
+                            <span className="font-medium">Relationship:</span> {cov.relationship.coding[0].display}
+                          </div>
+                        )}
+                        {cov.period && (
+                          <div className="md:col-span-2">
+                            <span className="font-medium">Period:</span>{' '}
+                            {cov.period.start ? new Date(cov.period.start).toLocaleDateString() : 'N/A'}
+                            {' - '}
+                            {cov.period.end ? new Date(cov.period.end).toLocaleDateString() : 'Ongoing'}
+                            {isExpired && <span className="ml-1 text-orange-600">(Expired)</span>}
+                          </div>
                         )}
                       </div>
                     </div>

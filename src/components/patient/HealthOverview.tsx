@@ -83,50 +83,61 @@ export const HealthOverview: React.FC<HealthOverviewProps> = ({
         ) : (
           <div className="space-y-4">
             {/* Overall Health Status */}
-            <div className="flex items-center justify-between pb-6 mb-6 border-b border-gray-200">
-              <div className="flex items-center space-x-3">
-                <div className={`p-3 rounded-full ${
-                  healthStatus.status === 'success' ? 'bg-green-100' :
-                  healthStatus.status === 'warning' ? 'bg-yellow-100' : 'bg-blue-100'
+            <div className="flex items-center justify-between pb-4 mb-4">
+              <div className="flex items-center space-x-4">
+                <div className={`p-4 rounded-xl ${
+                  healthStatus.status === 'success' ? 'bg-green-50' :
+                  healthStatus.status === 'warning' ? 'bg-yellow-50' : 'bg-blue-50'
                 }`}>
                   {healthStatus.status === 'success' ? (
-                    <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   ) : healthStatus.status === 'warning' ? (
-                    <svg className="w-6 h-6 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-8 h-8 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
                   ) : (
-                    <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                     </svg>
                   )}
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800">
+                  <h3 className="text-2xl font-bold text-gray-900">
                     Overall Health Status
                   </h3>
-                  <p className="text-sm text-gray-600">{healthStatus.reason}</p>
+                  <p className="text-base text-gray-600 mt-1">{healthStatus.reason}</p>
                 </div>
               </div>
-              <Badge
-                variant={healthStatus.status as 'success' | 'warning' | 'info'}
-                size="lg"
-              >
+              <div className={`px-6 py-3 rounded-lg font-semibold text-lg ${
+                healthStatus.status === 'success'
+                  ? 'bg-green-100 text-green-800'
+                  : healthStatus.status === 'warning'
+                  ? 'bg-yellow-100 text-yellow-800'
+                  : 'bg-blue-100 text-blue-800'
+              }`}>
                 {healthStatus.text}
-              </Badge>
+              </div>
             </div>
 
             {/* Key Health Information Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
               {/* Current Conditions */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-sm transition-shadow">
-                <div className="flex items-center mb-2">
-                  <svg className="w-5 h-5 text-red-600 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 3h-4v2h4V6z"/>
-                  </svg>
-                  <h4 className="font-medium text-gray-800">Current Diagnosis</h4>
+              <button
+                onClick={() => {
+                  const element = document.querySelector('[data-section="conditions"]');
+                  element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="bg-white rounded-xl p-5 border-2 border-gray-100 hover:border-red-200 hover:shadow-md transition-all cursor-pointer text-left w-full"
+              >
+                <div className="flex items-center mb-3">
+                  <div className="p-2 bg-red-50 rounded-lg mr-3">
+                    <svg className="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 3h-4v2h4V6z"/>
+                    </svg>
+                  </div>
+                  <h4 className="font-semibold text-gray-900">Diagnosis</h4>
                 </div>
                 {getLatestCondition() ? (
                   <div>
@@ -145,15 +156,23 @@ export const HealthOverview: React.FC<HealthOverviewProps> = ({
                 ) : (
                   <p className="text-sm text-gray-500">No Records</p>
                 )}
-              </div>
+              </button>
 
               {/* Critical Allergies */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-sm transition-shadow">
-                <div className="flex items-center mb-2">
-                  <svg className="w-5 h-5 text-orange-600 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                  </svg>
-                  <h4 className="font-medium text-gray-800">Critical Allergies</h4>
+              <button
+                onClick={() => {
+                  const element = document.querySelector('[data-section="allergies"]');
+                  element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="bg-white rounded-xl p-5 border-2 border-gray-100 hover:border-orange-200 hover:shadow-md transition-all cursor-pointer text-left w-full"
+              >
+                <div className="flex items-center mb-3">
+                  <div className="p-2 bg-orange-50 rounded-lg mr-3">
+                    <svg className="w-6 h-6 text-orange-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                  </div>
+                  <h4 className="font-semibold text-gray-900">Allergies</h4>
                 </div>
                 {getCriticalAllergies().length > 0 ? (
                   <div className="space-y-1">
@@ -173,29 +192,41 @@ export const HealthOverview: React.FC<HealthOverviewProps> = ({
                 ) : (
                   <p className="text-sm text-gray-500">No Allergy Records</p>
                 )}
-              </div>
+              </button>
 
               {/* Active Medications */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-sm transition-shadow">
-                <div className="flex items-center mb-2">
-                  <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M17,8C8,10 5.9,16.17 3.82,21.34L5.71,22L6.66,19.7C7.14,19.87 7.64,20 8,20C19,20 22,3 22,3C21,5 14,5.25 9,6.25C4,7.25 2,11.5 2,13.5C2,15.5 3.75,17.25 7,18C8,17 20,16 20,16C20,16 17,8 17,8Z"/>
-                  </svg>
-                  <h4 className="font-medium text-gray-800">Current Medications</h4>
+              <button
+                onClick={() => {
+                  const element = document.querySelector('[data-section="medications"]');
+                  element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="bg-white rounded-xl p-5 border-2 border-gray-100 hover:border-green-200 hover:shadow-md transition-all cursor-pointer text-left w-full"
+              >
+                <div className="flex items-center mb-3">
+                  <div className="p-2 bg-green-50 rounded-lg mr-3">
+                    <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M17,8C8,10 5.9,16.17 3.82,21.34L5.71,22L6.66,19.7C7.14,19.87 7.64,20 8,20C19,20 22,3 22,3C21,5 14,5.25 9,6.25C4,7.25 2,11.5 2,13.5C2,15.5 3.75,17.25 7,18C8,17 20,16 20,16C20,16 17,8 17,8Z"/>
+                    </svg>
+                  </div>
+                  <h4 className="font-semibold text-gray-900">Medications</h4>
                 </div>
                 {getActiveMedications().length > 0 ? (
-                  <div className="space-y-1">
-                    {getActiveMedications().map((medication, index) => (
-                      <div key={index} className="text-sm">
-                        <p className="font-medium text-gray-900">
-                          {medication.medicationCodeableConcept?.text ||
-                           medication.medicationCodeableConcept?.coding?.[0]?.display ||
-                           'Unknown Medication'}
-                        </p>
-                      </div>
-                    ))}
+                  <div className="space-y-2">
+                    {getActiveMedications().map((medication, index) => {
+                      const medName = medication.medicationCodeableConcept?.text ||
+                                     medication.medicationCodeableConcept?.coding?.[0]?.display ||
+                                     'Unknown Medication';
+
+                      return (
+                        <div key={index} className="text-sm">
+                          <p className="font-medium text-gray-900 truncate" title={medName}>
+                            {medName}
+                          </p>
+                        </div>
+                      );
+                    })}
                     {medications.filter(m => m.status === 'active').length > 3 && (
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 mt-2">
                         +{medications.filter(m => m.status === 'active').length - 3} other medications
                       </p>
                     )}
@@ -203,15 +234,23 @@ export const HealthOverview: React.FC<HealthOverviewProps> = ({
                 ) : (
                   <p className="text-sm text-gray-500">No Current Medications</p>
                 )}
-              </div>
+              </button>
 
               {/* Recent Procedures */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-sm transition-shadow">
-                <div className="flex items-center mb-2">
-                  <svg className="w-5 h-5 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M19,3H5C3.9,3 3,3.9 3,5V19C3,20.1 3.9,21 5,21H19C20.1,21 21,20.1 21,19V5C21,3.9 20.1,3 19,3M12,6C13.93,6 15.5,7.57 15.5,9.5C15.5,11.43 13.93,13 12,13C10.07,13 8.5,11.43 8.5,9.5C8.5,7.57 10.07,6 12,6M7,18C7,15.34 9.34,14 12,14C14.66,14 17,15.34 17,18V19H7V18Z"/>
-                  </svg>
-                  <h4 className="font-medium text-gray-800">Recent Procedures</h4>
+              <button
+                onClick={() => {
+                  const element = document.querySelector('[data-section="procedures"]');
+                  element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="bg-white rounded-xl p-5 border-2 border-gray-100 hover:border-blue-200 hover:shadow-md transition-all cursor-pointer text-left w-full"
+              >
+                <div className="flex items-center mb-3">
+                  <div className="p-2 bg-blue-50 rounded-lg mr-3">
+                    <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M19,3H5C3.9,3 3,3.9 3,5V19C3,20.1 3.9,21 5,21H19C20.1,21 21,20.1 21,19V5C21,3.9 20.1,3 19,3M12,6C13.93,6 15.5,7.57 15.5,9.5C15.5,11.43 13.93,13 12,13C10.07,13 8.5,11.43 8.5,9.5C8.5,7.57 10.07,6 12,6M7,18C7,15.34 9.34,14 12,14C14.66,14 17,15.34 17,18V19H7V18Z"/>
+                    </svg>
+                  </div>
+                  <h4 className="font-semibold text-gray-900">Procedures</h4>
                 </div>
                 {getLatestProcedure() ? (
                   <div>
@@ -236,7 +275,7 @@ export const HealthOverview: React.FC<HealthOverviewProps> = ({
                 ) : (
                   <p className="text-sm text-gray-500">No Procedure Records</p>
                 )}
-              </div>
+              </button>
             </div>
 
             {/* Quick Stats */}
