@@ -302,3 +302,59 @@ export interface MedicationRequest {
     text?: string;
   }>;
 }
+
+export interface Organization {
+  resourceType: 'Organization';
+  id: string;
+  active?: boolean;
+  type?: Array<{
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  }>;
+  name?: string;
+  alias?: string[];
+  telecom?: Array<{
+    system?: string;
+    value?: string;
+    use?: string;
+  }>;
+  address?: Array<{
+    use?: string;
+    type?: string;
+    text?: string;
+    line?: string[];
+    city?: string;
+    district?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
+  }>;
+  contact?: Array<{
+    purpose?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+    };
+    name?: {
+      text?: string;
+    };
+    telecom?: Array<{
+      system?: string;
+      value?: string;
+      use?: string;
+    }>;
+    address?: {
+      line?: string[];
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      country?: string;
+    };
+  }>;
+}
