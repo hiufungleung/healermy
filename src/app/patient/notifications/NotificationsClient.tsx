@@ -24,16 +24,6 @@ interface Communication {
   }>;
 }
 
-interface StaticNotification {
-  id: string;
-  type: 'appointment_confirmed' | 'appointment_reminder' | 'test_results' | 'message' | 'system';
-  title: string;
-  message: string;
-  timestamp: string;
-  read: boolean;
-  actionRequired?: boolean;
-}
-
 interface NotificationsClientProps {
   session: { patient: string; accessToken: string; fhirBaseUrl: string; [key: string]: any };
 }
@@ -67,14 +57,15 @@ export default function NotificationsClient({
           setPatient(patientData);
         }
 
-        // Fetch communications
-        const communicationsResponse = await fetch(`/api/fhir/communications?patient=${session.patient}`, {
+        // Fetch communications (API automatically filters by current patient via session)
+        const communicationsResponse = await fetch(`/api/fhir/communications`, {
           credentials: 'include',
         });
 
         if (communicationsResponse.ok) {
           const communicationsData = await communicationsResponse.json();
-          const communications = communicationsData.communications || [];
+          // Extract communications from FHIR Bundle format
+          const communications = (communicationsData.entry || []).map((entry: any) => entry.resource);
           setLocalCommunications(communications);
         }
       } catch (error) {
@@ -111,64 +102,6 @@ export default function NotificationsClient({
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
-  
-  // Static notifications data (initial data)
-  const initialStaticNotifications: StaticNotification[] = [
-    {
-      id: 'static-1',
-      type: 'appointment_confirmed',
-      title: 'Appointment Confirmed',
-      message: 'Your appointment with Dr. Sarah Johnson on Jan 15, 2025 at 10:30 AM has been confirmed.',
-      timestamp: '2025-01-12T14:30:00Z',
-      read: false,
-      actionRequired: false
-    },
-    {
-      id: 'static-2',
-      type: 'appointment_reminder',
-      title: 'Appointment Reminder',
-      message: 'You have an upcoming appointment with Dr. Michael Chen tomorrow at 2:15 PM.',
-      timestamp: '2025-01-11T09:00:00Z',
-      read: false,
-      actionRequired: false
-    },
-    {
-      id: 'static-3',
-      type: 'test_results',
-      title: 'New Test Results Available',
-      message: 'Your blood test results from your visit on Jan 8 are now available.',
-      timestamp: '2025-01-10T16:45:00Z',
-      read: true,
-      actionRequired: true
-    },
-    {
-      id: 'static-4',
-      type: 'message',
-      title: 'Message from Dr. Rodriguez',
-      message: 'Please schedule a follow-up appointment to discuss your recent test results.',
-      timestamp: '2025-01-09T11:20:00Z',
-      read: false,
-      actionRequired: true
-    },
-    {
-      id: 'static-5',
-      type: 'system',
-      title: 'System Maintenance',
-      message: 'Scheduled maintenance on Jan 15 from 2:00 AM - 4:00 AM. Some features may be temporarily unavailable.',
-      timestamp: '2025-01-08T10:00:00Z',
-      read: true,
-      actionRequired: false
-    }
-  ];
-
-  const [staticNotifications, setStaticNotifications] = useState<StaticNotification[]>([]);
-
-  // Initialize static notifications, filtering out deleted ones
-  useEffect(() => {
-    const deletedIds = JSON.parse(localStorage.getItem('deletedStaticNotifications') || '[]');
-    const filteredNotifications = initialStaticNotifications.filter(notif => !deletedIds.includes(notif.id));
-    setStaticNotifications(filteredNotifications);
   }, []);
 
   // Function to check if message is read
@@ -226,20 +159,11 @@ export default function NotificationsClient({
     }
   };
 
-  // Function to mark static notification as read
-  const markStaticAsRead = (id: string) => {
-    setStaticNotifications(prev =>
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
-
-    // Dispatch event to update notification bell
-    window.dispatchEvent(new CustomEvent('messageUpdate'));
-  };
 
   const markAllAsRead = () => {
     const unreadMessages = localCommunications.filter(comm => !isMessageRead(comm));
-    
-    setLocalCommunications(prev => 
+
+    setLocalCommunications(prev =>
       prev.map(comm => ({
         ...comm,
         extension: [
@@ -251,9 +175,6 @@ export default function NotificationsClient({
         ]
       }))
     );
-
-    // Mark all static notifications as read
-    setStaticNotifications(prev => prev.map(n => ({ ...n, read: true })));
 
     // Mark all as read on server
     unreadMessages.forEach(comm => {
@@ -344,58 +265,7 @@ export default function NotificationsClient({
     }
   };
 
-  const deleteStaticNotification = (id: string) => {
-    setStaticNotifications(prev => prev.filter(n => n.id !== id));
 
-    // Store deleted notification IDs in localStorage for persistence
-    const deletedIds = JSON.parse(localStorage.getItem('deletedStaticNotifications') || '[]');
-    const updatedDeletedIds = [...deletedIds, id];
-    localStorage.setItem('deletedStaticNotifications', JSON.stringify(updatedDeletedIds));
-
-    // Dispatch event to update notification bell
-    window.dispatchEvent(new CustomEvent('messageUpdate'));
-  };
-
-  const getStaticNotificationIcon = (type: StaticNotification['type']) => {
-    switch (type) {
-      case 'appointment_confirmed':
-        return (
-          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        );
-      case 'appointment_reminder':
-        return (
-          <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        );
-      case 'test_results':
-        return (
-          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-          </svg>
-        );
-      case 'message':
-        return (
-          <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-          </svg>
-        );
-      case 'system':
-        return (
-          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        );
-      default:
-        return (
-          <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-          </svg>
-        );
-    }
-  };
 
   const getNotificationIcon = (comm: Communication) => {
     const category = comm.category?.[0]?.text;
@@ -551,13 +421,13 @@ export default function NotificationsClient({
     }
   };
 
-  // Filter and combine both communication types
+  // Filter communications
   const filteredCommunications = localCommunications.filter(comm => {
     const patientRef = `Patient/${patient?.id}`;
     const isReceived = comm.recipient?.some(r => r.reference === patientRef);
     const isSent = comm.sender?.reference === patientRef;
     const category = comm.category?.[0]?.text;
-    
+
     switch (activeFilter) {
       case 'unread':
         return !isMessageRead(comm);
@@ -569,26 +439,14 @@ export default function NotificationsClient({
     }
   });
 
-  const filteredStaticNotifications = staticNotifications.filter(notif => {
-    switch (activeFilter) {
-      case 'unread':
-        return !notif.read;
-      case 'action_required':
-        return notif.actionRequired;
-      default:
-        return true;
-    }
-  });
-
-  // Combine and sort all notifications by timestamp
-  const allFilteredItems = [
-    ...filteredCommunications.map(comm => ({ type: 'communication' as const, data: comm })),
-    ...filteredStaticNotifications.map(notif => ({ type: 'static' as const, data: notif }))
-  ].sort((a, b) => {
-    const timeA = a.type === 'communication' ? a.data.sent : a.data.timestamp;
-    const timeB = b.type === 'communication' ? b.data.sent : b.data.timestamp;
-    return new Date(timeB || 0).getTime() - new Date(timeA || 0).getTime();
-  });
+  // Sort all notifications by timestamp
+  const allFilteredItems = filteredCommunications
+    .map(comm => ({ type: 'communication' as const, data: comm }))
+    .sort((a, b) => {
+      const timeA = a.data.sent;
+      const timeB = b.data.sent;
+      return new Date(timeB || 0).getTime() - new Date(timeA || 0).getTime();
+    });
 
   // Limit displayed items to displayCount
   const displayedItems = allFilteredItems.slice(0, displayCount);
@@ -599,29 +457,24 @@ export default function NotificationsClient({
     setDisplayCount(prev => prev + 10); // Load 10 more items each time
   };
 
-  // Combined counts for both dynamic and static data
-  const unreadCount = localCommunications.filter(comm => !isMessageRead(comm)).length +
-                     staticNotifications.filter(notif => !notif.read).length;
+  // Counts for communications
+  const unreadCount = localCommunications.filter(comm => !isMessageRead(comm)).length;
   const sentCount = localCommunications.filter(comm => comm.sender?.reference === `Patient/${patient?.id}`).length;
-  const receivedCount = localCommunications.filter(comm => comm.recipient?.some(r => r.reference === `Patient/${patient?.id}`)).length +
-                       staticNotifications.length; // Static notifications are considered "received"
+  const receivedCount = localCommunications.filter(comm => comm.recipient?.some(r => r.reference === `Patient/${patient?.id}`)).length;
 
-  // Action Required count - only messages explicitly marked as requiring action
-  const actionRequiredCount = staticNotifications.filter(notif => notif.actionRequired).length;
+  // Action Required count - Communications don't have actionRequired flag
+  const actionRequiredCount = 0;
 
-  const appointmentCount = localCommunications.filter(comm => comm.category?.[0]?.text === 'appointment-update').length +
-                          staticNotifications.filter(notif => notif.type === 'appointment_confirmed' || notif.type === 'appointment_reminder').length;
-  const systemCount = localCommunications.filter(comm => comm.category?.[0]?.text === 'system-notification').length +
-                     staticNotifications.filter(notif => notif.type === 'system').length;
-  const totalCount = localCommunications.length + staticNotifications.length;
+  const appointmentCount = localCommunications.filter(comm => comm.category?.[0]?.text === 'appointment-update').length;
+  const systemCount = localCommunications.filter(comm => comm.category?.[0]?.text === 'system-notification').length;
+  const totalCount = localCommunications.length;
 
   // Function to get appointment status badge - shows blue "Appointment Status Update" for appointment status changes only
-  const getAppointmentStatusBadge = (message: string, notificationType?: string) => {
+  const getAppointmentStatusBadge = (message: string) => {
     const lowerMessage = message.toLowerCase();
 
     // Only show for actual appointment status updates, not reminders
-    if (notificationType === 'appointment_confirmed' ||
-        lowerMessage.includes('confirmed') ||
+    if (lowerMessage.includes('confirmed') ||
         lowerMessage.includes('cancelled') ||
         lowerMessage.includes('canceled') ||
         lowerMessage.includes('reschedule') ||
@@ -732,245 +585,146 @@ export default function NotificationsClient({
           </Card>
         ) : (
           displayedItems.map((item) => {
-            if (item.type === 'communication') {
-              const comm = item.data;
-              const appointmentInfo = getAppointmentInfo(comm);
-              const isExpanded = selectedMessage?.id === comm.id;
-            
-              return (
-                <Card 
-                  key={comm.id}
-                  className={`hover:shadow-md transition-shadow ${
-                    !isMessageRead(comm) ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
-                  } ${isExpanded ? 'ring-2 ring-primary/20' : ''}`}
+            const comm = item.data;
+            const appointmentInfo = getAppointmentInfo(comm);
+            const isExpanded = selectedMessage?.id === comm.id;
+
+            return (
+              <Card
+                key={comm.id}
+                className={`hover:shadow-md transition-shadow ${
+                  !isMessageRead(comm) ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
+                } ${isExpanded ? 'ring-2 ring-primary/20' : ''}`}
+              >
+                <div
+                  className="flex items-start space-x-4 cursor-pointer"
+                  onClick={() => handleMessageClick(comm)}
                 >
-                  <div 
-                    className="flex items-start space-x-4 cursor-pointer"
-                    onClick={() => handleMessageClick(comm)}
-                  >
-                    {/* Icon */}
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
-                        {getNotificationIcon(comm)}
-                      </div>
+                  {/* Icon */}
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
+                      {getNotificationIcon(comm)}
                     </div>
-                    
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="mb-2">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
-                              <div className="flex items-center space-x-2 mb-1 sm:mb-0">
-                                <h3 className={`font-semibold ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
-                                  {getMessageTitle(comm)}
-                                </h3>
-                                {!isMessageRead(comm) && (
-                                  <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
-                                )}
-                              </div>
-                              <div className="flex flex-wrap gap-1">
-                                <Badge variant="info" size="sm">
-                                  {getCategoryDisplay(comm.category)}
-                                </Badge>
-                              </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="mb-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                            <div className="flex items-center space-x-2 mb-1 sm:mb-0">
+                              <h3 className={`font-semibold ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
+                                {getMessageTitle(comm)}
+                              </h3>
+                              {!isMessageRead(comm) && (
+                                <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              <Badge variant="info" size="sm">
+                                {getCategoryDisplay(comm.category)}
+                              </Badge>
                             </div>
                           </div>
-                          <div className="text-sm text-text-secondary mb-2">
-                            From: {getSenderDisplay(comm)}
-                          </div>
-                          <p className="text-text-secondary text-sm mb-2">
-                            {comm.payload?.[0]?.contentString?.substring(0, 100) || 'No content'}
-                            {(comm.payload?.[0]?.contentString?.length || 0) > 100 && '...'}
-                          </p>
-                          <p className="text-xs text-text-secondary">
-                            {formatDate(comm.sent)}
-                          </p>
                         </div>
-                        
-                        {/* Actions */}
-                        <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 ml-2 sm:ml-4 flex-shrink-0">
-                          {!isMessageRead(comm) && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (comm.id) {
-                                  setLocalCommunications(prev =>
-                                    prev.map(localComm =>
-                                      localComm.id === comm.id
-                                        ? {
-                                            ...localComm,
-                                            extension: [
-                                              ...(localComm.extension || []),
-                                              {
-                                                url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
-                                                valueDateTime: new Date().toISOString()
-                                              }
-                                            ]
-                                          }
-                                        : localComm
-                                    )
-                                  );
-                                  markAsRead(comm.id);
-                                }
-                              }}
-                              className="text-sm text-primary hover:underline"
-                            >
-                              Mark as Read
-                            </button>
-                          )}
+                        <div className="text-sm text-text-secondary mb-2">
+                          From: {getSenderDisplay(comm)}
+                        </div>
+                        <p className="text-text-secondary text-sm mb-2">
+                          {comm.payload?.[0]?.contentString?.substring(0, 100) || 'No content'}
+                          {(comm.payload?.[0]?.contentString?.length || 0) > 100 && '...'}
+                        </p>
+                        <p className="text-xs text-text-secondary">
+                          {formatDate(comm.sent)}
+                        </p>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 ml-2 sm:ml-4 flex-shrink-0">
+                        {!isMessageRead(comm) && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteNotification(comm.id);
+                              if (comm.id) {
+                                setLocalCommunications(prev =>
+                                  prev.map(localComm =>
+                                    localComm.id === comm.id
+                                      ? {
+                                          ...localComm,
+                                          extension: [
+                                            ...(localComm.extension || []),
+                                            {
+                                              url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
+                                              valueDateTime: new Date().toISOString()
+                                            }
+                                          ]
+                                        }
+                                      : localComm
+                                  )
+                                );
+                                markAsRead(comm.id);
+                              }
                             }}
-                            className="text-sm text-text-secondary hover:text-red-600"
+                            className="text-sm text-primary hover:underline"
                           >
-                            Delete
+                            Mark as Read
                           </button>
-                        </div>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNotification(comm.id);
+                          }}
+                          className="text-sm text-text-secondary hover:text-red-600"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
-                    
-                    {/* Expanded Content */}
-                    {isExpanded && (
-                      <div className="mt-4 pt-4 border-t">
-                        <div className="bg-gray-50 rounded-lg p-4 mb-3">
-                          <p className="text-text-primary whitespace-pre-wrap">
-                            {comm.payload?.[0]?.contentString || 'No content available'}
-                          </p>
-                        </div>
-                        
-                        {/* Action Buttons */}
-                        <div className="flex space-x-2">
-                          {appointmentInfo && (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(`/patient/appointments/${appointmentInfo.id}`);
-                              }}
-                            >
-                              View Appointment
-                            </Button>
-                          )}
-                          {comm.category?.[0]?.text === 'manual-message' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // Add reply functionality here
-                              }}
-                            >
-                              Reply
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
-                </Card>
-            );
-            } else {
-              // Static notification
-              const notif = item.data;
-              
-              return (
-                <Card 
-                  key={notif.id}
-                  className={`hover:shadow-md transition-shadow ${
-                    !notif.read ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
-                  }`}
-                >
-                  <div className="flex items-start space-x-4">
-                    {/* Icon */}
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
-                        {getStaticNotificationIcon(notif.type)}
+
+                  {/* Expanded Content */}
+                  {isExpanded && (
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="bg-gray-50 rounded-lg p-4 mb-3">
+                        <p className="text-text-primary whitespace-pre-wrap">
+                          {comm.payload?.[0]?.contentString || 'No content available'}
+                        </p>
                       </div>
-                    </div>
-                    
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="mb-2">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
-                              <div className="flex items-center space-x-2 mb-1 sm:mb-0">
-                                <h3 className={`font-semibold ${!notif.read ? 'text-text-primary' : 'text-text-secondary'}`}>
-                                  {notif.title}
-                                </h3>
-                                {!notif.read && (
-                                  <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
-                                )}
-                              </div>
-                              <div className="flex flex-wrap gap-1">
-                                {notif.actionRequired && (
-                                  <Badge variant="warning" size="sm">
-                                    Action Required
-                                  </Badge>
-                                )}
-                                {getAppointmentStatusBadge(notif.message, notif.type)}
-                              </div>
-                            </div>
-                          </div>
-                          <p className="text-text-secondary text-sm mb-2">
-                            {notif.message.substring(0, 100)}
-                            {notif.message.length > 100 && '...'}
-                          </p>
-                          <p className="text-xs text-text-secondary">
-                            {formatDate(notif.timestamp)}
-                          </p>
-                        </div>
-                        
-                        {/* Actions */}
-                        <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 ml-2 sm:ml-4 flex-shrink-0">
-                          {!notif.read && (
-                            <button
-                              onClick={() => markStaticAsRead(notif.id)}
-                              className="text-sm text-primary hover:underline"
-                            >
-                              Mark as Read
-                            </button>
-                          )}
-                          <button
-                            onClick={() => deleteStaticNotification(notif.id)}
-                            className="text-sm text-text-secondary hover:text-red-600"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                      
+
                       {/* Action Buttons */}
-                      {notif.actionRequired && (
-                        <div className="pt-3 border-t border-gray-100 mt-3">
-                          <div className="flex flex-wrap gap-2">
-                            {notif.type === 'test_results' && (
-                              <Button variant="primary" size="sm">
-                                View Results
-                              </Button>
-                            )}
-                            {notif.type === 'message' && (
-                              <>
-                                <Button variant="primary" size="sm">
-                                  Book Follow-up
-                                </Button>
-                                <Button variant="outline" size="sm">
-                                  Reply
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                      <div className="flex space-x-2">
+                        {appointmentInfo && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/patient/appointments/${appointmentInfo.id}`);
+                            }}
+                          >
+                            View Appointment
+                          </Button>
+                        )}
+                        {comm.category?.[0]?.text === 'manual-message' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Add reply functionality here
+                            }}
+                          >
+                            Reply
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              );
-            }
+                  )}
+                </div>
+              </Card>
+            );
           })
         )}
       </div>
