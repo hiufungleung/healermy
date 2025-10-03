@@ -6,6 +6,7 @@ import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import type { Patient } from '@/types/fhir';
+import type { AuthSession } from '@/types/auth';
 
 interface Communication {
   id: string;
@@ -25,7 +26,7 @@ interface Communication {
 }
 
 interface NotificationsClientProps {
-  session: { patient: string; accessToken: string; fhirBaseUrl: string; [key: string]: any };
+  session: AuthSession;
 }
 
 export default function NotificationsClient({
@@ -47,21 +48,23 @@ export default function NotificationsClient({
       try {
         setLoading(true);
 
-        // Fetch patient data
-        const patientResponse = await fetch(`/api/fhir/patients/${session.patient}`, {
-          credentials: 'include',
-        });
+        // Parallel requests - both APIs called at the same time (faster!)
+        const [patientResponse, communicationsResponse] = await Promise.all([
+          fetch(`/api/fhir/patients/${session.patient}`, {
+            credentials: 'include',
+          }),
+          fetch(`/api/fhir/communications`, {
+            credentials: 'include',
+          })
+        ]);
 
+        // Process patient data
         if (patientResponse.ok) {
           const patientData = await patientResponse.json();
           setPatient(patientData);
         }
 
-        // Fetch communications (API automatically filters by current patient via session)
-        const communicationsResponse = await fetch(`/api/fhir/communications`, {
-          credentials: 'include',
-        });
-
+        // Process communications data
         if (communicationsResponse.ok) {
           const communicationsData = await communicationsResponse.json();
           // Extract communications from FHIR Bundle format
