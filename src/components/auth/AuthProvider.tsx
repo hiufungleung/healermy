@@ -19,17 +19,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   const checkSession = async () => {
-    // Check if session cookies exist before making API call
-    const hasCookies = document.cookie.includes('healermy_tokens') &&
-                       document.cookie.includes('healermy_session');
-
-    if (!hasCookies) {
-      console.log('ℹ️ No session cookies found - skipping API call');
-      return null;
-    }
-
     try {
-      const response = await fetch('/api/auth/session');
+      const response = await fetch('/api/auth/session', {
+        credentials: 'include', // Important: Include HTTP-only cookies
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -39,8 +32,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return data.session;
         }
       } else if (response.status === 401) {
-        // No session found - this is normal for public pages
-        console.log('ℹ️ No session found (public page)');
+        // No session found - this is expected when not logged in
+        setSession(null);
       } else {
         console.warn('⚠️ Session check failed:', response.status);
       }
