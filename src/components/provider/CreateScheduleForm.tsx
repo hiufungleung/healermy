@@ -115,7 +115,7 @@ export function CreateScheduleForm({
 
       // Add optional fields if provided
       if (formData.serviceCategory) {
-        (scheduleData as any).serviceCategory = [{
+        scheduleData.serviceCategory = [{
           coding: [{
             system: 'http://terminology.hl7.org/CodeSystem/service-category',
             code: formData.serviceCategory,
@@ -125,7 +125,7 @@ export function CreateScheduleForm({
       }
 
       if (formData.serviceType) {
-        (scheduleData as any).serviceType = [{
+        scheduleData.serviceType = [{
           coding: [{
             system: 'http://terminology.hl7.org/CodeSystem/service-type',
             code: formData.serviceType,
@@ -135,7 +135,7 @@ export function CreateScheduleForm({
       }
 
       if (formData.specialty) {
-        (scheduleData as any).specialty = [{
+        scheduleData.specialty = [{
           coding: [{
             system: 'http://snomed.info/sct',
             code: formData.specialty,
@@ -145,7 +145,7 @@ export function CreateScheduleForm({
       }
 
       if (formData.comment) {
-        (scheduleData as any).comment = formData.comment;
+        scheduleData.comment = formData.comment;
       }
 
       const response = await fetch('/api/fhir/schedules', {

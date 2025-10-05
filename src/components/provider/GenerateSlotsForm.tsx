@@ -153,13 +153,13 @@ export function GenerateSlotsForm({
     // This could be enhanced based on actual FHIR Schedule.availableTime structure
 
     // If schedule has availableTime, use those days
-    if ((selectedSchedule as any).availableTime) {
-      const availableTimes = (selectedSchedule as any).availableTime;
+    if (selectedSchedule.availableTime) {
+      const availableTimes = selectedSchedule.availableTime;
       const days: string[] = [];
 
-      availableTimes.forEach((time: any) => {
+      availableTimes.forEach((time) => {
         if (time.daysOfWeek) {
-          time.daysOfWeek.forEach((day: string) => {
+          time.daysOfWeek.forEach((day) => {
             // Convert FHIR day codes (mon, tue, wed, etc.) to numbers
             const dayMapping: { [key: string]: string } = {
               'mon': '1', 'tue': '2', 'wed': '3', 'thu': '4',

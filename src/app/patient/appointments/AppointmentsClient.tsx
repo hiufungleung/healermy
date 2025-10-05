@@ -7,8 +7,8 @@ import { Badge } from '@/components/common/Badge';
 import { AppointmentSkeleton } from '@/components/common/LoadingSpinner';
 import { ContentContainer } from '@/components/common/ContentContainer';
 import { formatDateForDisplay } from '@/lib/timezone';
-import type { Appointment } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
+import type { AppointmentWithPractitionerDetails } from '@/lib/appointmentDetailInfo';
 
 interface AppointmentsClientProps {
   session: AuthSession;
@@ -18,7 +18,7 @@ type FilterStatus = 'all' | 'pending' | 'booked' | 'completed' | 'cancelled';
 
 export default function AppointmentsClient({ session }: AppointmentsClientProps) {
   const router = useRouter();
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentWithPractitionerDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,95 +34,12 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
         });
         if (response.ok) {
           const data = await response.json();
+          const appointments = data.appointments || [];
 
-          // Handle different possible response structures
-          let appointmentsList: any[] = [];
-          if (Array.isArray(data)) {
-            appointmentsList = data;
-          } else if (data.appointments && Array.isArray(data.appointments)) {
-            appointmentsList = data.appointments;
-          } else if (data.entry && Array.isArray(data.entry)) {
-            // Handle FHIR Bundle format
-            appointmentsList = data.entry.map((entry: any) => entry.resource).filter(Boolean);
-          } else {
-            console.warn('Unexpected appointments API response format:', data);
-            appointmentsList = [];
-          }
-
-          // Extract unique practitioner IDs to avoid duplicate API calls
-          const practitionerIds = new Set<string>();
-          appointmentsList.forEach((appointment: any) => {
-            const practitionerParticipant = appointment.participant?.find((p: any) =>
-              p.actor?.reference?.startsWith('Practitioner/')
-            );
-            if (practitionerParticipant?.actor?.reference) {
-              const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
-              practitionerIds.add(practitionerId);
-            }
-          });
-
-          // Fetch all practitioner details simultaneously
-          const practitionerPromises = Array.from(practitionerIds).map(async (practitionerId) => {
-            try {
-              const practitionerResponse = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
-                credentials: 'include'
-              });
-              if (practitionerResponse.ok) {
-                const practitionerData = await practitionerResponse.json();
-                return {
-                  id: practitionerId,
-                  data: practitionerData
-                };
-              }
-            } catch (error) {
-              console.warn(`Failed to fetch practitioner ${practitionerId}:`, error);
-            }
-            return null;
-          });
-
-          // Wait for all practitioner API calls to complete simultaneously
-          const practitionerResults = await Promise.all(practitionerPromises);
-
-          // Create a map of practitioner data for quick lookup
-          const practitionersMap = new Map();
-          practitionerResults.forEach((result) => {
-            if (result) {
-              practitionersMap.set(result.id, result.data);
-            }
-          });
-
-          // Add practitioner details to appointments
-          const appointmentsWithDetails = appointmentsList.map((appointment: any) => {
-            const practitionerParticipant = appointment.participant?.find((p: any) =>
-              p.actor?.reference?.startsWith('Practitioner/')
-            );
-
-            if (practitionerParticipant?.actor?.reference) {
-              const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
-              const practitionerData = practitionersMap.get(practitionerId);
-
-              if (practitionerData) {
-                appointment.practitionerDetails = {
-                  name: practitionerData.name?.[0] ?
-                    `${(practitionerData.name[0].prefix || []).join(' ')} ${(practitionerData.name[0].given || []).join(' ')} ${practitionerData.name[0].family || ''}`.trim() :
-                    'Provider',
-                  specialty: practitionerData.qualification?.[0]?.code?.text || 'General',
-                  address: practitionerData.address?.[0] ?
-                    [
-                      ...(practitionerData.address[0].line || []),
-                      practitionerData.address[0].city || practitionerData.address[0].district,
-                      practitionerData.address[0].state,
-                      practitionerData.address[0].postalCode
-                    ].filter(Boolean).join(', ') : 'TBD',
-                  phone: practitionerData.telecom?.find((t: any) => t.system === 'phone')?.value || 'N/A'
-                };
-              }
-            }
-
-            return appointment;
-          });
-
-          setAppointments(appointmentsWithDetails);
+          // Use the reusable appointment enhancement utility
+          const { enhanceAppointmentsWithPractitionerDetails } = await import('@/lib/appointmentDetailInfo');
+          const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
+          setAppointments(enhancedAppointments);
         } else {
           console.error('Failed to fetch appointments:', response.status, response.statusText);
           setAppointments([]);
@@ -393,14 +310,14 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
             <div className="space-y-4">
               {filteredAppointments.map((appointment) => {
                 const appointmentStatus = appointment.status;
-                const doctorName = (appointment as any).practitionerDetails?.name || 'Provider';
+                const doctorName = appointment.practitionerDetails?.name || 'Provider';
                 const appointmentDate = appointment.start;
                 const appointmentDateDisplay = appointmentDate ? formatDateForDisplay(appointmentDate) : 'TBD';
-                const specialty = (appointment as any).practitionerDetails?.specialty ||
+                const specialty = appointment.practitionerDetails?.specialty ||
                                 appointment.serviceType?.[0]?.text ||
                                 appointment.serviceType?.[0]?.coding?.[0]?.display || 'General';
-                const location = (appointment as any).practitionerDetails?.address || 'TBD';
-                const phoneNumber = (appointment as any).practitionerDetails?.phone || 'N/A';
+                const location = appointment.practitionerDetails?.address || 'TBD';
+                const phoneNumber = appointment.practitionerDetails?.phone || 'N/A';
 
                 const canCancel = appointmentStatus !== 'cancelled' && appointmentStatus !== 'fulfilled';
                 const canReschedule = appointmentStatus !== 'cancelled' && appointmentStatus !== 'fulfilled';

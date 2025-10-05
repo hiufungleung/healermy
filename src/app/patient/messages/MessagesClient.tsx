@@ -304,14 +304,14 @@ export default function MessagesClient({
             {/* Filter Tabs */}
             <div className="border-b border-gray-200 mb-6">
               <nav className="-mb-px flex space-x-8">
-                {[
-                  { key: 'all', label: 'All Messages', count: localCommunications.length },
-                  { key: 'received', label: 'Received', count: localCommunications.filter(c => c.recipient?.some(r => r.reference === `Patient/${patient?.id}`)).length },
-                  { key: 'sent', label: 'Sent', count: localCommunications.filter(c => c.sender?.reference === `Patient/${patient?.id}`).length }
-                ].map((tab) => (
+                {([
+                  { key: 'all' as const, label: 'All Messages', count: localCommunications.length },
+                  { key: 'received' as const, label: 'Received', count: localCommunications.filter(c => c.recipient?.some(r => r.reference === `Patient/${patient?.id}`)).length },
+                  { key: 'sent' as const, label: 'Sent', count: localCommunications.filter(c => c.sender?.reference === `Patient/${patient?.id}`).length }
+                ] as const).map((tab) => (
                   <button
                     key={tab.key}
-                    onClick={() => setFilter(tab.key as any)}
+                    onClick={() => setFilter(tab.key)}
                     className={`py-2 px-1 border-b-2 font-medium text-sm ${
                       filter === tab.key
                         ? 'border-primary text-primary'

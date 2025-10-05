@@ -9,8 +9,9 @@ import {
   AppointmentSkeleton
 } from '@/components/common/LoadingSpinner';
 import { formatDateForDisplay, getNowInAppTimezone } from '@/lib/timezone';
-import type { Patient, Appointment } from '@/types/fhir';
+import type { Patient } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
+import type { AppointmentWithPractitionerDetails } from '@/lib/appointmentDetailInfo';
 
 interface DashboardClientProps {
   patientName: string | undefined;
@@ -35,7 +36,7 @@ export default function DashboardClient({
   };
 
   const [firstName, setFirstName] = useState(getFirstName(initialPatientName));
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentWithPractitionerDetails[]>([]);
   const [loadingPatient, setLoadingPatient] = useState(true);
   const [loadingAppointments, setLoadingAppointments] = useState(true);
   const [patientError, setPatientError] = useState<string | null>(null);
@@ -477,14 +478,14 @@ export default function DashboardClient({
               ) : displayAppointments.map((appointment) => {
                 // Extract FHIR appointment data with practitioner details
                 const appointmentStatus = appointment.status;
-                const doctorName = (appointment as any).practitionerDetails?.name || 'Provider';
+                const doctorName = appointment.practitionerDetails?.name || 'Provider';
                 const appointmentDate = appointment.start;
                 const appointmentDateDisplay = appointmentDate ? formatDateForDisplay(appointmentDate) : 'TBD';
-                const specialty = (appointment as any).practitionerDetails?.specialty ||
+                const specialty = appointment.practitionerDetails?.specialty ||
                                appointment.serviceType?.[0]?.text ||
                                appointment.serviceType?.[0]?.coding?.[0]?.display || 'General';
-                const location = (appointment as any).practitionerDetails?.address || 'TBD';
-                const phoneNumber = (appointment as any).practitionerDetails?.phone || 'N/A';
+                const location = appointment.practitionerDetails?.address || 'TBD';
+                const phoneNumber = appointment.practitionerDetails?.phone || 'N/A';
 
                 return (
                   <div

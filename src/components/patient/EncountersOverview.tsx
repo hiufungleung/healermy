@@ -35,6 +35,10 @@ interface Encounter {
 interface Procedure {
   id: string;
   status: string;
+  encounter?: {
+    reference?: string;
+    display?: string;
+  };
   code?: {
     text?: string;
     coding?: Array<{
@@ -303,7 +307,7 @@ export const EncountersOverview: React.FC<EncountersOverviewProps> = ({
                 const encounterProcedures = procedures.filter(proc => {
                   // Check if procedure references this encounter
                   // Note: FHIR Procedure may have encounter reference
-                  return (proc as any).encounter?.reference?.includes(encounter.id);
+                  return proc.encounter?.reference?.includes(encounter.id);
                 });
 
                 // If no direct encounter reference, show all procedures for single encounter
@@ -363,11 +367,11 @@ export const EncountersOverview: React.FC<EncountersOverviewProps> = ({
                                   )}
 
                                   {/* Procedure reasons */}
-                                  {(procedure as any).reasonReference && (procedure as any).reasonReference.length > 0 && (
+                                  {procedure.reasonReference && procedure.reasonReference.length > 0 && (
                                     <div className="mt-2">
                                       <p className="text-xs text-gray-600 mb-1">Reason:</p>
                                       <div className="flex flex-wrap gap-1">
-                                        {(procedure as any).reasonReference.map((ref: any, idx: number) => {
+                                        {procedure.reasonReference.map((ref, idx) => {
                                           const conditionId = ref.reference?.split('/').pop();
                                           const condition = conditionId ? conditions[conditionId] : null;
                                           const conditionName = condition?.code?.text ||

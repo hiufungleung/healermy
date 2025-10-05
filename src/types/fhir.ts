@@ -1,6 +1,7 @@
 export interface Patient {
   resourceType: 'Patient';
   id: string;
+  active?: boolean;
   name?: Array<{
     given?: string[];
     family?: string;
@@ -134,6 +135,27 @@ export interface Schedule {
   id: string;
   active?: boolean;
   comment?: string;
+  serviceCategory?: Array<{
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+  }>;
+  serviceType?: Array<{
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+  }>;
+  specialty?: Array<{
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+  }>;
   actor?: Array<{
     reference?: string;
     display?: string;
@@ -142,6 +164,12 @@ export interface Schedule {
     start?: string;
     end?: string;
   };
+  availableTime?: Array<{
+    daysOfWeek?: string[];
+    allDay?: boolean;
+    availableStartTime?: string;
+    availableEndTime?: string;
+  }>;
 }
 
 export interface Bundle<T = unknown> {
@@ -161,6 +189,9 @@ export interface Bundle<T = unknown> {
 export interface Condition {
   resourceType: 'Condition';
   id: string;
+  meta?: {
+    lastUpdated?: string;
+  };
   clinicalStatus?: {
     coding?: Array<{
       system?: string;
@@ -185,6 +216,7 @@ export interface Condition {
     reference?: string;
   };
   onsetDateTime?: string;
+  recordedDate?: string;
 }
 
 export interface Communication {
@@ -357,4 +389,15 @@ export interface Organization {
       country?: string;
     };
   }>;
+}
+
+export interface Account {
+  resourceType: 'Account';
+  id: string;
+  owner?: {
+    reference?: string;
+    display?: string;
+  };
+  name?: string;
+  status?: 'active' | 'inactive' | 'entered-in-error' | 'on-hold' | 'unknown';
 }

@@ -557,14 +557,14 @@ export default function NotificationsClient({
       {/* Filter Tabs */}
       <Card className="mb-6">
         <div className="flex flex-wrap gap-2 sm:gap-3">
-          {[
-            { key: 'all', label: 'All', count: totalCount },
-            { key: 'unread', label: 'Unread', count: unreadCount },
-            { key: 'action_required', label: 'Action Required', count: actionRequiredCount }
-          ].map((filter) => (
+          {([
+            { key: 'all' as const, label: 'All', count: totalCount },
+            { key: 'unread' as const, label: 'Unread', count: unreadCount },
+            { key: 'action_required' as const, label: 'Action Required', count: actionRequiredCount }
+          ] as const).map((filter) => (
             <button
               key={filter.key}
-              onClick={() => setActiveFilter(filter.key as any)}
+              onClick={() => setActiveFilter(filter.key)}
               className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors flex-shrink-0 ${
                 activeFilter === filter.key
                   ? 'bg-primary text-white'

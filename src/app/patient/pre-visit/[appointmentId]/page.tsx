@@ -274,14 +274,14 @@ export default function PreVisitSummary() {
         {/* Tabs */}
         <div className="border-b mb-6">
           <div className="flex space-x-8">
-            {[
-              { key: 'current', label: 'Current Visit' },
-              { key: 'history', label: 'Medical History' },
-              { key: 'results', label: 'Test Results' }
-            ].map((tab) => (
+            {([
+              { key: 'current' as const, label: 'Current Visit' },
+              { key: 'history' as const, label: 'Medical History' },
+              { key: 'results' as const, label: 'Test Results' }
+            ] as const).map((tab) => (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key as any)}
+                onClick={() => setActiveTab(tab.key)}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${
                   activeTab === tab.key
                     ? 'border-primary text-primary'

@@ -6,7 +6,7 @@ import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { useAuth } from '@/components/auth/AuthProvider';
-import type { Patient, Bundle, Condition, MedicationRequest, Observation, AllergyIntolerance, Procedure, FamilyMemberHistory, DiagnosticReport, ServiceRequest } from '@/types/fhir';
+import type { Patient, Bundle, Condition, MedicationRequest, Observation, AllergyIntolerance, Procedure, FamilyMemberHistory, DiagnosticReport, ServiceRequest, Account, Organization } from '@/types/fhir';
 import type { Coverage } from '@/types/fhir';
 import { HealthOverview } from '@/components/patient/HealthOverview';
 import { InsuranceOverview } from '@/components/patient/InsuranceOverview';
@@ -657,12 +657,13 @@ export default function PatientProfileClient({ patientName }: PatientProfileClie
       console.log('📋 Accounts extracted:', Object.values(accountsMap).length);
 
       // Fetch organizations for accounts
-      const orgsMap: Record<string, any> = {};
+      const orgsMap: Record<string, Organization> = {};
       for (const account of Object.values(accountsMap)) {
-        const ownerId = (account as any).owner?.reference?.split('/').pop();
+        const typedAccount = account as Account;
+        const ownerId = typedAccount.owner?.reference?.split('/').pop();
         if (ownerId) {
           try {
-            const orgResponse = await fetch(`/api/fhir/accounts/${(account as any).id}`, {
+            const orgResponse = await fetch(`/api/fhir/accounts/${typedAccount.id}`, {
               method: 'GET',
               credentials: 'include',
             });
@@ -741,7 +742,7 @@ export default function PatientProfileClient({ patientName }: PatientProfileClie
           <div className="flex-1">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-2xl font-bold text-text-primary">{displayName}</h2>
-              {(patient as any)?.active !== false && (
+              {patient?.active !== false && (
                 <Badge variant="success" size="sm">Active</Badge>
               )}
             </div>
@@ -964,28 +965,28 @@ export default function PatientProfileClient({ patientName }: PatientProfileClie
                   </div>
                   {/* Show available dates */}
                   <div className="text-xs text-text-secondary mt-2 space-y-1">
-                    {(condition as any).recordedDate && (
+                    {condition.recordedDate && (
                       <p className="flex items-center">
                         <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
                         </svg>
-                        Recorded: {new Date((condition as any).recordedDate).toLocaleDateString()}
+                        Recorded: {new Date(condition.recordedDate).toLocaleDateString()}
                       </p>
                     )}
-                    {(condition as any).onsetDateTime && (
+                    {condition.onsetDateTime && (
                       <p className="flex items-center">
                         <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                         </svg>
-                        Onset: {new Date((condition as any).onsetDateTime).toLocaleDateString()}
+                        Onset: {new Date(condition.onsetDateTime).toLocaleDateString()}
                       </p>
                     )}
-                    {(condition as any).meta?.lastUpdated && !((condition as any).recordedDate) && (
+                    {condition.meta?.lastUpdated && !condition.recordedDate && (
                       <p className="flex items-center text-gray-400">
                         <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                         </svg>
-                        Data updated: {new Date((condition as any).meta.lastUpdated).toLocaleDateString()}
+                        Data updated: {new Date(condition.meta.lastUpdated).toLocaleDateString()}
                         <span className="ml-1">(not clinical date)</span>
                       </p>
                     )}
