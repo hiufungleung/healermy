@@ -47,62 +47,53 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Portal Selection */}
+      {/* Launch Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h2 className="text-3xl font-bold text-center mb-12">Choose Your Portal</h2>
-        
-        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          {/* Patient Portal */}
-          <Card className="text-center">
-            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-10 h-10 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-3xl font-bold mb-6">Access HealerMy Platform</h2>
+          <p className="text-text-secondary mb-8">
+            Connect to your FHIR-enabled healthcare system. Choose your role (patient or provider) on the next screen.
+          </p>
+
+          <Card className="text-center p-8">
+            <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-12 h-12 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
-            <h3 className="text-2xl font-semibold mb-2">Patient Portal</h3>
-            <p className="text-text-secondary mb-6">
-              Book appointments, view your medical history, and manage your healthcare journey
+
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => {
+                // Standalone launch - role selection on launch page
+                const fhirServerUrl = process.env.NEXT_PUBLIC_FHIR_SERVER_URL || 'https://gw.interop.community/healerMy/data';
+                router.push(`/launch?iss=${encodeURIComponent(fhirServerUrl)}`);
+              }}
+              className="text-lg px-8 py-4"
+            >
+              Launch HealerMy
+            </Button>
+
+            <p className="text-sm text-text-secondary mt-6">
+              Supports both <strong>EHR Launch</strong> (from MELD) and <strong>Standalone Launch</strong>
             </p>
-            <div className="space-y-3">
-              <Button
-                variant="primary"
-                fullWidth
-                onClick={() => {
-                  // Standalone launch - no launch parameter
-                  const fhirServerUrl = process.env.NEXT_PUBLIC_FHIR_SERVER_URL || 'https://gw.interop.community/healerMy/data';
-                  router.push(`/launch?role=patient&iss=${encodeURIComponent(fhirServerUrl)}`);
-                }}
-              >
-                Access Patient Portal
-              </Button>
-            </div>
           </Card>
 
-          {/* Provider Portal */}
-          <Card className="text-center">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+          <div className="mt-8 grid md:grid-cols-2 gap-6 text-left">
+            <div className="p-4 bg-blue-50 rounded-lg">
+              <h3 className="font-semibold text-primary mb-2">👤 Patient Access</h3>
+              <p className="text-sm text-text-secondary">
+                View appointments, medical records, book new appointments, and manage your healthcare
+              </p>
             </div>
-            <h3 className="text-2xl font-semibold mb-2">Provider Portal</h3>
-            <p className="text-text-secondary mb-6">
-              Manage appointments, review patient requests, and access patient medical records
-            </p>
-            <div className="space-y-3">
-              <Button
-                variant="primary"
-                fullWidth
-                onClick={() => {
-                  // Standalone launch - no launch parameter
-                  const fhirServerUrl = process.env.NEXT_PUBLIC_FHIR_SERVER_URL || 'https://gw.interop.community/healerMy/data';
-                  router.push(`/launch?role=provider&iss=${encodeURIComponent(fhirServerUrl)}`);
-                }}
-              >
-                Access Provider Portal
-              </Button>
+            <div className="p-4 bg-green-50 rounded-lg">
+              <h3 className="font-semibold text-green-600 mb-2">👨‍⚕️ Provider Access</h3>
+              <p className="text-sm text-text-secondary">
+                Manage patient appointments, review requests, access patient records
+              </p>
             </div>
-          </Card>
+          </div>
         </div>
       </div>
 

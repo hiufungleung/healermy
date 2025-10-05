@@ -48,15 +48,25 @@ function LaunchContent() {
         return;
       }
 
-      // For standalone launch with role specified in URL, use it directly
-      if (isStandaloneLaunch && requestedRole) {
-        setSelectedRole(requestedRole);
-      }
+      // Always show role selection if no role selected yet
+      // Role can come from: URL param (old bookmarks), sessionStorage (after OAuth redirect)
+      const storedRole = sessionStorage.getItem('auth_role') as 'patient' | 'provider' | null;
 
-      // Show role selection for MELD sandbox
       if (!selectedRole) {
-        setShowRoleSelection(true);
-        return;
+        // Check if role was already selected (stored from previous selection)
+        if (storedRole) {
+          console.log('🔐 Using stored role from sessionStorage:', storedRole);
+          setSelectedRole(storedRole);
+        } else if (requestedRole) {
+          // Support old URL format with role parameter
+          console.log('🔐 Using role from URL parameter:', requestedRole);
+          setSelectedRole(requestedRole);
+        } else {
+          // No role selected - show selection screen
+          console.log('🔐 No role selected, showing role selection screen');
+          setShowRoleSelection(true);
+          return;
+        }
       }
 
       // Discover SMART endpoints from the provided ISS
@@ -274,41 +284,80 @@ function LaunchContent() {
   }
 
   if (showRoleSelection) {
+    const launchToken = searchParams.get('launch');
+    const isEhrLaunch = !!launchToken;
+
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="card max-w-md w-full">
-          <h1 className="text-2xl font-bold mb-4">Select Your Role</h1>
-          <p className="text-text-secondary mb-6">
-            Please select how you want to access the system:
-          </p>
-          
-          <div className="space-y-3">
-            <button
-              onClick={() => handleRoleSelection('patient')}
-              className="w-full p-4 text-left border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-colors"
-            >
-              <div className="font-semibold text-lg">🏥 Patient</div>
-              <div className="text-sm text-text-secondary mt-1">
-                Access your personal health records and book appointments
-              </div>
-            </button>
-            
-            <button
-              onClick={() => handleRoleSelection('provider')}
-              className="w-full p-4 text-left border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-colors"
-            >
-              <div className="font-semibold text-lg">👨‍⚕️ Healthcare Provider</div>
-              <div className="text-sm text-text-secondary mt-1">
-                Manage patient care and appointment scheduling
-              </div>
-            </button>
-          </div>
-          
-          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">
-              <strong>Note:</strong> If launching without patient context, select "Healthcare Provider" to avoid authentication errors.
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="card max-w-lg w-full">
+          <div className="text-center mb-6">
+            <h1 className="text-3xl font-bold mb-2">Select Your Role</h1>
+            <p className="text-text-secondary">
+              {isEhrLaunch
+                ? 'How do you want to access the system?'
+                : 'Choose your role to continue with authentication'}
             </p>
           </div>
+
+          <div className="space-y-4">
+            <button
+              onClick={() => handleRoleSelection('patient')}
+              className="w-full p-5 text-left border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-all hover:shadow-md group"
+            >
+              <div className="flex items-start">
+                <div className="text-4xl mr-4">👤</div>
+                <div className="flex-1">
+                  <div className="font-bold text-xl text-primary mb-1">Patient</div>
+                  <div className="text-sm text-text-secondary">
+                    Access your personal health records, view appointments, and book new appointments
+                  </div>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleRoleSelection('provider')}
+              className="w-full p-5 text-left border-2 border-gray-200 rounded-lg hover:border-green-600 hover:bg-green-50 transition-all hover:shadow-md group"
+            >
+              <div className="flex items-start">
+                <div className="text-4xl mr-4">👨‍⚕️</div>
+                <div className="flex-1">
+                  <div className="font-bold text-xl text-green-600 mb-1">Healthcare Provider</div>
+                  <div className="text-sm text-text-secondary">
+                    Manage patient appointments, review requests, and access patient medical records
+                  </div>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start">
+              <svg className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+              <div className="text-sm text-blue-800">
+                {isEhrLaunch ? (
+                  <>
+                    <strong>EHR Launch:</strong> Your healthcare system has provided context.
+                    Select your role to continue.
+                  </>
+                ) : (
+                  <>
+                    <strong>Standalone Launch:</strong> After selecting your role, you'll choose
+                    which patient or practitioner to access.
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={handleLogoutAndHome}
+            className="mt-4 w-full text-center text-sm text-text-secondary hover:text-primary transition-colors"
+          >
+            ← Back to Home
+          </button>
         </div>
       </div>
     );
