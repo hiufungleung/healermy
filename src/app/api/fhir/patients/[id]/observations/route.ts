@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, prepareToken } from '../../../utils/auth';
+import { getSessionFromCookies, prepareToken } from '../../../utils/auth';
 import { getPatientObservations } from '../../operations';
 
 /**
@@ -13,7 +13,7 @@ export async function GET(
 
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
 
     // Await params in Next.js 15
     const { id } = await params;

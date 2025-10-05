@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, validateRole, prepareToken } from '../utils/auth';
+import { getSessionFromCookies, validateRole, prepareToken } from '../utils/auth';
 import { searchSlots, createSlot } from './operations';
 import { FHIRClient } from '../client';
 
@@ -9,7 +9,7 @@ import { FHIRClient } from '../client';
 export async function GET(request: NextRequest) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Both providers and patients can search for slots
     // Providers: to manage their slots
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Only providers can create slots
     validateRole(session, 'provider');

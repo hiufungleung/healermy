@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, validateRole, prepareToken } from '../../utils/auth';
+import { getSessionFromCookies, validateRole, prepareToken } from '../../utils/auth';
 import { getSlot, updateSlot, patchSlot, deleteSlot } from '../operations';
 
 /**
@@ -11,7 +11,7 @@ export async function GET(
 ) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Both providers and patients can view individual slots
     
@@ -51,7 +51,7 @@ export async function PUT(
 ) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Only providers can update slots
     validateRole(session, 'provider');
@@ -106,7 +106,7 @@ export async function PATCH(
 ) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Only providers can patch slots
     validateRole(session, 'provider');
@@ -149,7 +149,7 @@ export async function DELETE(
 ) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Only providers can delete slots
     validateRole(session, 'provider');

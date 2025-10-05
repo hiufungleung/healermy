@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders } from '../../../utils/auth';
+import { getSessionFromCookies } from '../../../utils/auth';
 import { FHIRClient } from '../../../client';
 import { getPatientCoverage } from '../../../patients/operations';
 // Inline Coverage type to avoid import issues
@@ -32,7 +32,7 @@ export async function GET(
 ): Promise<NextResponse> {
   try {
     console.log('🔍 [COVERAGE] Starting Coverage API request');
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     console.log('🔍 [COVERAGE] Session obtained:', { role: session?.role, hasToken: !!session?.accessToken });
 
     if (!session) {
@@ -90,7 +90,7 @@ export async function POST(
   context: RouteContext
 ): Promise<NextResponse> {
   try {
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

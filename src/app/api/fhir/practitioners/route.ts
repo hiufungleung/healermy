@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, validateRole, prepareToken } from '../utils/auth';
+import { getSessionFromCookies, validateRole, prepareToken } from '../utils/auth';
 import { validatePractitionerData } from '../utils/validation';
 import { searchPractitioners, createPractitioner } from './operations';
 
@@ -9,7 +9,7 @@ import { searchPractitioners, createPractitioner } from './operations';
 export async function GET(request: NextRequest) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Parse query parameters
     const { searchParams } = new URL(request.url);
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Check authorization (only providers can create practitioners)
     validateRole(session, 'provider');

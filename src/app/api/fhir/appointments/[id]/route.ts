@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, validateRole, prepareToken } from '../../utils/auth';
+import { getSessionFromCookies, validateRole, prepareToken } from '../../utils/auth';
 import { updateAppointment } from '../operations';
 import { createStatusUpdateMessage } from '../../communications/operations';
 import { FHIRClient } from '../../client';
@@ -21,7 +21,7 @@ export async function GET(
   
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     const token = prepareToken(session.accessToken);
     
     // Get appointment from FHIR
@@ -67,7 +67,7 @@ export async function PATCH(
   
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     const token = prepareToken(session.accessToken);
     const patchOperations: Array<{
@@ -298,7 +298,7 @@ export async function PUT(
   
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Check authorization (only providers can update appointments)
     validateRole(session, 'provider');

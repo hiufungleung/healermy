@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, prepareToken } from '../utils/auth';
+import { getSessionFromCookies, prepareToken } from '../utils/auth';
 import { searchAppointments, createAppointment } from './operations';
 import { createStatusUpdateMessage } from '../communications/operations';
 import type { Appointment } from '../../../../types/fhir';
@@ -10,7 +10,7 @@ import type { Appointment } from '../../../../types/fhir';
 export async function GET(request: NextRequest) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Parse query parameters
     const { searchParams } = new URL(request.url);
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Both patients and providers can create appointments
     // Patients create with status "pending", providers can create "booked"

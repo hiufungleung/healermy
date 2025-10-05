@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, validateRole, prepareToken } from '../../utils/auth';
+import { getSessionFromCookies, validateRole, prepareToken } from '../../utils/auth';
 import { createSlotsWithOverlapValidation, SlotCreationRequest } from '../../utils/slotOverlap';
 import { isFutureTime } from '@/lib/timezone';
 
@@ -9,7 +9,7 @@ import { isFutureTime } from '@/lib/timezone';
 export async function POST(request: NextRequest) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Only providers can create slots
     validateRole(session, 'provider');

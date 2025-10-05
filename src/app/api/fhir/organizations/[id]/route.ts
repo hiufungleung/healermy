@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, prepareToken } from '../../utils/auth';
+import { getSessionFromCookies, prepareToken } from '../../utils/auth';
 import { getOrganization } from '../operations';
 
 interface RouteContext {
@@ -14,7 +14,7 @@ export async function GET(
   context: RouteContext
 ) {
   try {
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     const token = prepareToken(session.accessToken);
     const { id } = await context.params;
 

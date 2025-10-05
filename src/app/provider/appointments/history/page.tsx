@@ -1,6 +1,6 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
-import { getSessionFromHeaders } from '@/app/api/fhir/utils/auth';
+import { getSessionFromCookies } from '@/app/api/fhir/utils/auth';
 import { searchAppointments } from '@/app/api/fhir/appointments/operations';
 import { prepareToken } from '@/app/api/fhir/utils/auth';
 import { Layout } from '@/components/common/Layout';
@@ -11,7 +11,7 @@ export default async function ProviderAppointmentsHistoryPage() {
   // Get session from middleware headers
   let session;
   try {
-    session = await getSessionFromHeaders();
+    session = await getSessionFromCookies();
   } catch (error) {
     console.error('Session error:', error);
     redirect('/launch');

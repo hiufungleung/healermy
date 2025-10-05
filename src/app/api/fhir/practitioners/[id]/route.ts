@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, prepareToken } from '../../utils/auth';
+import { getSessionFromCookies, prepareToken } from '../../utils/auth';
 import { getPractitioner } from '../operations';
 
 /**
@@ -14,7 +14,7 @@ export async function GET(
   
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Call FHIR operations
     const token = prepareToken(session.accessToken);

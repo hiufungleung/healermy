@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, prepareToken } from '../utils/auth';
+import { getSessionFromCookies, prepareToken } from '../utils/auth';
 import {
   searchCommunications,
   createCommunication,
@@ -14,7 +14,7 @@ import type { Communication } from '../../../../types/fhir';
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     const token = prepareToken(session.accessToken);
     
     const { searchParams } = new URL(request.url);
@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     const token = prepareToken(session.accessToken);
     
     const body = await request.json();

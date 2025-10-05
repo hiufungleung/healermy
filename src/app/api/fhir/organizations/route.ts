@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, prepareToken } from '../utils/auth';
+import { getSessionFromCookies, prepareToken } from '../utils/auth';
 import { searchOrganizations, createOrganization } from './operations';
 
 /**
@@ -7,7 +7,7 @@ import { searchOrganizations, createOrganization } from './operations';
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     const token = prepareToken(session.accessToken);
 
     const { searchParams } = new URL(request.url);
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
 
     // Only providers can create organizations
     if (session.role !== 'provider') {

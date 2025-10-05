@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, prepareToken } from '../../utils/auth';
+import { getSessionFromCookies, prepareToken } from '../../utils/auth';
 import {
   getCommunication,
   updateCommunication,
@@ -21,7 +21,7 @@ export async function GET(
   const { id } = await context.params;
   
   try {
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     const token = prepareToken(session.accessToken);
     
     const result = await getCommunication(token, session.fhirBaseUrl, id);
@@ -59,7 +59,7 @@ export async function PATCH(
   const { id } = await context.params;
 
   try {
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     const token = prepareToken(session.accessToken);
 
     const body = await request.json();
@@ -131,7 +131,7 @@ export async function DELETE(
   const { id } = await context.params;
 
   try {
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     const token = prepareToken(session.accessToken);
 
     // Delete the communication from FHIR

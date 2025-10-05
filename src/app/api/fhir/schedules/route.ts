@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, validateRole, prepareToken } from '../utils/auth';
+import { getSessionFromCookies, validateRole, prepareToken } from '../utils/auth';
 import { searchSchedules, createSchedule } from './operations';
 
 /**
@@ -8,7 +8,7 @@ import { searchSchedules, createSchedule } from './operations';
 export async function GET(request: NextRequest) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Both providers and patients can search schedules
     // Providers: to manage their schedules  
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Validate that user has provider role
     validateRole(session, 'provider');

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, validateRole, prepareToken } from '../../utils/auth';
+import { getSessionFromCookies, validateRole, prepareToken } from '../../utils/auth';
 import { getSchedule, updateSchedule, deleteSchedule } from '../operations';
 
 /**
@@ -11,7 +11,7 @@ export async function GET(
 ) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Validate that user has provider role
     validateRole(session, 'provider');
@@ -50,7 +50,7 @@ export async function PUT(
 ) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Validate that user has provider role
     validateRole(session, 'provider');
@@ -102,7 +102,7 @@ export async function DELETE(
 ) {
   try {
     // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     
     // Validate that user has provider role
     validateRole(session, 'provider');

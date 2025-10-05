@@ -1,4 +1,4 @@
-import { getSessionFromHeaders, prepareToken } from '@/app/api/fhir/utils/auth';
+import { getSessionFromCookies, prepareToken } from '@/app/api/fhir/utils/auth';
 import { Layout } from '@/components/common/Layout';
 import { FHIRClient } from '@/app/api/fhir/client';
 import AppointmentDetailClient from './AppointmentDetailClient';
@@ -24,7 +24,7 @@ export default async function PatientAppointmentDetailPage({ params }: PageProps
   
   try {
     // Get session from middleware headers
-    const session = await getSessionFromHeaders();
+    const session = await getSessionFromCookies();
     const token = prepareToken(session.accessToken);
     
     // Get patient information

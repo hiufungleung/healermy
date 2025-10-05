@@ -1,10 +1,12 @@
 'use server';
 
-import { headers } from 'next/headers';
+import { cookies } from 'next/headers';
+import { decrypt } from '@/library/auth/encryption';
+import { SESSION_COOKIE_NAME, TOKEN_COOKIE_NAME } from '@/library/auth/config';
 import { getPatient } from '@/app/api/fhir/patients/operations';
 import { searchAppointments } from '@/app/api/fhir/appointments/operations';
 import type { Patient, Appointment } from '@/types/fhir';
-import type { AuthSession } from '@/types/auth';
+import type { AuthSession, TokenData, SessionData } from '@/types/auth';
 
 // Server action that gets session data only (no FHIR API calls for fast page render)
 export async function getSessionOnly(): Promise<{
@@ -12,18 +14,30 @@ export async function getSessionOnly(): Promise<{
   error?: string;
 }> {
   try {
-    // Get session directly from middleware headers (already decrypted and validated)
-    const headersList = await headers();
-    const sessionHeader = headersList.get('x-session-data');
+    // Get session from encrypted HTTP-only cookies
+    const cookieStore = await cookies();
+    const tokenCookie = cookieStore.get(TOKEN_COOKIE_NAME);
+    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
 
-    if (!sessionHeader) {
+    if (!tokenCookie || !sessionCookie) {
       return {
         session: null,
         error: 'No session found'
       };
     }
 
-    const session: AuthSession = JSON.parse(sessionHeader);
+    // Decrypt both cookie parts
+    const decryptedTokenString = await decrypt(tokenCookie.value);
+    const decryptedSessionString = await decrypt(sessionCookie.value);
+
+    const tokenData: TokenData = JSON.parse(decryptedTokenString);
+    const sessionMetadata: SessionData = JSON.parse(decryptedSessionString);
+
+    // Combine into single session object
+    const session: AuthSession = {
+      ...tokenData,
+      ...sessionMetadata
+    };
 
     // Additional validation for required fields
     if (!session.patient || !session.accessToken || !session.fhirBaseUrl) {
@@ -53,11 +67,12 @@ export async function getDashboardData(): Promise<{
   error?: string;
 }> {
   try {
-    // Get session directly from middleware headers (already decrypted and validated)
-    const headersList = await headers();
-    const sessionHeader = headersList.get('x-session-data');
+    // Get session from encrypted HTTP-only cookies
+    const cookieStore = await cookies();
+    const tokenCookie = cookieStore.get(TOKEN_COOKIE_NAME);
+    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
 
-    if (!sessionHeader) {
+    if (!tokenCookie || !sessionCookie) {
       return {
         patient: null,
         appointments: [],
@@ -66,7 +81,18 @@ export async function getDashboardData(): Promise<{
       };
     }
 
-    const session: AuthSession = JSON.parse(sessionHeader);
+    // Decrypt both cookie parts
+    const decryptedTokenString = await decrypt(tokenCookie.value);
+    const decryptedSessionString = await decrypt(sessionCookie.value);
+
+    const tokenData: TokenData = JSON.parse(decryptedTokenString);
+    const sessionMetadata: SessionData = JSON.parse(decryptedSessionString);
+
+    // Combine into single session object
+    const session: AuthSession = {
+      ...tokenData,
+      ...sessionMetadata
+    };
 
     // Additional validation for required fields
     if (!session.patient || !session.accessToken || !session.fhirBaseUrl) {

@@ -42,9 +42,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
-  // DEBUG: Log encrypted cookies (DELETE BEFORE PRODUCTION)
-  console.log(`🍪 [DEBUG] Encrypted token cookie:`, tokenCookie.value.substring(0, 50) + '...');
-  console.log(`🍪 [DEBUG] Encrypted session cookie:`, sessionCookie.value.substring(0, 50) + '...');
+  // Cookies are encrypted and HTTP-only - secure storage
 
   try {
     // Decrypt both cookie parts
@@ -60,20 +58,7 @@ export async function middleware(request: NextRequest) {
       ...sessionMetadata
     };
     
-    // DEBUG: Log decrypted session structure (DELETE BEFORE PRODUCTION)
-    console.log(`🔓 [DEBUG] Decrypted session data:`, {
-      role: sessionData.role,
-      accessToken: sessionData.accessToken ? `${sessionData.accessToken.substring(0, 20)}...` : 'undefined',
-      patient: sessionData.patient,
-      user: sessionData.user, // Show user field for provider detection
-      username: sessionData.username, // Show username field
-      need_patient_banner: sessionData.need_patient_banner,
-      expiresAt: sessionData.expiresAt
-    });
-
-    console.log(`Access Token: ${sessionData.accessToken}`);
-    console.log(`Refresh Token: ${sessionData.refreshToken}`);
-    console.log(`Token URL: ${sessionData.tokenUrl}`);
+    // Session validated - role and expiry checked below
     
     // Check if session is expired or expiring soon and attempt refresh if possible
     const refreshBufferSeconds = parseInt(process.env.TOKEN_REFRESH_BUFFER_SECONDS || '30');
@@ -147,8 +132,7 @@ export async function middleware(request: NextRequest) {
           
           response.cookies.set(TOKEN_COOKIE_NAME, encryptedRefreshedTokenData, cookieOptions);
           response.cookies.set(SESSION_COOKIE_NAME, encryptedRefreshedSessionData, cookieOptions);
-          response.headers.set('x-session-data', JSON.stringify(refreshedSession));
-          
+
           console.log(`✅ [MIDDLEWARE] Session refreshed for ${refreshedSession.role}, allowing: ${pathname}`);
           return response;
         } catch (refreshError) {
@@ -175,14 +159,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/', request.url));
     }
 
-    // Session data is already fully decrypted, ready to pass to route
-    const sessionForRoute = sessionData;
-
-    // Pass decrypted session data to the route via headers
+    // Session validated - cookies remain encrypted and HTTP-only for security
     const response = NextResponse.next();
-    response.headers.set('x-session-data', JSON.stringify(sessionForRoute));
 
-    console.log(`✅ [MIDDLEWARE] Valid session for ${sessionData.role}, fully decrypted, allowing: ${pathname}`);
+    console.log(`✅ [MIDDLEWARE] Valid session for ${sessionData.role}, allowing: ${pathname}`);
     return response;
     
   } catch (error) {
