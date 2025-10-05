@@ -18,6 +18,8 @@ export default function ProviderDashboardWrapper({
   useEffect(() => {
     async function fetchProviderName() {
       try {
+        let nameFound = false;
+
         // Extract practitioner ID from fhirUser URL
         if (session.fhirUser) {
           const practitionerMatch = session.fhirUser.match(/\/Practitioner\/(.+)$/);
@@ -36,28 +38,34 @@ export default function ProviderDashboardWrapper({
                 const fullName = `${name.prefix ? name.prefix.join(' ') + ' ' : ''}${name.given ? name.given.join(' ') : ''} ${name.family || ''}`.trim();
                 if (fullName) {
                   setProviderName(fullName);
+                  nameFound = true;
                 }
               }
             }
           }
         }
 
-        // Fallback to session username
-        if (!providerName && session.username && session.username !== 'portal') {
-          setProviderName(session.username);
-        } else if (!providerName && session.user) {
-          setProviderName(`Provider ${session.user}`);
+        // Fallback to session username if practitioner name not found
+        if (!nameFound) {
+          if (session.username && session.username !== 'portal') {
+            setProviderName(session.username);
+          } else if (session.user) {
+            setProviderName(`HealerMy ${session.user}`);
+          } else {
+            setProviderName('HealerMy');
+          }
         }
       } catch (error) {
         console.error('Error fetching provider name:', error);
-        // Keep undefined to show loading state
+        // Set fallback on error
+        setProviderName(session.username || 'HealerMy');
       }
     }
 
     if (session) {
       fetchProviderName();
     }
-  }, [session, providerName]);
+  }, [session]);
 
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Morning' : currentHour < 18 ? 'Afternoon' : 'Evening';

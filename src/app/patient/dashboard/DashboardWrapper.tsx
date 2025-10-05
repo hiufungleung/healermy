@@ -31,19 +31,29 @@ export default function DashboardWrapper({
             const fullName = `${given} ${family}`.trim();
             if (fullName) {
               setPatientName(fullName);
+            } else {
+              // Name fields exist but are empty
+              setPatientName(session.username || 'Patient');
             }
+          } else {
+            // No name data in response
+            setPatientName(session.username || 'Patient');
           }
+        } else {
+          // API call failed
+          setPatientName(session.username || 'Patient');
         }
       } catch (error) {
         console.error('Error fetching patient name:', error);
-        // Keep undefined to show loading state
+        // Set fallback on error
+        setPatientName(session.username || 'Patient');
       }
     }
 
     if (session?.patient) {
       fetchPatientName();
     }
-  }, [session?.patient]);
+  }, [session?.patient, session.username]);
 
   return (
     <Layout patientName={patientName}>

@@ -211,23 +211,20 @@ export default function ProviderDashboardClient({
 
   return (
     <>
-      {/* Welcome Section */}
-      <div className="mb-8">
-        <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl p-6 border border-primary/20">
-          <div className="flex items-center mb-3">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center mr-3">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-text-primary">
-                Welcome to HealerMy
-              </h1>
-            </div>
+      {/* Welcome Section - Clinic Profile Style */}
+      <Card className="mb-8 bg-gradient-to-r from-primary to-blue-600 text-white">
+        <div className="flex items-center space-x-4">
+          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-primary text-3xl font-bold">
+            <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold">HealerMy Clinic</h2>
+            <p className="text-blue-100">info@healermy.com.au</p>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid md:grid-cols-4 gap-6 mb-8">
