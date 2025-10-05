@@ -171,8 +171,24 @@ export default function BookAppointment() {
         return {};
       }
 
+      // Log detailed schedule information BEFORE filtering
+      console.log('\n========== ALL SCHEDULE DETAILS (BEFORE FILTERING) ==========');
+      schedulesData.schedules.forEach((schedule: any, index: number) => {
+        console.log(`\nSchedule ${index + 1}: ${schedule.id}`);
+        console.log('  Service Category:', JSON.stringify(schedule.serviceCategory, null, 2));
+        console.log('  Service Type:', JSON.stringify(schedule.serviceType, null, 2));
+        console.log('  Specialty:', JSON.stringify(schedule.specialty, null, 2));
+        console.log('  Comment:', schedule.comment);
+        console.log('  Active:', schedule.active);
+      });
+      console.log('=============================================================\n');
+
+      // TEMPORARILY DISABLE FILTERING - show all schedules to debug
+      console.log('⚠️  SCHEDULE FILTERING DISABLED FOR DEBUGGING - Showing ALL schedules');
+
+      // OLD FILTERING CODE (commented out for debugging):
       // Filter schedules for patient booking - improved logic for legacy schedules
-      const patientBookableSchedules = schedulesData.schedules.filter((schedule: any) => {
+      const patientBookableSchedules_FILTERED = schedulesData.schedules.filter((schedule: any) => {
         // Check if schedule has serviceCategory
         const serviceCategories = schedule.serviceCategory;
 
@@ -222,7 +238,10 @@ export default function BookAppointment() {
         return hasOutpatientService;
       });
 
-      console.log(`Filtered schedules: ${patientBookableSchedules.length} patient-bookable out of ${schedulesData.schedules.length} total`);
+      // Use ALL schedules (no filtering) for debugging
+      const patientBookableSchedules = schedulesData.schedules;
+
+      console.log(`Using ${patientBookableSchedules.length} schedules (filtering disabled for debugging) out of ${schedulesData.schedules.length} total`);
 
       if (patientBookableSchedules.length === 0) {
         console.log('No patient-bookable schedules found (all schedules are for Home Visit, Telehealth, or other non-outpatient services)');
@@ -235,8 +254,9 @@ export default function BookAppointment() {
       console.log('Fetching slots without server-side date filtering (FHIR server time filtering has issues)');
 
       // Build FHIR slot query without date filtering - filter client-side instead
+      // NOTE: We don't filter by status=free on the server because the FHIR API
+      // returns 0 results even though slots are marked as free. Filter client-side instead.
       const slotParams = new URLSearchParams({
-        status: 'free',
         _count: '100'  // Increased count since we're not filtering server-side
       });
 

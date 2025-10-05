@@ -19,21 +19,36 @@ import type { AuthSession } from '@/types/auth';
 function ScheduleSkeleton() {
   return (
     <Card className="animate-pulse">
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-2">
-          <Skeleton className="h-5 w-32" /> {/* Schedule ID */}
-          <div className="flex items-center space-x-2">
-            <Skeleton className="h-8 w-24 rounded-md" /> {/* Clear All Slots button */}
+      <div className="p-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6">
+          <div className="flex-1">
+            <Skeleton className="h-7 w-40 mb-2" /> {/* Schedule ID */}
+            <Skeleton className="h-4 w-64" /> {/* Planning Horizon */}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Skeleton className="h-8 w-28 rounded-md" /> {/* Generate Slots button */}
             <Skeleton className="h-8 w-20 rounded-md" /> {/* Show Slots button */}
+            <Skeleton className="h-8 w-24 rounded-md" /> {/* Clear All Slots button */}
+            <Skeleton className="h-8 w-28 rounded-md" /> {/* Delete Schedule button */}
           </div>
         </div>
 
-        <div className="space-y-1">
-          <div>
-            <Skeleton className="h-4 w-80" /> {/* Planning Horizon */}
-          </div>
-          <div>
-            <Skeleton className="h-4 w-48" /> {/* Comment */}
+        {/* Details Grid */}
+        <div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="bg-white rounded-md p-3">
+              <Skeleton className="h-3 w-24 mb-2" />
+              <Skeleton className="h-5 w-32" />
+            </div>
+            <div className="bg-white rounded-md p-3">
+              <Skeleton className="h-3 w-24 mb-2" />
+              <Skeleton className="h-5 w-28" />
+            </div>
+            <div className="bg-white rounded-md p-3">
+              <Skeleton className="h-3 w-20 mb-2" />
+              <Skeleton className="h-5 w-36" />
+            </div>
           </div>
         </div>
       </div>
@@ -112,10 +127,12 @@ export default function PractitionerDetailClient({
   const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
   const [showCreateSchedule, setShowCreateSchedule] = useState(false);
   const [showGenerateSlots, setShowGenerateSlots] = useState(false);
+  const [selectedScheduleForSlots, setSelectedScheduleForSlots] = useState<string>('');
 
   // Slot deletion
   const [deletingSlots, setDeletingSlots] = useState<Set<string>>(new Set());
   const [clearingScheduleSlots, setClearingScheduleSlots] = useState<Set<string>>(new Set());
+  const [deletingSchedules, setDeletingSchedules] = useState<Set<string>>(new Set());
 
   // Load practitioner name in background
   useEffect(() => {
@@ -366,6 +383,71 @@ export default function PractitionerDetailClient({
     }
   };
 
+  // Handle deleting a schedule
+  const handleDeleteSchedule = async (scheduleId: string) => {
+    setDeletingSchedules(prev => new Set(prev).add(scheduleId));
+
+    try {
+      // First, check if schedule has any slots by querying the API
+      // Use _count=1000 to get all slots (FHIR defaults to 50 without this)
+      const slotsResponse = await fetch(`/api/fhir/slots?schedule=Schedule/${scheduleId}&_count=1000`, {
+        credentials: 'include',
+      });
+
+      if (!slotsResponse.ok) {
+        throw new Error(`Failed to check slots: ${slotsResponse.status}`);
+      }
+
+      const slotsData = await slotsResponse.json();
+      const slotCount = slotsData.slots?.length || 0;
+
+      if (slotCount > 0) {
+        alert(`Cannot delete schedule with active slots. Please clear all ${slotCount} slots first using the "Clear All Slots" button.`);
+        setDeletingSchedules(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(scheduleId);
+          return newSet;
+        });
+        return;
+      }
+
+      // Confirm deletion
+      if (!confirm(`Are you sure you want to delete Schedule ${scheduleId}? This action cannot be undone.`)) {
+        setDeletingSchedules(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(scheduleId);
+          return newSet;
+        });
+        return;
+      }
+
+      // Delete the schedule
+      const response = await fetch(`/api/fhir/schedules/${scheduleId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || `Failed to delete schedule: ${response.status}`);
+      }
+
+      // Remove schedule from local state
+      setSchedules(prevSchedules => prevSchedules.filter(s => s.id !== scheduleId));
+
+      alert(`Successfully deleted Schedule ${scheduleId}.`);
+    } catch (error) {
+      console.error('Error deleting schedule:', error);
+      alert(`Failed to delete schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setDeletingSchedules(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(scheduleId);
+        return newSet;
+      });
+    }
+  };
+
   // Tab content rendering
   const renderTabContent = () => {
     switch (activeTab) {
@@ -405,22 +487,28 @@ export default function PractitionerDetailClient({
                 ) : (
                   schedules.map((schedule) => (
                       <Card key={schedule.id}>
-                        <div className="p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-semibold">Schedule {schedule.id}</h3>
-                            <div className="flex items-center space-x-2">
+                        <div className="p-6">
+                          {/* Header with Title and Actions */}
+                          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6">
+                            <div>
+                              <h3 className="text-xl font-bold text-text-primary mb-1">Schedule {schedule.id}</h3>
+                              <p className="text-sm text-gray-500">
+                                {schedule.planningHorizon?.start && formatDateForDisplay(schedule.planningHorizon.start)} -{' '}
+                                {schedule.planningHorizon?.end && formatDateForDisplay(schedule.planningHorizon.end)}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
                               <Button
-                                variant="danger"
+                                variant="primary"
                                 size="sm"
-                                onClick={() => schedule.id && handleClearScheduleSlots(schedule.id)}
-                                disabled={!schedule.id || clearingScheduleSlots.has(schedule.id || '')}
-                                title="Delete all slots for this schedule"
+                                onClick={() => {
+                                  setSelectedScheduleForSlots(schedule.id || '');
+                                  setShowGenerateSlots(true);
+                                }}
+                                disabled={!schedule.id}
+                                title="Generate slots for this schedule"
                               >
-                                {clearingScheduleSlots.has(schedule.id || '') ? (
-                                  <LoadingSpinner size="sm" />
-                                ) : (
-                                  'Clear All Slots'
-                                )}
+                                Generate Slots
                               </Button>
                               <Button
                                 variant="outline"
@@ -437,18 +525,107 @@ export default function PractitionerDetailClient({
                               >
                                 {expandedScheduleId === schedule.id ? 'Hide' : 'Show'} Slots
                               </Button>
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                onClick={() => schedule.id && handleClearScheduleSlots(schedule.id)}
+                                disabled={!schedule.id || clearingScheduleSlots.has(schedule.id || '')}
+                                title="Delete all slots for this schedule"
+                              >
+                                {clearingScheduleSlots.has(schedule.id || '') ? (
+                                  <LoadingSpinner size="sm" />
+                                ) : (
+                                  'Clear All Slots'
+                                )}
+                              </Button>
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                onClick={() => schedule.id && handleDeleteSchedule(schedule.id)}
+                                disabled={!schedule.id || deletingSchedules.has(schedule.id || '')}
+                                title="Delete this schedule (must have no slots)"
+                              >
+                                {deletingSchedules.has(schedule.id || '') ? (
+                                  <LoadingSpinner size="sm" />
+                                ) : (
+                                  'Delete Schedule'
+                                )}
+                              </Button>
                             </div>
                           </div>
 
-                          <div className="text-sm text-gray-600 space-y-1">
-                            <div>
-                              <strong>Planning Horizon:</strong>{' '}
-                              {schedule.planningHorizon?.start && formatDateForDisplay(schedule.planningHorizon.start)} -{' '}
-                              {schedule.planningHorizon?.end && formatDateForDisplay(schedule.planningHorizon.end)}
+                          {/* Details Grid */}
+                          <div className="mb-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {/* Service Category */}
+                              {schedule.serviceCategory && schedule.serviceCategory.length > 0 && (
+                                <div className="bg-white rounded-md p-3">
+                                  <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Service Category</div>
+                                  <div className="text-base text-text-primary font-medium">
+                                    {schedule.serviceCategory.map((cat, idx) => (
+                                      <div key={idx}>{cat.coding?.[0]?.display || 'N/A'}</div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Service Type */}
+                              {schedule.serviceType && schedule.serviceType.length > 0 && (
+                                <div className="bg-white rounded-md p-3">
+                                  <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Service Type</div>
+                                  <div className="text-base text-text-primary font-medium">
+                                    {schedule.serviceType.map((type, idx) => (
+                                      <div key={idx}>{type.coding?.[0]?.display || 'N/A'}</div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Specialty */}
+                              {schedule.specialty && schedule.specialty.length > 0 && (
+                                <div className="bg-white rounded-md p-3">
+                                  <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Specialty</div>
+                                  <div className="text-base text-text-primary font-medium">
+                                    {schedule.specialty.map((spec, idx) => (
+                                      <div key={idx}>{spec.coding?.[0]?.display || 'N/A'}</div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Available Time */}
+                              {schedule.availableTime && schedule.availableTime.length > 0 && (
+                                <div className="bg-white rounded-md p-3 md:col-span-2 lg:col-span-3">
+                                  <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Available Times</div>
+                                  <div className="text-base text-text-primary">
+                                    {schedule.availableTime.map((time, idx) => {
+                                      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                                      const days = time.daysOfWeek?.map(day => dayNames[parseInt(day)]).join(', ');
+
+                                      return (
+                                        <div key={idx} className="mb-1">
+                                          {days && <span className="font-medium">{days}</span>}
+                                          {time.availableStartTime && time.availableEndTime && (
+                                            <span className="ml-2 text-gray-600">
+                                              {time.availableStartTime} - {time.availableEndTime}
+                                            </span>
+                                          )}
+                                          {time.allDay && <span className="ml-2 text-blue-600">(All Day)</span>}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Comment */}
+                              {schedule.comment && (
+                                <div className="bg-white rounded-md p-3 md:col-span-2 lg:col-span-3">
+                                  <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Comment</div>
+                                  <div className="text-base text-text-primary">{schedule.comment}</div>
+                                </div>
+                              )}
                             </div>
-                            {schedule.comment && (
-                              <div><strong>Comment:</strong> {schedule.comment}</div>
-                            )}
                           </div>
 
                           {/* Expandable Slots Section */}
@@ -615,11 +792,16 @@ export default function PractitionerDetailClient({
       <GenerateSlotsForm
         schedules={schedules}
         isOpen={showGenerateSlots}
-        onClose={() => setShowGenerateSlots(false)}
+        onClose={() => {
+          setShowGenerateSlots(false);
+          setSelectedScheduleForSlots(''); // Reset selection when closing
+        }}
         onSuccess={(newSlots) => {
           setSlots(prev => [...prev, ...newSlots]);
           setShowGenerateSlots(false);
+          setSelectedScheduleForSlots(''); // Reset selection after success
         }}
+        preSelectedScheduleId={selectedScheduleForSlots}
       />
     </>
   );

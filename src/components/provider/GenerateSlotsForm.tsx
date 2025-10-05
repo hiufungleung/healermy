@@ -11,6 +11,7 @@ interface GenerateSlotsFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (slots: Slot[], pastSlotsInfo?: { count: number; totalSlots: number }) => void;
+  preSelectedScheduleId?: string;
 }
 
 interface SlotGenerationData {
@@ -35,14 +36,15 @@ const DAYS_OF_WEEK = [
   { value: '0', label: 'Sunday' },
 ];
 
-export function GenerateSlotsForm({ 
-  schedules, 
-  isOpen, 
-  onClose, 
-  onSuccess 
+export function GenerateSlotsForm({
+  schedules,
+  isOpen,
+  onClose,
+  onSuccess,
+  preSelectedScheduleId
 }: GenerateSlotsFormProps) {
   const [formData, setFormData] = useState<SlotGenerationData>({
-    scheduleId: '',
+    scheduleId: preSelectedScheduleId || '',
     startDate: '',
     endDate: '',
     slotDuration: 30,
@@ -54,6 +56,14 @@ export function GenerateSlotsForm({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+
+  // Update schedule when preSelectedScheduleId changes
+  useEffect(() => {
+    if (preSelectedScheduleId) {
+      setFormData(prev => ({ ...prev, scheduleId: preSelectedScheduleId }));
+    }
+  }, [preSelectedScheduleId]);
 
   // Auto-update selected days when date range changes
   useEffect(() => {
@@ -448,22 +458,58 @@ export function GenerateSlotsForm({
         }
       }
 
-      // Use batch creation with overlap validation
-      const response = await fetch('/api/fhir/slots/batch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ slots: slotsToCreate }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to create slots: ${response.status}`);
+      // Use chunked batch creation with progress updates
+      const CHUNK_SIZE = 50; // Create 50 slots at a time for better progress visibility
+      const chunks: Slot[][] = [];
+      for (let i = 0; i < slotsToCreate.length; i += CHUNK_SIZE) {
+        chunks.push(slotsToCreate.slice(i, i + CHUNK_SIZE));
       }
 
-      const result = await response.json();
+      let createdSlots: any[] = [];
+      let totalRejected: any[] = [];
+      let processedSlots = 0;
+
+      // Initialize progress
+      setProgress({ current: 0, total: slotsToCreate.length });
+
+      // Process chunks sequentially to show progress updates
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+
+        const response = await fetch('/api/fhir/slots/batch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ slots: chunk }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to create slots: ${response.status}`);
+        }
+
+        const chunkResult = await response.json();
+        createdSlots = [...createdSlots, ...(chunkResult.results?.created || [])];
+        totalRejected = [...totalRejected, ...(chunkResult.rejected || [])];
+
+        // Update progress after each chunk
+        processedSlots += chunk.length;
+        setProgress({ current: processedSlots, total: slotsToCreate.length });
+      }
+
+      // Clear progress when done
+      setProgress(null);
+
+      // Consolidate results from all chunks
+      const result = {
+        created: createdSlots.length,
+        rejected: totalRejected,
+        results: {
+          created: createdSlots
+        }
+      };
 
       // Show detailed results to user
       if (result.rejected && result.rejected.length > 0) {
@@ -542,7 +588,15 @@ export function GenerateSlotsForm({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={(e) => {
+        // Prevent closing when clicking backdrop during loading
+        if (e.target === e.currentTarget && !loading) {
+          onClose();
+        }
+      }}
+    >
       <div className="max-w-3xl w-full max-h-[90vh] overflow-y-auto">
         <Card>
           <div className="p-6">
@@ -550,7 +604,9 @@ export function GenerateSlotsForm({
               <h2 className="text-2xl font-bold text-text-primary">Generate Available Slots</h2>
               <button
                 onClick={onClose}
-                className="text-text-secondary hover:text-text-primary"
+                disabled={loading}
+                className={`${loading ? 'text-gray-400 cursor-not-allowed' : 'text-text-secondary hover:text-text-primary'}`}
+                title={loading ? "Cannot close while slots are being created" : "Close"}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -876,6 +932,7 @@ export function GenerateSlotsForm({
                   variant="outline"
                   onClick={onClose}
                   disabled={loading}
+                  title={loading ? "Cannot cancel while slots are being created" : "Cancel"}
                 >
                   Cancel
                 </Button>
@@ -891,7 +948,7 @@ export function GenerateSlotsForm({
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Generating...
+                      {progress ? `Creating slots: ${progress.current}/${progress.total}...` : 'Generating...'}
                     </>
                   ) : (
                     'Generate Slots'

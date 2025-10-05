@@ -93,11 +93,19 @@ export default function SelectAppointment() {
       const scheduleIds = schedulesData.schedules.map((s: any) => s.id);
       console.log('Schedule IDs:', scheduleIds);
 
-      // Use optimized working approach - fetch slots and filter client-side
+      // Fetch slots for this practitioner's schedules
       console.log('Fetching slots for date:', selectedDate);
 
-      // Increased count for better coverage while keeping it reasonable
-      const response = await fetch(`/api/fhir/slots?_count=50`, {
+      // Build query params with schedule filters
+      // NOTE: We don't filter by status=free on the server because the FHIR API
+      // returns 0 results even though slots are marked as free. Filter client-side instead.
+      const params = new URLSearchParams();
+      scheduleIds.forEach(scheduleId => {
+        params.append('schedule', `Schedule/${scheduleId}`);
+      });
+      params.append('_count', '100');
+
+      const response = await fetch(`/api/fhir/slots?${params.toString()}`, {
         credentials: 'include',
       });
 
@@ -115,27 +123,20 @@ export default function SelectAppointment() {
 
       const result = await response.json();
       const allSlots = result.slots || [];
-      console.log('Total slots from API:', allSlots.length);
-
-      // Filter slots that belong to this practitioner's schedules
-      const practitionerSlots = allSlots.filter((slot: Slot) =>
-        scheduleIds.some(scheduleId => slot.schedule?.reference === `Schedule/${scheduleId}`)
-      );
-
-      console.log('Filtered practitioner slots:', practitionerSlots.length);
+      console.log('Total slots from API for practitioner:', allSlots.length);
 
       // Filter by selected date and free status using patient's local timezone
       const startOfDay = new Date(`${selectedDate}T00:00:00`);
       const endOfDay = new Date(`${selectedDate}T23:59:59`);
 
-      const dateAndStatusFilteredSlots = practitionerSlots.filter((slot: Slot) => {
+      const dateAndStatusFilteredSlots = allSlots.filter((slot: Slot) => {
         const slotStart = new Date(slot.start);
         return slot.status === 'free' &&
                slotStart >= startOfDay &&
                slotStart <= endOfDay;
       });
 
-      console.log('Available slots for selected date:', dateAndStatusFilteredSlots.length);
+      console.log('Available free slots for selected date:', dateAndStatusFilteredSlots.length);
       setAvailableSlots(dateAndStatusFilteredSlots);
 
     } catch (error) {
