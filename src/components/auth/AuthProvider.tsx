@@ -19,9 +19,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   const checkSession = async () => {
+    // Check if session cookies exist before making API call
+    const hasCookies = document.cookie.includes('healermy_tokens') &&
+                       document.cookie.includes('healermy_session');
+
+    if (!hasCookies) {
+      console.log('ℹ️ No session cookies found - skipping API call');
+      return null;
+    }
+
     try {
       const response = await fetch('/api/auth/session');
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.authenticated && data.session) {

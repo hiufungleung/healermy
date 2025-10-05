@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { getProviderSessionOnly } from './actions';
 import ProviderDashboardWrapper from './ProviderDashboardWrapper';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ProviderDashboard() {
   const { session, error } = await getProviderSessionOnly();
 

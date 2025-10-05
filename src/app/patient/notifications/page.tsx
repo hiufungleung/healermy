@@ -2,6 +2,8 @@ import { getSessionFromCookies } from '@/app/api/fhir/utils/auth';
 import { redirect } from 'next/navigation';
 import NotificationsWrapper from './NotificationsWrapper';
 
+export const dynamic = 'force-dynamic';
+
 export default async function PatientNotifications() {
   try {
     // Get session from middleware headers (fast, no FHIR calls)

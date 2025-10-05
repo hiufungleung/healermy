@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { getSessionOnly } from '../dashboard/actions';
 import PatientProfileClient from './PatientProfileClient';
 
+export const dynamic = 'force-dynamic';
+
 // Extract patient name from FHIR Patient resource
 const extractPatientName = (patient: any): string => {
   if (!patient?.name || patient.name.length === 0) {

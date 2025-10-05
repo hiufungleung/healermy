@@ -7,6 +7,8 @@ import { Layout } from '@/components/common/Layout';
 import HistoryClient from './HistoryClient';
 import type { Appointment } from '@/types/fhir';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ProviderAppointmentsHistoryPage() {
   // Get session from middleware headers
   let session;

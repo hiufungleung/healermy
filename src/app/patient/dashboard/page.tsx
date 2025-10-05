@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { getSessionOnly } from './actions';
 import DashboardWrapper from './DashboardWrapper';
 
+export const dynamic = 'force-dynamic';
+
 export default async function PatientDashboard() {
   const { session, error } = await getSessionOnly();
 

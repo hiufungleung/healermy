@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { getSessionOnly } from '../dashboard/actions';
 import AppointmentsWrapper from './AppointmentsWrapper';
 
+export const dynamic = 'force-dynamic';
+
 export default async function PatientAppointments() {
   const { session, error } = await getSessionOnly();
 

@@ -7,6 +7,8 @@ import { Layout } from '@/components/common/Layout';
 import ProviderAppointmentsClient from './ProviderAppointmentsClient';
 import type { Appointment } from '@/types/fhir';
 
+export const dynamic = 'force-dynamic';
+
 interface AppointmentStats {
   today: number;
   pending: number;
