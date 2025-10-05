@@ -16,13 +16,16 @@ interface LayoutProps {
 
 export function Layout({ children, patientName, providerName }: LayoutProps) {
   const pathname = usePathname();
-  const { session, logout, isLoading } = useAuth();
+  const { session, logout, isLoading, userName, isLoadingUserName } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  
+
   const isPatient = session?.role === 'patient';
   const isProvider = session?.role === 'provider';
+
+  // Use cached userName from AuthProvider, fallback to prop-based names
+  const displayName = userName || (isPatient ? patientName : providerName);
   
   const handleLogoutClick = () => {
     setShowLogoutConfirmation(true);
@@ -102,17 +105,14 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
                     <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold">
                       {session.role === 'patient' ? 'P' : 'D'}
                     </div>
-                    {/* Show loading skeleton if no name provided yet */}
-                    {(session.role === 'patient' && !patientName) || (session.role === 'provider' && !providerName) ? (
+                    {/* Show loading skeleton if name is still loading */}
+                    {isLoadingUserName || !displayName ? (
                       <div className="animate-pulse">
                         <div className="h-4 bg-gray-200 rounded w-20"></div>
                       </div>
                     ) : (
                       <span className="text-sm font-medium">
-                        {session.role === 'patient'
-                          ? (patientName || 'Patient')
-                          : (providerName || 'Provider')
-                        }
+                        {displayName}
                       </span>
                     )}
                   </div>
