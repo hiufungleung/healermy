@@ -54,6 +54,8 @@ interface PractitionerSearchProps {
   totalCount?: number;
   showAdvancedFilters?: boolean;
   showOracleIdField?: boolean;
+  showSubtitle?: boolean;
+  showPhoneField?: boolean;
 }
 
 export function PractitionerSearch({
@@ -62,7 +64,9 @@ export function PractitionerSearch({
   resultsCount,
   totalCount,
   showAdvancedFilters = true,
-  showOracleIdField = false
+  showOracleIdField = false,
+  showSubtitle = true,
+  showPhoneField = true
 }: PractitionerSearchProps) {
   const [givenName, setGivenName] = useState('');
   const [familyName, setFamilyName] = useState('');
@@ -124,9 +128,11 @@ export function PractitionerSearch({
           </svg>
           <h3 className="text-lg font-medium text-gray-900">Find Your Doctor</h3>
         </div>
-        <p className="text-gray-600 text-sm">
-          Search by doctor&apos;s name, location, or practitioner ID. Use multiple fields to narrow your results.
-        </p>
+        {showSubtitle && (
+          <p className="text-gray-600 text-sm">
+            Search by doctor&apos;s name, location, or practitioner ID. Use multiple fields to narrow your results.
+          </p>
+        )}
       </div>
 
       {/* FHIR Search Filters */}
@@ -166,37 +172,43 @@ export function PractitionerSearch({
           </div>
 
           {/* Contact Fields Row - 2 columns on mobile, responsive on larger screens */}
-          <div className="grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4">
-            {/* Phone */}
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                Phone Number
-                <span className="text-xs text-gray-500 ml-1">(Clinic contact)</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., (555) 123-4567 or +1234567890"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
-              />
-            </div>
+          {(showPhoneField || showOracleIdField) && (
+            <div className="grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4">
+              {/* Phone */}
+              {showPhoneField && (
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">
+                    Phone Number
+                    <span className="text-xs text-gray-500 ml-1">(Clinic contact)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g., (555) 123-4567 or +1234567890"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
+                  />
+                </div>
+              )}
 
-            {/* Practitioner ID */}
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                Practitioner ID
-                <span className="text-xs text-gray-500 ml-1">(Oracle FHIR ID)</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., 12345 or ABC123-DEF456"
-                value={practitionerId}
-                onChange={(e) => setPractitionerId(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
-              />
+              {/* Practitioner ID */}
+              {showOracleIdField && (
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">
+                    Practitioner ID
+                    <span className="text-xs text-gray-500 ml-1">(Oracle FHIR ID)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g., 12345 or ABC123-DEF456"
+                    value={practitionerId}
+                    onChange={(e) => setPractitionerId(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
+                  />
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           {/* Location Fields Row - Responsive based on screen size */}
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -308,25 +320,13 @@ export function PractitionerSearch({
       )}
 
       {/* Results Count Display */}
-      {(resultsCount !== undefined || totalCount !== undefined) && (
+      {resultsCount !== undefined && (
         <div className="mt-4 p-3 bg-gray-50 rounded-lg border">
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <div className="flex items-center">
-              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-              </svg>
-              <span>Search Results</span>
-            </div>
-            <div className="font-medium">
-              {resultsCount !== undefined && totalCount !== undefined
-                ? `Showing ${resultsCount} of ${totalCount} practitioners`
-                : resultsCount !== undefined
-                ? `${resultsCount} practitioners found`
-                : totalCount !== undefined
-                ? `${totalCount} total practitioners`
-                : ''
-              }
-            </div>
+          <div className="flex items-center text-sm text-gray-600">
+            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+            </svg>
+            <span className="font-medium">{resultsCount} practitioners</span>
           </div>
         </div>
       )}

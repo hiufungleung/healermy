@@ -35,12 +35,6 @@ export default function BookAppointment() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
 
-  // Expandable cards state
-  const [expandedPractitionerId, setExpandedPractitionerId] = useState<string | null>(null);
-  const [practitionerSlots, setPractitionerSlots] = useState<Record<string, Record<string, any[]>>>({});
-  const [slotsLoading, setSlotsLoading] = useState<Record<string, boolean>>({});
-  const [selectedDates, setSelectedDates] = useState<Record<string, string>>({});
-  const [selectedSlots, setSelectedSlots] = useState<Record<string, string>>({});
 
   const fetchPractitioners = useCallback(async (page = 1, isSearch = false) => {
     if (isSearch || page === 1) {
@@ -145,207 +139,9 @@ export default function BookAppointment() {
     fetchPractitioners(1, false); // page 1, not a search
   }, [fetchPractitioners]);
 
-  // Timezone-aware slot fetching for next 7 days using local timezone
-  const fetchSlotsForPractitioner = async (practitionerId: string) => {
-    try {
-      console.log('Fetching schedules for practitioner:', practitionerId);
-
-      // Get all schedules for this practitioner, then filter for patient-bookable ones
-      const schedulesResponse = await fetch(
-        `/api/fhir/schedules?actor=Practitioner/${practitionerId}`,
-        {
-          credentials: 'include',
-        }
-      );
-
-      if (!schedulesResponse.ok) {
-        console.error('Schedules API failed with status:', schedulesResponse.status, schedulesResponse.statusText);
-        return {};
-      }
-
-      const schedulesData = await schedulesResponse.json();
-      console.log('Schedules data:', schedulesData);
-
-      if (!schedulesData.schedules || schedulesData.schedules.length === 0) {
-        console.log('No schedules found for practitioner');
-        return {};
-      }
-
-      // Log detailed schedule information BEFORE filtering
-      console.log('\n========== ALL SCHEDULE DETAILS (BEFORE FILTERING) ==========');
-      schedulesData.schedules.forEach((schedule: any, index: number) => {
-        console.log(`\nSchedule ${index + 1}: ${schedule.id}`);
-        console.log('  Service Category:', JSON.stringify(schedule.serviceCategory, null, 2));
-        console.log('  Service Type:', JSON.stringify(schedule.serviceType, null, 2));
-        console.log('  Specialty:', JSON.stringify(schedule.specialty, null, 2));
-        console.log('  Comment:', schedule.comment);
-        console.log('  Active:', schedule.active);
-      });
-      console.log('=============================================================\n');
-
-      // TEMPORARILY DISABLE FILTERING - show all schedules to debug
-      console.log('⚠️  SCHEDULE FILTERING DISABLED FOR DEBUGGING - Showing ALL schedules');
-
-      // OLD FILTERING CODE (commented out for debugging):
-      // Filter schedules for patient booking - improved logic for legacy schedules
-      const patientBookableSchedules_FILTERED = schedulesData.schedules.filter((schedule: any) => {
-        // Check if schedule has serviceCategory
-        const serviceCategories = schedule.serviceCategory;
-
-        if (!serviceCategories || !Array.isArray(serviceCategories)) {
-          // Legacy schedule without service category - check serviceType instead
-          const serviceTypes = schedule.serviceType;
-
-          if (!serviceTypes || !Array.isArray(serviceTypes)) {
-            // Very old schedule with no categories or types - allow for maximum compatibility
-            console.log('Legacy schedule with no category/type, allowing:', schedule.id);
-            return true;
-          }
-
-          // For legacy schedules, assume patient-bookable if service type is consultation-like
-          const hasPatientBookableType = serviceTypes.some((type: any) => {
-            const typeCode = type.coding?.[0]?.code || type.coding?.[0]?.display || '';
-            const patientBookableTypes = ['consultation', 'follow-up', 'screening', 'vaccination'];
-            const isBookable = patientBookableTypes.includes(typeCode.toLowerCase());
-
-            if (!isBookable) {
-              console.log('Legacy schedule filtered out by service type:', schedule.id, 'Type:', typeCode);
-            }
-
-            return isBookable;
-          });
-
-          if (hasPatientBookableType) {
-            console.log('Legacy schedule allowed by service type:', schedule.id);
-          }
-
-          return hasPatientBookableType;
-        }
-
-        // Modern schedule with service category - check if "outpatient"
-        const hasOutpatientService = serviceCategories.some((category: any) => {
-          const categoryCode = category.coding?.[0]?.code || category.coding?.[0]?.display;
-          return categoryCode === 'outpatient';
-        });
-
-        if (!hasOutpatientService) {
-          console.log('Modern schedule filtered out - not outpatient:', schedule.id,
-            'Service categories:', serviceCategories.map((c: any) => c.coding?.[0]?.code || c.coding?.[0]?.display));
-        } else {
-          console.log('Modern schedule allowed - outpatient category:', schedule.id);
-        }
-
-        return hasOutpatientService;
-      });
-
-      // Use ALL schedules (no filtering) for debugging
-      const patientBookableSchedules = schedulesData.schedules;
-
-      console.log(`Using ${patientBookableSchedules.length} schedules (filtering disabled for debugging) out of ${schedulesData.schedules.length} total`);
-
-      if (patientBookableSchedules.length === 0) {
-        console.log('No patient-bookable schedules found (all schedules are for Home Visit, Telehealth, or other non-outpatient services)');
-        return {};
-      }
-
-      const scheduleIds = patientBookableSchedules.map((s: any) => s.id);
-      console.log('Patient-bookable Schedule IDs:', scheduleIds);
-
-      console.log('Fetching slots without server-side date filtering (FHIR server time filtering has issues)');
-
-      // Build FHIR slot query without date filtering - filter client-side instead
-      // NOTE: We don't filter by status=free on the server because the FHIR API
-      // returns 0 results even though slots are marked as free. Filter client-side instead.
-      const slotParams = new URLSearchParams({
-        _count: '100'  // Increased count since we're not filtering server-side
-      });
-
-      // Add all schedule IDs for this practitioner
-      scheduleIds.forEach((scheduleId: string) => {
-        slotParams.append('schedule', `Schedule/${scheduleId}`);
-      });
-
-      console.log('Fetching slots with date filtering:', slotParams.toString());
-      console.log('Full slot API URL:', `/api/fhir/slots?${slotParams.toString()}`);
-
-      const response = await fetch(`/api/fhir/slots?${slotParams.toString()}`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-
-      console.log('Slots response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Slots API error response:', errorText);
-        console.error('Failed to fetch slots: HTTP', response.status);
-        return {};
-      }
-
-      const result = await response.json();
-      console.log('Slots API response:', {
-        slotsFound: result.slots?.length || 0,
-        total: result.total
-      });
-
-      const allSlots = result.slots || [];
-      console.log('Server-filtered slots (next 7 days, free status):', allSlots.length);
-
-      // Client-side filtering and organization by patient's local date
-      const slotsByDate: Record<string, any[]> = {};
-      const now = new Date();
-      const sevenDaysFromNow = new Date();
-      sevenDaysFromNow.setDate(now.getDate() + 7);
-
-      console.log('Client-side filtering for next 7 days:', now.toISOString(), 'to', sevenDaysFromNow.toISOString());
-
-      allSlots.forEach((slot: any) => {
-        // Convert UTC slot time to patient's local timezone
-        const localSlotTime = new Date(slot.start);
-
-        // Client-side filtering: only show slots in next 7 days and in the future
-        if (localSlotTime > now && localSlotTime <= sevenDaysFromNow) {
-          // Use patient's local date for grouping (YYYY-MM-DD format)
-          const dateKey = localSlotTime.toLocaleDateString('en-CA');
-
-          if (!slotsByDate[dateKey]) {
-            slotsByDate[dateKey] = [];
-          }
-          slotsByDate[dateKey].push(slot);
-        }
-      });
-
-      console.log('Client organized slots by date:',
-        Object.keys(slotsByDate).map(date => `${date}: ${slotsByDate[date].length} slots`)
-      );
-      return slotsByDate;
-
-    } catch (error) {
-      console.error('Error fetching slots:', error);
-      return {};
-    }
-  };
-
-  const handleBookNow = async (practitioner: Practitioner) => {
-    // Check if this card is already expanded
-    if (expandedPractitionerId === practitioner.id) {
-      // Card is expanded, collapse it
-      setExpandedPractitionerId(null);
-      return;
-    }
-
-    // Expand this card and fetch slots for next 7 days
-    setExpandedPractitionerId(practitioner.id);
-    setSlotsLoading((prev: Record<string, boolean>) => ({ ...prev, [practitioner.id]: true }));
-
-    // Set default date to today in patient's local timezone
-    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format
-    setSelectedDates((prev: Record<string, string>) => ({ ...prev, [practitioner.id]: today }));
-
-    // Fetch slots for all 7 days (organized by date)
-    const slotsByDate = await fetchSlotsForPractitioner(practitioner.id);
-    setPractitionerSlots((prev: Record<string, Record<string, any[]>>) => ({ ...prev, [practitioner.id]: slotsByDate }));
-    setSlotsLoading((prev: Record<string, boolean>) => ({ ...prev, [practitioner.id]: false }));
+  const handleBookNow = (practitioner: Practitioner) => {
+    // Navigate to practitioner detail page for service selection and booking
+    router.push(`/patient/book-appointment/${practitioner.id}`);
   };
 
   const handleNextPage = () => {
@@ -362,9 +158,6 @@ export default function BookAppointment() {
           <h1 className="text-3xl font-bold text-text-primary mb-2">
             Book New Appointment
           </h1>
-          <p className="text-text-secondary">
-            Find and book with the right clinic for you
-          </p>
         </div>
 
         {/* Progress Steps - Updated for combined flow */}
@@ -384,7 +177,9 @@ export default function BookAppointment() {
           resultsCount={practitioners.length}
           totalCount={totalPractitioners}
           showAdvancedFilters={true}
-          showOracleIdField={true}
+          showOracleIdField={false}
+          showSubtitle={false}
+          showPhoneField={false}
         />
 
         {/* Practitioner List */}
@@ -446,20 +241,12 @@ export default function BookAppointment() {
                   {/* Fixed Button - Always in top-right corner */}
                   <div className="absolute top-4 right-4 z-10">
                     <Button
-                      variant={practitioner.active ? "primary" : "outline"}
+                      variant="primary"
                       size="sm"
                       onClick={() => handleBookNow(practitioner)}
-                      disabled={!practitioner.active || slotsLoading[practitioner.id]}
                       className="w-16 h-8 text-xs px-2 py-1 sm:w-20 sm:h-9 sm:text-sm sm:px-3 sm:py-2 md:w-24 md:h-10 md:text-base md:px-4 md:py-2"
                     >
-                      {slotsLoading[practitioner.id]
-                        ? 'Loading...'
-                        : expandedPractitionerId === practitioner.id
-                          ? 'Collapse'
-                          : practitioner.active
-                            ? 'Book'
-                            : 'Unavailable'
-                      }
+                      Book
                     </Button>
                   </div>
 
@@ -478,13 +265,6 @@ export default function BookAppointment() {
                           <h3 className="text-xl font-semibold text-text-primary">{displayName}</h3>
                           {qualifications.length > 0 && (
                             <p className="text-sm text-primary font-medium">{qualifications.join(', ')}</p>
-                          )}
-                        </div>
-                        <div className="flex-shrink-0">
-                          {practitioner.active ? (
-                            <Badge variant="success" size="sm">Active</Badge>
-                          ) : (
-                            <Badge variant="danger" size="sm">Inactive</Badge>
                           )}
                         </div>
                       </div>
@@ -537,134 +317,6 @@ export default function BookAppointment() {
                       )}
                     </div>
                   </div>
-
-                  {/* Expandable Content */}
-                  {expandedPractitionerId === practitioner.id && (
-                    <div className="mt-6 pt-6 border-t border-gray-200">
-                      <h3 className="text-lg font-semibold mb-4">Select Date & Time</h3>
-
-                      {/* Date Selection */}
-                      <div className="mb-6">
-                        <h4 className="font-medium mb-3">Choose Date</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
-                          {Array.from({ length: 7 }, (_, i) => {
-                            // Use patient's local timezone for consistent date calculation
-                            const localDate = new Date();
-                            localDate.setDate(localDate.getDate() + i);
-                            const dateStr = localDate.toLocaleDateString('en-CA'); // YYYY-MM-DD
-                            const isSelected = selectedDates[practitioner.id] === dateStr;
-
-                            // Format display using patient's local timezone
-                            const displayDate = new Date(dateStr + 'T12:00:00'); // Noon to avoid timezone edge cases
-                            const dayNum = displayDate.getDate();
-                            const month = displayDate.toLocaleDateString('en-US', { month: 'short' });
-                            const weekday = displayDate.toLocaleDateString('en-US', { weekday: 'short' });
-
-                            return (
-                              <button
-                                key={dateStr}
-                                onClick={() => {
-                                  setSelectedDates((prev: Record<string, string>) => ({ ...prev, [practitioner.id]: dateStr }));
-                                }}
-                                className={`p-3 rounded-lg border text-center transition-colors ${
-                                  isSelected
-                                    ? 'bg-primary text-white border-primary'
-                                    : 'bg-white hover:bg-gray-50 border-gray-200'
-                                }`}
-                              >
-                                <div className="text-xs">{weekday}</div>
-                                <div className="font-semibold">{dayNum}</div>
-                                <div className="text-xs">{month}</div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Time Slot Selection */}
-                      <div className="mb-6">
-                        <h4 className="font-medium mb-3">Available Times</h4>
-                        {slotsLoading[practitioner.id] ? (
-                          <div className="text-center py-8">
-                            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                            <p className="mt-2 text-text-secondary">Loading available times...</p>
-                          </div>
-                        ) : !practitionerSlots[practitioner.id]?.[selectedDates[practitioner.id] || ''] || practitionerSlots[practitioner.id]?.[selectedDates[practitioner.id] || '']?.length === 0 ? (
-                          <div className="text-center py-8">
-                            {/* Check if no slots exist for any date (schedule has no slots generated) */}
-                            {!practitionerSlots[practitioner.id] || Object.keys(practitionerSlots[practitioner.id]).length === 0 || Object.values(practitionerSlots[practitioner.id]).every(slots => !slots || slots.length === 0) ? (
-                              <div>
-                                <div className="mb-4">
-                                  <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                  </svg>
-                                </div>
-                                <p className="text-gray-600 font-medium mb-2">No appointment slots available</p>
-                                <p className="text-sm text-gray-500 mb-3">
-                                  This practitioner hasn't set up their appointment schedule yet.
-                                </p>
-                                <p className="text-sm text-blue-600">
-                                  Please contact them directly at <a href={`tel:${practitioner.telecom?.find((t: any) => t.system === 'phone')?.value}`} className="font-medium hover:underline">{practitioner.telecom?.find((t: any) => t.system === 'phone')?.value}</a> to schedule an appointment.
-                                </p>
-                              </div>
-                            ) : (
-                              <div>
-                                <p className="text-text-secondary">No available time slots for this date.</p>
-                                <p className="text-sm text-text-secondary mt-2">Please try a different date.</p>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                            {practitionerSlots[practitioner.id]?.[selectedDates[practitioner.id] || '']?.map((slot: any) => {
-                              // Extract only time from slot start, exclude date
-                              const slotDate = new Date(slot.start);
-                              const timeDisplay = slotDate.toLocaleTimeString('en-US', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                hour12: true
-                              });
-                              const isSelected = selectedSlots[practitioner.id] === slot.id;
-
-                              return (
-                                <button
-                                  key={slot.id}
-                                  onClick={() => {
-                                    setSelectedSlots((prev: Record<string, string>) => ({ ...prev, [practitioner.id]: slot.id }));
-                                  }}
-                                  className={`p-3 rounded-lg border text-center transition-colors ${
-                                    isSelected
-                                      ? 'bg-primary text-white border-primary'
-                                      : 'bg-white hover:bg-gray-50 border-gray-200'
-                                  }`}
-                                >
-                                  {timeDisplay}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Next Button */}
-                      {selectedSlots[practitioner.id] && (
-                        <FormNavigationButtons
-                          onNext={() => {
-                            const selectedSlotId = selectedSlots[practitioner.id];
-                            const selectedDate = selectedDates[practitioner.id];
-                            const selectedSlot = practitionerSlots[practitioner.id]?.[selectedDate]?.find((s: any) => s.id === selectedSlotId);
-                            const selectedTime = selectedSlot ? formatTimeForDisplay(selectedSlot.start) : '';
-
-                            router.push(`/patient/book-appointment/${practitioner.id}/visit-info?date=${selectedDate}&time=${selectedTime}&slotId=${selectedSlotId}`);
-                          }}
-                          nextLabel="Next"
-                          showPrevious={false}
-                          size="md"
-                          className="justify-end"
-                        />
-                      )}
-                    </div>
-                  )}
                 </Card>
               );
               })}

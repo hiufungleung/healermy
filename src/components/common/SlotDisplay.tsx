@@ -87,6 +87,8 @@ export function SlotDisplay({
               
               {/* Tooltip for calendar mode */}
               <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-10 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                ID: {slot.id}
+                <br />
                 {formatSlotTime(slot.start, slot.end)}
                 <br />
                 Status: {slot.status}
@@ -111,7 +113,7 @@ export function SlotDisplay({
         {slots.map(slot => {
           const isSelected = selectedSlotId === slot.id;
           const isAvailable = slot.status === 'free';
-          
+
           return (
             <button
               key={slot.id}
@@ -125,7 +127,7 @@ export function SlotDisplay({
                   : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
               }`}
             >
-              {formatTimeForDisplay(slot.start)}
+              <div>{formatTimeForDisplay(slot.start)}</div>
             </button>
           );
         })}
@@ -150,6 +152,9 @@ export function SlotDisplay({
               <div>
                 <div className="font-medium">
                   {formatSlotTime(slot.start, slot.end)}
+                </div>
+                <div className="text-xs text-gray-400">
+                  ID: {slot.id}
                 </div>
                 {slot.serviceType && slot.serviceType[0]?.coding?.[0]?.display && (
                   <div className="text-sm text-gray-500">
