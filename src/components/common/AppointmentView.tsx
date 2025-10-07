@@ -22,6 +22,9 @@ interface AppointmentViewProps {
   selectedSlotId?: string;
   reasonText?: string;
   symptoms?: string;
+  serviceCategory?: string;
+  serviceType?: string;
+  specialty?: string;
   practitionerId?: string;
   session?: Pick<AuthSession, 'patient' | 'role'> | null;
 
@@ -328,12 +331,9 @@ export default function AppointmentView(props: AppointmentViewProps) {
   return (
     <ContentContainer size="md">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-text-primary mb-2">
+        <h1 className="text-3xl font-bold text-text-primary">
           {mode === 'confirm' ? 'Book New Appointment' : 'Appointment Details'}
         </h1>
-        <p className="text-text-secondary">
-          {mode === 'confirm' ? 'Find and book with the right clinic for you' : 'View and manage your appointment'}
-        </p>
       </div>
 
       {/* Progress Steps - Only show for confirm mode */}
@@ -341,10 +341,31 @@ export default function AppointmentView(props: AppointmentViewProps) {
         <ProgressSteps
           steps={[
             { id: 1, label: 'Search & Select', status: 'completed' },
-            { id: 2, label: 'Visit Information', status: 'completed' },
-            { id: 3, label: 'Confirm', status: 'active' }
+            { id: 2, label: 'Service & Date', status: 'completed' },
+            { id: 3, label: 'Visit Information', status: 'completed' },
+            { id: 4, label: 'Confirm', status: 'active' }
           ]}
-          currentStep={3}
+          currentStep={4}
+          onStepClick={(stepId) => {
+            if (stepId === 1) {
+              router.push('/patient/book-appointment');
+            } else if (stepId === 2 && mode === 'confirm' && props.practitionerId) {
+              // Go back to service & date page
+              router.push(`/patient/book-appointment/${props.practitionerId}`);
+            } else if (stepId === 3 && mode === 'confirm' && props.practitionerId) {
+              // Go back to visit info page
+              const params = new URLSearchParams({
+                date: props.selectedDate || '',
+                time: props.selectedTime || '',
+                slotId: props.selectedSlotId || '',
+                serviceCategory: props.serviceCategory || '',
+                serviceType: props.serviceType || '',
+                specialty: props.specialty || ''
+              });
+              router.push(`/patient/book-appointment/${props.practitionerId}/visit-info?${params.toString()}`);
+            }
+            // Step 4 is current, not clickable
+          }}
         />
       )}
 
@@ -382,6 +403,24 @@ export default function AppointmentView(props: AppointmentViewProps) {
             <span className="text-text-secondary font-medium">Visit Type</span>
             <span className="text-text-primary font-semibold text-right">{appointmentData.visitType}</span>
           </div>
+
+          {/* Service Details - Only show in confirm mode */}
+          {mode === 'confirm' && props.serviceCategory && (
+            <>
+              <div className="flex justify-between items-center">
+                <span className="text-text-secondary font-medium">Service Category</span>
+                <span className="text-text-primary font-semibold text-right capitalize">{props.serviceCategory.replace(/-/g, ' ')}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-text-secondary font-medium">Service Type</span>
+                <span className="text-text-primary font-semibold text-right capitalize">{props.serviceType?.replace(/-/g, ' ')}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-text-secondary font-medium">Specialty</span>
+                <span className="text-text-primary font-semibold text-right capitalize">{props.specialty?.replace(/-/g, ' ')}</span>
+              </div>
+            </>
+          )}
 
           {appointmentData.phone && (
             <div className="flex justify-between items-center">

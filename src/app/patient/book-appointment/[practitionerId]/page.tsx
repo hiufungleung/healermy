@@ -243,7 +243,15 @@ export default function SelectAppointment() {
 
   const handleNext = () => {
     if (selectedTime && selectedSlotId) {
-      router.push(`/patient/book-appointment/${practitionerId}/confirm?date=${selectedDate}&time=${selectedTime}&slotId=${selectedSlotId}`);
+      const params = new URLSearchParams({
+        date: selectedDate,
+        time: selectedTime,
+        slotId: selectedSlotId,
+        serviceCategory: selectedServiceCategory,
+        serviceType: selectedServiceType,
+        specialty: selectedSpecialty
+      });
+      router.push(`/patient/book-appointment/${practitionerId}/visit-info?${params.toString()}`);
     }
   };
 
@@ -297,25 +305,28 @@ export default function SelectAppointment() {
 
   return (
     <Layout>
-      <ContentContainer size="md">
+      <ContentContainer size="xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-text-primary mb-2">
+          <h1 className="text-3xl font-bold text-text-primary">
             Book New Appointment
           </h1>
-          <p className="text-text-secondary">
-            Find and book with the right clinic for you
-          </p>
         </div>
 
         {/* Progress Steps */}
         <ProgressSteps
           steps={[
-            { id: 1, label: 'Search', status: 'completed' },
-            { id: 2, label: 'Select Doctor & Date', status: 'active' },
-            { id: 3, label: 'Confirm', status: 'upcoming' },
-            { id: 4, label: 'Complete', status: 'upcoming' }
+            { id: 1, label: 'Search & Select', status: 'completed' },
+            { id: 2, label: 'Service & Date', status: 'active' },
+            { id: 3, label: 'Visit Information', status: 'upcoming' },
+            { id: 4, label: 'Confirm', status: 'upcoming' }
           ]}
           currentStep={2}
+          onStepClick={(stepId) => {
+            if (stepId === 1) {
+              router.push('/patient/book-appointment');
+            }
+            // Step 2 is current, Steps 3-4 are not clickable (upcoming)
+          }}
         />
 
         {/* Service Selection Card - Required before viewing slots */}
@@ -415,15 +426,32 @@ export default function SelectAppointment() {
               </select>
             </div>
           </div>
+
+          {/* Navigation Buttons - Show here if service selection incomplete */}
+          {(!selectedServiceCategory || !selectedServiceType || !selectedSpecialty) && (
+            <div className="flex justify-between mt-6">
+              <Button
+                variant="outline"
+                onClick={handlePrevious}
+              >
+                ← Previous
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleNext}
+                disabled={true}
+                className="opacity-50 cursor-not-allowed"
+              >
+                Next →
+              </Button>
+            </div>
+          )}
         </Card>
 
-        {/* Only show doctor selection and date/time after service criteria are selected */}
+        {/* Only show date/time selection after service criteria are selected */}
         {selectedServiceCategory && selectedServiceType && selectedSpecialty && (
-          <Card>
-          <h2 className="text-xl font-semibold mb-4">Select Doctor & Date</h2>
-          <p className="text-text-secondary mb-6">
-            Choose your preferred doctor and appointment time
-          </p>
+          <Card className="mb-6">
+          <h2 className="text-xl font-semibold mb-4">Select Date & Time</h2>
 
           {/* Selected Doctor */}
           <div className="mb-6">
@@ -522,8 +550,8 @@ export default function SelectAppointment() {
             )}
           </div>
 
-          {/* Navigation Buttons */}
-          <div className="flex justify-between">
+          {/* Navigation Buttons - Show here when service selection complete */}
+          <div className="flex justify-between mt-6">
             <Button
               variant="outline"
               onClick={handlePrevious}

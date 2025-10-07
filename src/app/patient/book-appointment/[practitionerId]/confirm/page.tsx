@@ -22,6 +22,9 @@ export default async function ConfirmBookingPage({ params, searchParams }: PageP
   const selectedSlotId = (searchParamsData.slotId as string) || '';
   const reasonText = (searchParamsData.reasonText as string) || '';
   const symptoms = (searchParamsData.symptoms as string) || '';
+  const serviceCategory = (searchParamsData.serviceCategory as string) || '';
+  const serviceType = (searchParamsData.serviceType as string) || '';
+  const specialty = (searchParamsData.specialty as string) || '';
 
   // Get session from middleware headers
   let session;
@@ -94,6 +97,9 @@ export default async function ConfirmBookingPage({ params, searchParams }: PageP
         selectedSlotId={selectedSlotId}
         reasonText={reasonText}
         symptoms={symptoms}
+        serviceCategory={serviceCategory}
+        serviceType={serviceType}
+        specialty={specialty}
         practitionerId={practitionerId}
         session={{ patient: session.patient, role: session.role }}
       />

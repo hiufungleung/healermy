@@ -11,13 +11,15 @@ interface ProgressStepsProps {
   steps: Step[];
   currentStep: number;
   className?: string;
+  onStepClick?: (stepId: number) => void;
 }
 
 /**
  * Reusable progress steps component for multi-step flows.
  * Shows numbered steps with completion states and connecting lines.
+ * Steps can be clicked to navigate (only completed and active steps).
  */
-export function ProgressSteps({ steps, currentStep, className }: ProgressStepsProps) {
+export function ProgressSteps({ steps, currentStep, className, onStepClick }: ProgressStepsProps) {
   const getStepClasses = (step: Step) => {
     switch (step.status) {
       case 'completed':
@@ -40,13 +42,37 @@ export function ProgressSteps({ steps, currentStep, className }: ProgressStepsPr
     return step.status === 'active' ? 'font-semibold' : '';
   };
 
+  const isClickable = (step: Step) => {
+    return onStepClick && (step.status === 'completed' || step.status === 'active');
+  };
+
+  const handleStepClick = (step: Step) => {
+    if (isClickable(step)) {
+      onStepClick?.(step.id);
+    }
+  };
+
   return (
     <div className={clsx('mb-8', className)}>
       <div className="flex items-center justify-between">
         {steps.map((step, index) => (
           <React.Fragment key={step.id}>
             {/* Step Circle and Label */}
-            <div className="flex items-center">
+            <div
+              className={clsx(
+                'flex items-center',
+                isClickable(step) && 'cursor-pointer hover:opacity-80 transition-opacity'
+              )}
+              onClick={() => handleStepClick(step)}
+              role={isClickable(step) ? 'button' : undefined}
+              tabIndex={isClickable(step) ? 0 : undefined}
+              onKeyDown={(e) => {
+                if (isClickable(step) && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault();
+                  handleStepClick(step);
+                }
+              }}
+            >
               <div className={clsx(
                 'w-8 h-8 rounded-full flex items-center justify-center font-semibold',
                 getStepClasses(step)

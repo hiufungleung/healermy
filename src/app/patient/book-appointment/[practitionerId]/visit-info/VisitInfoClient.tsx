@@ -127,24 +127,30 @@ export default function VisitInfoClient({
   ].filter(Boolean).join(', ') : '789 Care Avenue, Toowong, QLD 4066';
 
   return (
-    <ContentContainer size="md">
+    <ContentContainer size="xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-text-primary mb-2">
+        <h1 className="text-3xl font-bold text-text-primary">
           Book New Appointment
         </h1>
-        <p className="text-text-secondary">
-          Find and book with the right clinic for you
-        </p>
       </div>
 
-      {/* Progress Steps - Updated for combined flow */}
+      {/* Progress Steps */}
       <ProgressSteps
         steps={[
           { id: 1, label: 'Search & Select', status: 'completed' },
-          { id: 2, label: 'Visit Information', status: 'active' },
-          { id: 3, label: 'Confirm', status: 'upcoming' }
+          { id: 2, label: 'Service & Date', status: 'completed' },
+          { id: 3, label: 'Visit Information', status: 'active' },
+          { id: 4, label: 'Confirm', status: 'upcoming' }
         ]}
-        currentStep={2}
+        currentStep={3}
+        onStepClick={(stepId) => {
+          if (stepId === 1) {
+            router.push('/patient/book-appointment');
+          } else if (stepId === 2) {
+            router.back(); // Go back to service & date page
+          }
+          // Step 3 is current, Step 4 is not clickable (upcoming)
+        }}
       />
 
       <Card>

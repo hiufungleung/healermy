@@ -16,7 +16,7 @@ export function ContentContainer({ children, size = 'lg', className }: ContentCo
     sm: 'max-w-2xl',     // ~672px - for narrow content like forms
     md: 'max-w-4xl',     // ~896px - for medium content
     lg: 'max-w-5xl',     // ~1024px - for most content (default)
-    xl: 'max-w-6xl',     // ~1152px - for wider content
+    xl: 'max-w-7xl',     // ~1280px - full width aligned with header navigation
   };
 
   return (

@@ -10,6 +10,9 @@ interface ConfirmBookingClientProps {
   selectedSlotId: string;
   reasonText: string;
   symptoms: string;
+  serviceCategory: string;
+  serviceType: string;
+  specialty: string;
   practitionerId: string;
   session: Pick<AuthSession, 'patient' | 'role'> | null;
 }

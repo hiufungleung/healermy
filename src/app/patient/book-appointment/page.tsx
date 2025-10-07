@@ -153,19 +153,20 @@ export default function BookAppointment() {
 
   return (
     <Layout>
-      <ContentContainer size="lg">
+      <ContentContainer size="xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-text-primary mb-2">
+          <h1 className="text-3xl font-bold text-text-primary">
             Book New Appointment
           </h1>
         </div>
 
-        {/* Progress Steps - Updated for combined flow */}
+        {/* Progress Steps */}
         <ProgressSteps
           steps={[
             { id: 1, label: 'Search & Select', status: 'active' },
-            { id: 2, label: 'Confirm', status: 'upcoming' },
-            { id: 3, label: 'Complete', status: 'upcoming' }
+            { id: 2, label: 'Service & Date', status: 'upcoming' },
+            { id: 3, label: 'Visit Information', status: 'upcoming' },
+            { id: 4, label: 'Confirm', status: 'upcoming' }
           ]}
           currentStep={1}
         />
