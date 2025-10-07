@@ -29,6 +29,7 @@ export default function SelectAppointment() {
   const [availableSlots, setAvailableSlots] = useState<Slot[]>([]);
   const [filteredSchedules, setFilteredSchedules] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   useEffect(() => {
     fetchPractitionerDetails();
@@ -40,6 +41,13 @@ export default function SelectAppointment() {
   useEffect(() => {
     if (selectedDate && practitioner && selectedServiceCategory && selectedServiceType && selectedSpecialty) {
       fetchAvailableSlots();
+
+      // Auto-refresh slots every 60 seconds to keep availability up to date
+      const refreshInterval = setInterval(() => {
+        fetchAvailableSlots();
+      }, 60000); // 60 seconds
+
+      return () => clearInterval(refreshInterval);
     } else {
       setAvailableSlots([]);
     }
@@ -193,10 +201,12 @@ export default function SelectAppointment() {
       // Filter by selected date and free status using patient's local timezone
       const startOfDay = new Date(`${selectedDate}T00:00:00`);
       const endOfDay = new Date(`${selectedDate}T23:59:59`);
+      const now = new Date(); // Current time
 
       console.log('Date filter boundaries (local timezone):');
       console.log('  Start of day:', startOfDay.toISOString(), '(local:', startOfDay.toString(), ')');
       console.log('  End of day:', endOfDay.toISOString(), '(local:', endOfDay.toString(), ')');
+      console.log('  Current time:', now.toISOString(), '(local:', now.toString(), ')');
 
       const dateAndStatusFilteredSlots = allSlots.filter((slot: Slot) => {
         const slotStart = new Date(slot.start);
@@ -208,6 +218,7 @@ export default function SelectAppointment() {
 
         const matchesDate = slotDateStr === selectedDate;
         const isFree = slot.status === 'free';
+        const isNotPast = slotStart > now; // Only show future time slots
 
         console.log(`Slot ${slot.id}:`, {
           slotStart: slot.start,
@@ -218,15 +229,17 @@ export default function SelectAppointment() {
           matchesDate,
           status: slot.status,
           isFree,
-          willInclude: matchesDate && isFree
+          isNotPast,
+          willInclude: matchesDate && isFree && isNotPast
         });
 
-        return isFree && matchesDate;
+        return isFree && matchesDate && isNotPast;
       });
 
       console.log('Available free slots for selected date:', dateAndStatusFilteredSlots.length);
       console.log('=== END DEBUG ===');
       setAvailableSlots(dateAndStatusFilteredSlots);
+      setLastRefreshed(new Date());
 
     } catch (error) {
       console.error('Error fetching slots:', error);
@@ -511,7 +524,17 @@ export default function SelectAppointment() {
 
           {/* Time Selection */}
           <div className="mb-6">
-            <h3 className="font-semibold mb-3">Available Times</h3>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-semibold">Available Times</h3>
+              {lastRefreshed && (
+                <div className="text-xs text-text-secondary flex items-center">
+                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Auto-updating • Last updated {lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              )}
+            </div>
             {!selectedServiceCategory || !selectedServiceType || !selectedSpecialty ? (
               <div className="text-center py-8 bg-blue-50 rounded-lg border border-blue-200">
                 <svg className="w-12 h-12 mx-auto text-blue-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

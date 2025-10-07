@@ -33,6 +33,8 @@ export function SlotDisplay({
         return 'bg-green-500 hover:bg-green-600 text-white';
       case 'busy':
         return 'bg-red-500 hover:bg-red-600 text-white';
+      case 'busy-unavailable':
+        return 'bg-gray-500 hover:bg-gray-600 text-white';
       default:
         return 'bg-yellow-500 hover:bg-yellow-600 text-white';
     }
@@ -43,6 +45,7 @@ export function SlotDisplay({
       case 'free':
         return 'success';
       case 'busy':
+      case 'busy-unavailable':
         return 'danger';
       default:
         return 'warning';

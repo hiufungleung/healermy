@@ -16,6 +16,9 @@ interface VisitInfoClientProps {
   selectedDate: string;
   selectedTime: string;
   selectedSlotId: string;
+  serviceCategory: string;
+  serviceType: string;
+  specialty: string;
   practitionerId: string;
   session: Pick<AuthSession, 'patient' | 'role'> | null;
 }
@@ -26,6 +29,9 @@ export default function VisitInfoClient({
   selectedDate,
   selectedTime,
   selectedSlotId,
+  serviceCategory,
+  serviceType,
+  specialty,
   practitionerId,
   session
 }: VisitInfoClientProps) {
@@ -93,7 +99,10 @@ export default function VisitInfoClient({
       time: selectedTime,
       slotId: selectedSlotId,
       reasonText: reasonText,
-      symptoms: symptoms
+      symptoms: symptoms,
+      serviceCategory: serviceCategory,
+      serviceType: serviceType,
+      specialty: specialty
     });
 
     router.push(`/patient/book-appointment/${practitionerId}/confirm?${params.toString()}`);
@@ -109,12 +118,12 @@ export default function VisitInfoClient({
     const prefix = name?.prefix?.join(' ') || '';
     const given = name?.given?.join(' ') || '';
     const family = name?.family || '';
-    
+
     const nameParts = [prefix, given, family].filter(Boolean);
     return nameParts.length > 0 ? nameParts.join(' ') : 'Dr. Emily Rodriguez';
   })();
-  
-  const specialty = practitioner?.qualification?.[0]?.code?.text || 'Family Medicine';
+
+  const practitionerSpecialty = practitioner?.qualification?.[0]?.code?.text || 'Family Medicine';
   
   // Handle address display
   const address = practitioner?.address?.[0];
@@ -166,7 +175,7 @@ export default function VisitInfoClient({
             <div>
               <p className="text-sm text-text-secondary">Doctor</p>
               <p className="font-semibold">{displayName}</p>
-              <p className="text-sm text-text-secondary">{specialty}</p>
+              <p className="text-sm text-text-secondary">{practitionerSpecialty}</p>
             </div>
             <div>
               <p className="text-sm text-text-secondary">Date & Time</p>

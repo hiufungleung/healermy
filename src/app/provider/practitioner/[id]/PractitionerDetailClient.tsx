@@ -134,6 +134,53 @@ export default function PractitionerDetailClient({
   const [clearingScheduleSlots, setClearingScheduleSlots] = useState<Set<string>>(new Set());
   const [deletingSchedules, setDeletingSchedules] = useState<Set<string>>(new Set());
 
+  // Function to mark past free slots as busy-unavailable
+  const markPastSlotsAsBusy = async (allSlots: Slot[]) => {
+    const now = new Date();
+    const pastFreeSlots = allSlots.filter(slot => {
+      const slotStart = new Date(slot.start);
+      return slotStart < now && slot.status === 'free';
+    });
+
+    if (pastFreeSlots.length === 0) {
+      return; // No past free slots to update
+    }
+
+    console.log(`🔄 Marking ${pastFreeSlots.length} past free slots as busy-unavailable...`);
+
+    // Update slots in parallel
+    const updatePromises = pastFreeSlots.map(async (slot) => {
+      if (!slot.id) return;
+
+      try {
+        const response = await fetch(`/api/fhir/slots/${slot.id}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json-patch+json' },
+          body: JSON.stringify([
+            { op: 'replace', path: '/status', value: 'busy-unavailable' }
+          ]),
+        });
+
+        if (response.ok) {
+          // Update local state
+          setSlots(prevSlots =>
+            prevSlots.map(s =>
+              s.id === slot.id ? { ...s, status: 'busy-unavailable' } : s
+            )
+          );
+        } else {
+          console.warn(`Failed to update slot ${slot.id}:`, response.status);
+        }
+      } catch (error) {
+        console.warn(`Error updating slot ${slot.id}:`, error);
+      }
+    });
+
+    await Promise.all(updatePromises);
+    console.log(`✅ Marked ${pastFreeSlots.length} past slots as busy-unavailable`);
+  };
+
   // Load practitioner name in background
   useEffect(() => {
     const fetchPractitionerName = async () => {
@@ -247,6 +294,9 @@ export default function PractitionerDetailClient({
         const allSlots = slotArrays.flat();
         setSlots(allSlots);
         console.log('✅ Loaded slots:', allSlots.length);
+
+        // Mark past free slots as busy-unavailable
+        await markPastSlotsAsBusy(allSlots);
       } catch (error) {
         console.error('Error fetching slots:', error);
         setSlotsError(error instanceof Error ? error.message : 'Failed to load slots');
@@ -257,6 +307,13 @@ export default function PractitionerDetailClient({
     };
 
     fetchSlots();
+
+    // Auto-refresh slots every 60 seconds
+    const refreshInterval = setInterval(() => {
+      fetchSlots();
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(refreshInterval);
   }, [activeTab, schedules, slotsLoaded]);
 
   // Update stats when schedules or slots change
@@ -302,6 +359,9 @@ export default function PractitionerDetailClient({
       setSlots(allSlots);
       setSlotsLoaded(true);
       console.log('✅ Loaded slots for stats:', allSlots.length);
+
+      // Mark past free slots as busy-unavailable
+      await markPastSlotsAsBusy(allSlots);
     } catch (error) {
       console.error('Error fetching slots for stats:', error);
     } finally {

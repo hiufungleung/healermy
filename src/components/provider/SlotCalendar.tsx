@@ -179,6 +179,10 @@ export function SlotCalendar({ slots }: SlotCalendarProps) {
               <div className="w-3 h-3 bg-red-500 rounded"></div>
               <span>Busy ({slots.filter(s => s.status === 'busy').length})</span>
             </div>
+            <div className="flex items-center space-x-1">
+              <div className="w-3 h-3 bg-gray-500 rounded"></div>
+              <span>Past ({slots.filter(s => s.status === 'busy-unavailable').length})</span>
+            </div>
           </div>
         </div>
       </div>

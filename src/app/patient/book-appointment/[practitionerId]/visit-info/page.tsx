@@ -21,6 +21,9 @@ export default async function ConfirmAppointmentPage({ params, searchParams }: P
   const selectedDate = (searchParamsData.date as string) || '';
   const selectedTime = (searchParamsData.time as string) || '';
   const selectedSlotId = (searchParamsData.slotId as string) || '';
+  const serviceCategory = (searchParamsData.serviceCategory as string) || '';
+  const serviceType = (searchParamsData.serviceType as string) || '';
+  const specialty = (searchParamsData.specialty as string) || '';
   
   // Get session from middleware headers
   let session;
@@ -103,6 +106,9 @@ export default async function ConfirmAppointmentPage({ params, searchParams }: P
         selectedDate={selectedDate}
         selectedTime={selectedTime}
         selectedSlotId={selectedSlotId}
+        serviceCategory={serviceCategory}
+        serviceType={serviceType}
+        specialty={specialty}
         practitionerId={practitionerId}
         session={{ patient: session.patient, role: session.role }}
       />

@@ -399,11 +399,6 @@ export default function AppointmentView(props: AppointmentViewProps) {
             <span className="text-text-primary font-semibold text-right">{appointmentData.dateTime}</span>
           </div>
 
-          <div className="flex justify-between items-center">
-            <span className="text-text-secondary font-medium">Visit Type</span>
-            <span className="text-text-primary font-semibold text-right">{appointmentData.visitType}</span>
-          </div>
-
           {/* Service Details - Only show in confirm mode */}
           {mode === 'confirm' && props.serviceCategory && (
             <>
@@ -420,6 +415,21 @@ export default function AppointmentView(props: AppointmentViewProps) {
                 <span className="text-text-primary font-semibold text-right capitalize">{props.specialty?.replace(/-/g, ' ')}</span>
               </div>
             </>
+          )}
+
+          {/* Visit Information - Only show if reason is provided */}
+          {appointmentData.reasonText && (
+            <div className="col-span-2 pt-4 border-t border-gray-200">
+              <span className="text-text-secondary font-medium block mb-2">Reason for Visit</span>
+              <p className="text-text-primary">{appointmentData.reasonText}</p>
+            </div>
+          )}
+
+          {appointmentData.symptoms && (
+            <div className="col-span-2">
+              <span className="text-text-secondary font-medium block mb-2">Symptoms</span>
+              <p className="text-text-primary">{appointmentData.symptoms}</p>
+            </div>
           )}
 
           {appointmentData.phone && (
