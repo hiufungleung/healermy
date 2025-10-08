@@ -8,10 +8,10 @@ import {
   PatientInfoSkeleton,
   AppointmentSkeleton
 } from '@/components/common/LoadingSpinner';
-import { formatDateForDisplay, getNowInAppTimezone } from '@/lib/timezone';
+import { formatDateForDisplay, getNowInAppTimezone } from '@/library/timezone';
 import type { Patient } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
-import type { AppointmentWithPractitionerDetails } from '@/lib/appointmentDetailInfo';
+import type { AppointmentWithPractitionerDetails } from '@/library/appointmentDetailInfo';
 
 interface DashboardClientProps {
   patientName: string | undefined;
@@ -101,7 +101,7 @@ export default function DashboardClient({
         const appointments = data.appointments || [];
 
         // Use the reusable appointment enhancement utility
-        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/lib/appointmentDetailInfo');
+        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');
         const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
         setAppointments(enhancedAppointments);
       } catch (error) {
@@ -159,7 +159,7 @@ export default function DashboardClient({
         const appointments = data.appointments || [];
 
         // Use the reusable appointment enhancement utility
-        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/lib/appointmentDetailInfo');
+        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');
         const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
         setAppointments(enhancedAppointments);
       }
@@ -218,7 +218,7 @@ export default function DashboardClient({
         const appointments = data.appointments || [];
 
         // Use the reusable appointment enhancement utility
-        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/lib/appointmentDetailInfo');
+        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');
         const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
         setAppointments(enhancedAppointments);
       }

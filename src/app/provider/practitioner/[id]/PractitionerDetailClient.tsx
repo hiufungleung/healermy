@@ -11,7 +11,7 @@ import {
 import { CreateScheduleForm } from '@/components/provider/CreateScheduleForm';
 import { GenerateSlotsForm } from '@/components/provider/GenerateSlotsForm';
 import { SlotCalendar } from '@/components/provider/SlotCalendar';
-import { formatDateForDisplay } from '@/lib/timezone';
+import { formatDateForDisplay } from '@/library/timezone';
 import type { Schedule, Slot } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
 

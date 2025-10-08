@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromCookies, validateRole, prepareToken } from '../../utils/auth';
 import { createSlotsWithOverlapValidation, SlotCreationRequest } from '../../utils/slotOverlap';
-import { isFutureTime } from '@/lib/timezone';
+import { isFutureTime } from '@/library/timezone';
 
 /**
  * POST /api/fhir/slots/batch - Create multiple slots with overlap validation (providers only)

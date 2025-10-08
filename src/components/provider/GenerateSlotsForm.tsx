@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
-import { createFHIRDateTime } from '@/lib/timezone';
+import { createFHIRDateTime } from '@/library/timezone';
 import type { Schedule, Slot } from '@/types/fhir';
 
 interface GenerateSlotsFormProps {

@@ -10,7 +10,40 @@ HealerMy provides two distinct portals:
 
 **Key Architecture**: Pure FHIR workflow with automatic slot management - no custom database required.
 
-## 🚀 Quick Start
+## 🐳 Docker Quick Start (5 Minutes)
+
+**Pull and run the pre-built image** - no installation or compilation required!
+
+```bash
+# 1. Pull the image
+docker pull hiufungleung/healermy:latest
+
+# 2. Generate session secret
+export SESSION_SECRET=$(openssl rand -hex 32)
+
+# 3. Run the container (replace with your values)
+docker run -d \
+  --name healermy \
+  -p 3000:3000 \
+  -e BASE_URL=https://your-domain.com \
+  -e FHIR_SERVER_URL=https://gw.interop.community/healerMy/data \
+  -e CLIENT_ID=your_fhir_client_id \
+  -e CLIENT_SECRET=your_fhir_client_secret \
+  -e SESSION_SECRET=$SESSION_SECRET \
+  hiufungleung/healermy:latest
+
+# 4. Access the app at: https://your-domain.com
+```
+
+**That's it!** The image is completely portable and works anywhere Docker runs.
+
+See [Docker Deployment](#docker-deployment-portable---works-anywhere) for more options including docker-compose.
+
+---
+
+## 🚀 Development Quick Start
+
+For local development with full source code:
 
 ### Prerequisites
 
@@ -121,18 +154,68 @@ pnpm lint         # Run ESLint
 pnpm tsc --noEmit # Type check without building
 ```
 
-### Docker
+### Docker Deployment (Portable - Works Anywhere!)
+
+The Docker image is **completely portable** and can be used by anyone. All configuration is done via environment variables at runtime.
+
+#### Option 1: Docker Compose (Recommended)
+
+1. **Create environment file:**
 ```bash
-# Build Docker image
+cp .env.example .env
+# Edit .env with your configuration
+```
+
+2. **Start the container:**
+```bash
+docker-compose up -d
+```
+
+3. **View logs:**
+```bash
+docker-compose logs -f healermy
+```
+
+#### Option 2: Docker Run (Quick Start)
+
+```bash
+# Pull the image
+docker pull hiufungleung/healermy:latest
+
+# Generate session secret
+SESSION_SECRET=$(openssl rand -hex 32)
+
+# Run with minimum required config
+docker run -d \
+  --name healermy \
+  -p 3000:3000 \
+  -e BASE_URL=https://your-domain.com \
+  -e FHIR_SERVER_URL=https://gw.interop.community/healerMy/data \
+  -e CLIENT_ID=your_fhir_client_id \
+  -e CLIENT_SECRET=your_fhir_client_secret \
+  -e SESSION_SECRET=$SESSION_SECRET \
+  --restart unless-stopped \
+  hiufungleung/healermy:latest
+```
+
+#### Option 3: Docker Build (Local Development)
+
+```bash
+# Build your own image
 docker build -t healermy .
 
-# Run container
-docker run -d -p 3000:3000 \
-  -e CLIENT_ID=your_client_id \
-  -e CLIENT_SECRET=your_client_secret \
-  -e SESSION_SECRET=your_session_secret \
-  healermy
+# Run with local config
+docker run -d -p 3000:3000 --env-file .env healermy
 ```
+
+**Required Environment Variables:**
+- `BASE_URL`: Your public HTTPS URL
+- `FHIR_SERVER_URL`: FHIR server endpoint
+- `CLIENT_ID`: FHIR app client ID
+- `CLIENT_SECRET`: FHIR app client secret
+- `SESSION_SECRET`: Generated encryption key
+
+See [.env.example](.env.example) for all available configuration options.
 
 ## 🏗️ Architecture
 
@@ -154,6 +237,7 @@ docker run -d -p 3000:3000 \
 - **RESTful API Layer**: All FHIR operations via `/api/fhir/*` routes
 - **Edge Runtime**: Optimized middleware for token refresh
 - **Session Encryption**: AES-GCM encrypted cookies using Web Crypto API
+- **🐳 Portable Docker Image**: Zero hardcoded values - configure entirely via environment variables
 
 ### Project Structure
 
@@ -231,7 +315,30 @@ Slots automatically update when appointments change status:
 
 ## 🚢 Deployment
 
-### GitHub Actions CI/CD
+### Portable Docker Image
+
+The Docker image (`hiufungleung/healermy:latest`) is **completely portable** and can be deployed anywhere:
+
+**✅ Works with:**
+- AWS (EC2, ECS, Fargate)
+- Google Cloud (Cloud Run, GKE)
+- Azure (Container Instances, AKS)
+- DigitalOcean (Droplets, App Platform)
+- Any VPS with Docker
+- Local development
+
+**✅ No hardcoded values:**
+- All configuration via environment variables
+- Same image for dev/staging/production
+- Multi-platform: linux/amd64, linux/arm64
+
+**Deployment Methods:**
+1. **Docker Compose**: See [docker-compose.yml](docker-compose.yml)
+2. **Docker Run**: See [Docker Quick Start](#-docker-quick-start-5-minutes)
+3. **Kubernetes**: Use environment variables in deployment manifests
+4. **Cloud Platforms**: Use managed container services
+
+### GitHub Actions CI/CD (Automated)
 
 The project includes automated deployment via GitHub Actions:
 

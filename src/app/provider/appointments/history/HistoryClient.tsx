@@ -20,7 +20,7 @@ export default function HistoryClient({ appointments: initialAppointments }: His
     const resolveAppointmentNames = async () => {
       try {
         if (initialAppointments.length > 0) {
-          const { enhanceAppointmentsWithNames } = await import('@/lib/fhirNameResolver');
+          const { enhanceAppointmentsWithNames } = await import('@/library/fhirNameResolver');
           const enhancedAppointments = await enhanceAppointmentsWithNames(initialAppointments);
           setAppointments(enhancedAppointments);
         }

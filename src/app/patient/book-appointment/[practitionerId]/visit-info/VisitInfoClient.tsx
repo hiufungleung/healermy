@@ -6,7 +6,7 @@ import { Card } from '@/components/common/Card';
 import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { FormNavigationButtons } from '@/components/common/NavigationButtons';
-import { createFHIRDateTime } from '@/lib/timezone';
+import { createFHIRDateTime } from '@/library/timezone';
 import type { Practitioner, Appointment, Slot } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
 

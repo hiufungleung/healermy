@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { AppointmentSkeleton } from '@/components/common/LoadingSpinner';
-import { formatDateForDisplay } from '@/lib/timezone';
+import { formatDateForDisplay } from '@/library/timezone';
 import type { AuthSession } from '@/types/auth';
-import type { AppointmentWithPractitionerDetails } from '@/lib/appointmentDetailInfo';
+import type { AppointmentWithPractitionerDetails } from '@/library/appointmentDetailInfo';
 
 interface AppointmentsClientProps {
   session: AuthSession;
@@ -36,7 +36,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
           const appointments = data.appointments || [];
 
           // Use the reusable appointment enhancement utility
-          const { enhanceAppointmentsWithPractitionerDetails } = await import('@/lib/appointmentDetailInfo');
+          const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');
           const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
           setAppointments(enhancedAppointments);
         } else {

@@ -12,7 +12,7 @@ import { PractitionerSearch } from '@/components/common/PractitionerSearch';
 import { FormNavigationButtons } from '@/components/common/NavigationButtons';
 import {
   formatTimeForDisplay
-} from '@/lib/timezone';
+} from '@/library/timezone';
 import type { Practitioner } from '@/types/fhir';
 
 export default function BookAppointment() {

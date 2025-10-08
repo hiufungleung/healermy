@@ -9,7 +9,7 @@ import { Badge } from '@/components/common/Badge';
 import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { SlotSelectionGrid } from '@/components/common/SlotDisplay';
-import { formatTimeForDisplay } from '@/lib/timezone';
+import { formatTimeForDisplay } from '@/library/timezone';
 import type { Practitioner, Slot } from '@/types/fhir';
 
 

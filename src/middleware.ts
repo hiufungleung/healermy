@@ -3,6 +3,7 @@ import { AuthSession, TokenData, SessionData } from '@/types/auth';
 import { decrypt, encrypt } from '@/library/auth/encryption';
 import { refreshAccessToken } from '@/library/auth/tokenRefresh';
 import { SESSION_COOKIE_NAME, TOKEN_COOKIE_NAME } from '@/library/auth/config';
+import { getPublicBaseUrl } from '@/library/server-utils';
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -39,7 +40,8 @@ export async function middleware(request: NextRequest) {
     
     // For page routes, redirect to home
     console.log(`🏠 [MIDDLEWARE] Page route redirecting to home: ${pathname}`);
-    return NextResponse.redirect(new URL('/', request.url));
+    const baseUrl = getPublicBaseUrl(request);
+    return NextResponse.redirect(new URL('/', baseUrl));
   }
 
   // Cookies are encrypted and HTTP-only - secure storage
@@ -142,21 +144,23 @@ export async function middleware(request: NextRequest) {
       
       // If refresh failed or no refresh token, redirect to home
       console.log(`❌ [MIDDLEWARE] Session expired and refresh failed, redirecting to home: ${pathname}`);
-      const response = NextResponse.redirect(new URL('/', request.url));
+      const baseUrl = getPublicBaseUrl(request);
+      const response = NextResponse.redirect(new URL('/', baseUrl));
       response.cookies.delete(TOKEN_COOKIE_NAME);
       response.cookies.delete(SESSION_COOKIE_NAME);
       return response;
     }
 
     // Validate role-based access
+    const baseUrl = getPublicBaseUrl(request);
     if (pathname.startsWith('/patient/') && sessionData.role !== 'patient') {
       console.log(`❌ [MIDDLEWARE] Patient route access denied for role: ${sessionData.role}`);
-      return NextResponse.redirect(new URL('/', request.url));
+      return NextResponse.redirect(new URL('/', baseUrl));
     }
 
     if (pathname.startsWith('/provider/') && sessionData.role !== 'provider') {
       console.log(`❌ [MIDDLEWARE] Provider route access denied for role: ${sessionData.role}`);
-      return NextResponse.redirect(new URL('/', request.url));
+      return NextResponse.redirect(new URL('/', baseUrl));
     }
 
     // Session validated - cookies remain encrypted and HTTP-only for security
@@ -167,7 +171,8 @@ export async function middleware(request: NextRequest) {
     
   } catch (error) {
     console.error('❌ [MIDDLEWARE] Session decryption failed:', error);
-    const response = NextResponse.redirect(new URL('/', request.url));
+    const baseUrl = getPublicBaseUrl(request);
+    const response = NextResponse.redirect(new URL('/', baseUrl));
     response.cookies.delete(TOKEN_COOKIE_NAME);
     response.cookies.delete(SESSION_COOKIE_NAME);
     return response;

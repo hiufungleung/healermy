@@ -3,7 +3,7 @@
 import React from 'react';
 import { Badge } from '@/components/common/Badge';
 import { Button } from '@/components/common/Button';
-import { formatTimeForDisplay, formatSlotTime } from '@/lib/timezone';
+import { formatTimeForDisplay, formatSlotTime } from '@/library/timezone';
 import type { Slot } from '@/types/fhir';
 
 export interface SlotDisplayProps {

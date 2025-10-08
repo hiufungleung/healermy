@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  healermy:
+    image: hiufungleung/healermy:latest
+    container_name: healermy
+    restart: unless-stopped
+    ports:
+      - "3000:3000"  # Change to your desired port
+    environment:
+      # ============================================================================
+      # REQUIRED: Application URLs
+      # ============================================================================
+      BASE_URL: ${BASE_URL}                                    # Your public HTTPS URL
+      NEXT_PUBLIC_FHIR_SERVER_URL: ${FHIR_SERVER_URL}         # FHIR server endpoint
+
+      # ============================================================================
+      # REQUIRED: SMART on FHIR Credentials
+      # ============================================================================
+      CLIENT_ID: ${CLIENT_ID}                                  # From your FHIR app registration
+      CLIENT_SECRET: ${CLIENT_SECRET}                          # From your FHIR app registration
+      SESSION_SECRET: ${SESSION_SECRET}                        # Generate: openssl rand -hex 32
+
+      # ============================================================================
+      # OPTIONAL: Override Defaults (uncomment to customize)
+      # ============================================================================
+      # NODE_ENV: production
+      # PORT: 3000
+      # HOSTNAME: 0.0.0.0
+      # ACCESS_TYPE: offline
+      # SESSION_EXPIRY: 90d
+      # PATIENT_SCOPE_OFFLINE: "launch/encounter launch/patient openid profile offline_access launch fhirUser user/*.* patient/*.*"
+      # PATIENT_SCOPE_ONLINE: "launch/encounter launch/patient openid profile online_access launch fhirUser user/*.* patient/*.*"
+      # PROVIDER_SCOPE_OFFLINE: "launch/encounter launch/patient openid profile offline_access launch fhirUser user/*.* patient/*.*"
+      # PROVIDER_SCOPE_ONLINE: "launch/encounter launch/patient openid profile online_access launch fhirUser user/*.* patient/*.*"
+
+    networks:
+      - web
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health-check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+networks:
+  web:
+    external: true  # Remove this line if not using external network
