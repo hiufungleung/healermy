@@ -61,7 +61,7 @@ export async function middleware(request: NextRequest) {
     // Session validated - role and expiry checked below
     
     // Check if session is expired or expiring soon and attempt refresh if possible
-    const refreshBufferSeconds = parseInt(process.env.TOKEN_REFRESH_BUFFER_SECONDS || '30');
+    const refreshBufferSeconds = 300; // 5 minutes buffer before token expiry
     const refreshThreshold = Date.now() + (refreshBufferSeconds * 1000);
     if (sessionData.expiresAt && sessionData.expiresAt <= refreshThreshold) {
       console.log(`⏰ [MIDDLEWARE] Session expires in ${Math.round((sessionData.expiresAt - Date.now()) / 1000)}s (buffer: ${refreshBufferSeconds}s), attempting token refresh: ${pathname}`);
