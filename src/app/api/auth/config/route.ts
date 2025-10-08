@@ -14,9 +14,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing or invalid role parameter' }, { status: 400 });
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+    // Use BASE_URL (server-side) instead of NEXT_PUBLIC_BASE_URL (build-time)
+    // This allows runtime configuration in Docker without rebuilding
+    const baseUrl = process.env.BASE_URL || process.env.NEXT_PUBLIC_BASE_URL;
     if (!baseUrl) {
-      throw new Error('Missing required environment variable: NEXT_PUBLIC_BASE_URL');
+      throw new Error('Missing required environment variable: BASE_URL or NEXT_PUBLIC_BASE_URL');
     }
 
     // Use single client credentials for MELD sandbox
