@@ -10,6 +10,8 @@ interface AuthContextType {
   isLoading: boolean;
   userName: string | null;
   isLoadingUserName: boolean;
+  unreadCount: number;
+  refreshNotifications: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [userName, setUserName] = useState<string | null>(null);
   const [isLoadingUserName, setIsLoadingUserName] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -81,8 +84,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               }
             }
           }
-        } else if (session.role === 'provider' && session.practitionerId) {
-          const response = await fetch(`/api/fhir/practitioners/${session.practitionerId}`, {
+        } else if (session.role === 'provider' && session.fhirUser) {
+          // Extract practitioner ID from fhirUser URL
+          const practitionerMatch = session.fhirUser.match(/\/Practitioner\/(.+)$/);
+          if (!practitionerMatch) return;
+
+          const practitionerId = practitionerMatch[1];
+          const response = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
             method: 'GET',
             credentials: 'include',
           });
@@ -110,6 +118,111 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     fetchUserName();
   }, [session, userName]);
+
+  // Fetch notification count with interval polling (no refetch on navigation)
+  const fetchNotificationCount = async () => {
+    if (!session) {
+      setUnreadCount(0);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/fhir/communications', {
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const commData = await response.json();
+      const allCommunications = (commData.entry || []).map((entry: any) => entry.resource);
+
+      if (session.role === 'patient') {
+        // Patient logic - count unread messages
+        const patientRef = `Patient/${session.patient}`;
+        const isMessageRead = (comm: any): boolean => {
+          const isReceivedByPatient = comm.recipient?.some((r: any) => r.reference === patientRef);
+          if (!isReceivedByPatient) return true;
+
+          const readExtension = comm.extension?.find((ext: any) =>
+            ext.url === 'http://hl7.org/fhir/StructureDefinition/communication-read-status'
+          );
+          return !!readExtension?.valueDateTime;
+        };
+
+        const count = allCommunications.filter((comm: any) => !isMessageRead(comm)).length;
+        setUnreadCount(count);
+
+      } else if (session.role === 'provider') {
+        // Provider logic - filter and count
+        let hiddenNotifications = new Set<string>();
+        let readNotifications = new Set<string>();
+
+        try {
+          const storedHidden = localStorage.getItem('healermy-provider-hidden-notifications');
+          if (storedHidden) hiddenNotifications = new Set(JSON.parse(storedHidden));
+
+          const storedRead = localStorage.getItem('healermy-provider-read-notifications');
+          if (storedRead) readNotifications = new Set(JSON.parse(storedRead));
+        } catch (error) {
+          // Ignore localStorage errors
+        }
+
+        const filteredCommunications = allCommunications.filter((comm: any) => {
+          if (hiddenNotifications.has(comm.id)) return false;
+
+          const messageContent = comm.payload?.[0]?.contentString?.toLowerCase() || '';
+
+          // Skip patient-facing messages
+          if (messageContent.includes('your appointment') ||
+              messageContent.includes('you have been') ||
+              messageContent.includes('thank you for')) {
+            return false;
+          }
+
+          return true;
+        });
+
+        const isMessageRead = (comm: any): boolean => {
+          const readExtension = comm.extension?.find((ext: any) =>
+            ext.url === 'http://hl7.org/fhir/StructureDefinition/communication-read-status'
+          );
+          return !!readExtension?.valueDateTime;
+        };
+
+        let count = filteredCommunications.filter((comm: any) => !isMessageRead(comm)).length;
+
+        // Add pending appointment count
+        try {
+          const aptResponse = await fetch('/api/fhir/appointments', {
+            method: 'GET',
+            credentials: 'include',
+          });
+
+          if (aptResponse.ok) {
+            const data = await aptResponse.json();
+            const appointments = data.appointments || [];
+
+            const pendingCount = appointments.filter((apt: any) => {
+              const notificationId = `apt-${apt.id}`;
+              return apt.status === 'pending' &&
+                     !hiddenNotifications.has(notificationId) &&
+                     !readNotifications.has(notificationId);
+            }).length;
+
+            count += pendingCount;
+          }
+        } catch (error) {
+          // Ignore appointment fetch errors
+        }
+
+        setUnreadCount(count);
+      }
+    } catch (error) {
+      // Silently fail - don't show errors for background polling
+    }
+  };
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -141,6 +254,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [pathname, session, isLoading]);
+
+  // Fetch notifications on session load and poll every 30 seconds
+  useEffect(() => {
+    if (!session) {
+      setUnreadCount(0);
+      return;
+    }
+
+    // Initial fetch
+    fetchNotificationCount();
+
+    // Poll every 30 seconds
+    const interval = setInterval(fetchNotificationCount, 30000);
+
+    // Listen for manual refresh events
+    const handleMessageUpdate = () => {
+      fetchNotificationCount();
+    };
+    window.addEventListener('messageUpdate', handleMessageUpdate);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('messageUpdate', handleMessageUpdate);
+    };
+  }, [session]);
 
   const logout = async () => {
     try {
@@ -184,18 +322,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setSession(null);
       setUserName(null);
+      setUnreadCount(0);
       router.push('/');
     } catch (error) {
       console.error('Error during logout:', error);
       // Always clear session and redirect even if logout API fails
       setSession(null);
       setUserName(null);
+      setUnreadCount(0);
       router.push('/');
     }
   };
 
   return (
-    <AuthContext.Provider value={{ session, logout, isLoading, userName, isLoadingUserName }}>
+    <AuthContext.Provider value={{
+      session,
+      logout,
+      isLoading,
+      userName,
+      isLoadingUserName,
+      unreadCount,
+      refreshNotifications: fetchNotificationCount
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -110,7 +110,7 @@ export default async function ProviderAppointmentsPage() {
   }
 
   return (
-    <Layout patientName={providerName}>
+    <Layout>
       <ProviderAppointmentsClient
         appointments={allAppointments}
         stats={stats}

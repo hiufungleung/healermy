@@ -38,21 +38,11 @@ interface ProviderNotification {
   communicationId?: string; // Add this for Communication-based notifications
 }
 
-interface ProviderNotificationsClientProps {
-  communications: Communication[];
-  practitionerName: string;
-}
-
-export default function ProviderNotificationsClient({
-  communications: initialCommunications,
-  practitionerName
-}: ProviderNotificationsClientProps) {
+export default function ProviderNotificationsClient() {
   const searchParams = useSearchParams();
 
-  // Use practitionerName in the header
-  console.log('Provider notifications for:', practitionerName);
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'action_required' | 'urgent'>('all');
-  const [localCommunications, setLocalCommunications] = useState<Communication[]>(initialCommunications);
+  const [localCommunications, setLocalCommunications] = useState<Communication[]>([]);
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
   const [selectedMessage, setSelectedMessage] = useState<Communication | null>(null);
   const [displayCount, setDisplayCount] = useState(10); // Show 10 notifications initially
