@@ -174,10 +174,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           const messageContent = comm.payload?.[0]?.contentString?.toLowerCase() || '';
 
-          // Skip patient-facing messages
-          if (messageContent.includes('your appointment') ||
+          // Skip patient-facing messages (exact same logic as ProviderNotificationsClient)
+          if (messageContent.includes('your appointment request has been submitted') ||
+              messageContent.includes('your appointment request has been approved') ||
+              messageContent.includes('your appointment has been approved') ||
+              messageContent.includes('your appointment has been confirmed') ||
+              messageContent.includes('your appointment has been') ||
               messageContent.includes('you have been') ||
-              messageContent.includes('thank you for')) {
+              messageContent.includes('thank you for') ||
+              messageContent.includes('approved and confirmed')) {
+            return false;
+          }
+
+          // Skip appointment-related Communications to avoid duplicates (same as ProviderNotificationsClient)
+          if (messageContent.includes('the patient has cancelled') ||
+              messageContent.includes('patient has cancelled') ||
+              messageContent.includes('appointment with') ||
+              messageContent.includes('has been cancelled') ||
+              messageContent.includes('has been confirmed') ||
+              messageContent.includes('has been approved') ||
+              (messageContent.includes('appointment') &&
+               (messageContent.includes('cancelled') || messageContent.includes('confirmed') || messageContent.includes('scheduled')))) {
             return false;
           }
 
