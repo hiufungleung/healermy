@@ -8,6 +8,141 @@ import { Badge } from '@/components/common/Badge';
 import type { Patient } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
 
+// Cache for appointment details to avoid refetching
+const appointmentCache = new Map<string, { appointment: any; practitionerName: string }>();
+
+// Component to fetch and display appointment details
+function AppointmentDetailsExpanded({ appointmentId }: { appointmentId: string }) {
+  const [appointmentDetails, setAppointmentDetails] = useState<any>(null);
+  const [practitionerName, setPractitionerName] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchAppointmentDetails() {
+      try {
+        setLoading(true);
+
+        // Check cache first
+        const cached = appointmentCache.get(appointmentId);
+        if (cached) {
+          setAppointmentDetails(cached.appointment);
+          setPractitionerName(cached.practitionerName);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch both in parallel for speed
+        const appointmentResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+          credentials: 'include'
+        });
+
+        if (appointmentResponse.ok) {
+          const appointment = await appointmentResponse.json();
+          setAppointmentDetails(appointment);
+
+          // Extract practitioner ID from participants
+          const practitionerParticipant = appointment.participant?.find((p: any) =>
+            p.actor?.reference?.startsWith('Practitioner/')
+          );
+
+          if (practitionerParticipant?.actor?.reference) {
+            const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
+
+            // Fetch practitioner details
+            const practitionerResponse = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
+              credentials: 'include'
+            });
+
+            if (practitionerResponse.ok) {
+              const practitioner = await practitionerResponse.json();
+              if (practitioner?.name?.[0]) {
+                const prefix = practitioner.name[0]?.prefix?.[0] || '';
+                const given = practitioner.name[0]?.given?.join(' ') || '';
+                const family = practitioner.name[0]?.family || '';
+                const fullName = `${prefix} ${given} ${family}`.trim();
+                setPractitionerName(fullName);
+
+                // Cache the result
+                appointmentCache.set(appointmentId, {
+                  appointment,
+                  practitionerName: fullName
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching appointment details:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchAppointmentDetails();
+  }, [appointmentId]);
+
+  if (loading) {
+    return (
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <div className="bg-gray-50 rounded-lg p-3 animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!appointmentDetails) {
+    return null;
+  }
+
+  const appointmentDate = appointmentDetails.start
+    ? new Date(appointmentDetails.start).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    : 'Date not available';
+
+  const appointmentTime = appointmentDetails.start
+    ? new Date(appointmentDetails.start).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit'
+      })
+    : 'Time not available';
+
+  return (
+    <div className="mt-4 pt-4 border-t border-gray-200">
+      <div className="bg-blue-50 rounded-lg p-4 space-y-3 text-sm">
+        <h4 className="font-semibold text-text-primary mb-1">Appointment Details</h4>
+
+        {practitionerName && (
+          <div className="flex items-start gap-2">
+            <svg className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <div>
+              <span className="text-text-secondary font-medium">Doctor:</span>
+              <span className="text-text-primary ml-2">{practitionerName}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-start gap-2">
+          <svg className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <div>
+            <span className="text-text-secondary font-medium">Date & Time:</span>
+            <span className="text-text-primary ml-2">{appointmentDate} at {appointmentTime}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface Communication {
   id: string;
   status: string;
@@ -27,6 +162,55 @@ interface Communication {
 
 interface NotificationsClientProps {
   session: AuthSession;
+}
+
+// Function to prefetch appointment details
+async function prefetchAppointmentDetails(appointmentId: string) {
+  // Skip if already cached
+  if (appointmentCache.has(appointmentId)) return;
+
+  try {
+    const appointmentResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+      credentials: 'include'
+    });
+
+    if (appointmentResponse.ok) {
+      const appointment = await appointmentResponse.json();
+
+      // Extract practitioner ID
+      const practitionerParticipant = appointment.participant?.find((p: any) =>
+        p.actor?.reference?.startsWith('Practitioner/')
+      );
+
+      if (practitionerParticipant?.actor?.reference) {
+        const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
+
+        // Fetch practitioner details
+        const practitionerResponse = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
+          credentials: 'include'
+        });
+
+        if (practitionerResponse.ok) {
+          const practitioner = await practitionerResponse.json();
+          if (practitioner?.name?.[0]) {
+            const prefix = practitioner.name[0]?.prefix?.[0] || '';
+            const given = practitioner.name[0]?.given?.join(' ') || '';
+            const family = practitioner.name[0]?.family || '';
+            const fullName = `${prefix} ${given} ${family}`.trim();
+
+            // Cache the result
+            appointmentCache.set(appointmentId, {
+              appointment,
+              practitionerName: fullName
+            });
+          }
+        }
+      }
+    }
+  } catch (error) {
+    // Silently fail for prefetch
+    console.debug('Prefetch failed for appointment:', appointmentId);
+  }
 }
 
 export default function NotificationsClient({
@@ -592,17 +776,25 @@ export default function NotificationsClient({
             const appointmentInfo = getAppointmentInfo(comm);
             const isExpanded = selectedMessage?.id === comm.id;
 
+            const messageContent = comm.payload?.[0]?.contentString || 'No content';
+            const isLongMessage = messageContent.length > 150;
+
             return (
-              <Card
+              <div
                 key={comm.id}
-                className={`hover:shadow-md transition-shadow ${
-                  !isMessageRead(comm) ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
-                } ${isExpanded ? 'ring-2 ring-primary/20' : ''}`}
+                onMouseEnter={() => {
+                  // Prefetch appointment details on hover for faster expansion
+                  if (appointmentInfo && !appointmentCache.has(appointmentInfo.id)) {
+                    prefetchAppointmentDetails(appointmentInfo.id);
+                  }
+                }}
               >
-                <div
-                  className="flex items-start space-x-4 cursor-pointer"
-                  onClick={() => handleMessageClick(comm)}
+                <Card
+                  className={`transition-all duration-200 ${
+                    !isMessageRead(comm) ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
+                  } ${isExpanded ? 'shadow-lg ring-2 ring-primary/30' : 'hover:shadow-md'}`}
                 >
+                  <div className="flex items-start space-x-4">
                   {/* Icon */}
                   <div className="flex-shrink-0">
                     <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
@@ -612,39 +804,29 @@ export default function NotificationsClient({
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between">
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <div className="mb-2">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
-                            <div className="flex items-center space-x-2 mb-1 sm:mb-0">
-                              <h3 className={`font-semibold ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
-                                {getMessageTitle(comm)}
-                              </h3>
-                              {!isMessageRead(comm) && (
-                                <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                              <Badge variant="info" size="sm">
-                                {getCategoryDisplay(comm.category)}
-                              </Badge>
-                            </div>
-                          </div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className={`font-semibold ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
+                            {getMessageTitle(comm)}
+                          </h3>
+                          {!isMessageRead(comm) && (
+                            <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
+                          )}
                         </div>
-                        <div className="text-sm text-text-secondary mb-2">
-                          From: {getSenderDisplay(comm)}
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <Badge variant="info" size="sm">
+                            {getCategoryDisplay(comm.category)}
+                          </Badge>
+                          <span className="text-xs text-text-secondary">
+                            From: {getSenderDisplay(comm)}
+                          </span>
                         </div>
-                        <p className="text-text-secondary text-sm mb-2">
-                          {comm.payload?.[0]?.contentString?.substring(0, 100) || 'No content'}
-                          {(comm.payload?.[0]?.contentString?.length || 0) > 100 && '...'}
-                        </p>
-                        <p className="text-xs text-text-secondary">
-                          {formatDate(comm.sent)}
-                        </p>
                       </div>
 
                       {/* Actions */}
-                      <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 ml-2 sm:ml-4 flex-shrink-0">
+                      <div className="flex items-center gap-2 ml-4 flex-shrink-0">
                         {!isMessageRead(comm) && (
                           <button
                             onClick={(e) => {
@@ -669,7 +851,7 @@ export default function NotificationsClient({
                                 markAsRead(comm.id);
                               }
                             }}
-                            className="text-sm text-primary hover:underline"
+                            className="text-sm text-primary hover:underline whitespace-nowrap"
                           >
                             Mark as Read
                           </button>
@@ -679,54 +861,66 @@ export default function NotificationsClient({
                             e.stopPropagation();
                             deleteNotification(comm.id);
                           }}
-                          className="text-sm text-text-secondary hover:text-red-600"
+                          className="text-sm text-text-secondary hover:text-red-600 whitespace-nowrap"
                         >
                           Delete
                         </button>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Expanded Content */}
-                  {isExpanded && (
-                    <div className="mt-4 pt-4 border-t">
-                      <div className="bg-gray-50 rounded-lg p-4 mb-3">
-                        <p className="text-text-primary whitespace-pre-wrap">
-                          {comm.payload?.[0]?.contentString || 'No content available'}
-                        </p>
-                      </div>
+                    {/* Message Preview/Full Content */}
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => handleMessageClick(comm)}
+                    >
+                      <p className={`text-text-secondary text-sm mb-2 ${isExpanded ? '' : 'line-clamp-3'}`}>
+                        {isExpanded ? messageContent : `${messageContent.substring(0, 150)}${isLongMessage ? '...' : ''}`}
+                      </p>
 
-                      {/* Action Buttons */}
-                      <div className="flex space-x-2">
-                        {appointmentInfo && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/patient/appointments/${appointmentInfo.id}`);
-                            }}
+                      {/* Expand/Collapse Indicator */}
+                      {isLongMessage && (
+                        <div className="flex items-center gap-1 text-xs text-primary hover:underline mb-2">
+                          <span>{isExpanded ? 'Show less' : 'Read more'}</span>
+                          <svg
+                            className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                           >
-                            View Appointment
-                          </Button>
-                        )}
-                        {comm.category?.[0]?.text === 'manual-message' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Add reply functionality here
-                            }}
-                          >
-                            Reply
-                          </Button>
-                        )}
-                      </div>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      )}
+
+                      <p className="text-xs text-text-secondary">
+                        {formatDate(comm.sent)}
+                      </p>
                     </div>
-                  )}
+
+                    {/* Expanded Details */}
+                    {isExpanded && appointmentInfo && (
+                      <AppointmentDetailsExpanded appointmentId={appointmentInfo.id} />
+                    )}
+
+                    {/* Action Buttons - only show if expanded and has appointment */}
+                    {isExpanded && appointmentInfo && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/patient/appointments/${appointmentInfo.id}`);
+                          }}
+                        >
+                          View Appointment Details
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </Card>
+                </Card>
+              </div>
             );
           })
         )}
