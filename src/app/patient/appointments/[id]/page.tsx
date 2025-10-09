@@ -3,6 +3,12 @@ import { Layout } from '@/components/common/Layout';
 import { FHIRClient } from '@/app/api/fhir/client';
 import AppointmentDetailClient from './AppointmentDetailClient';
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Appointment Details',
+  description: 'View appointment details and information',
+};
 
 // Extract patient name from FHIR Patient resource
 function extractPatientName(patient: any): string {

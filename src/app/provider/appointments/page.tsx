@@ -6,8 +6,14 @@ import { prepareToken } from '@/app/api/fhir/utils/auth';
 import { Layout } from '@/components/common/Layout';
 import ProviderAppointmentsClient from './ProviderAppointmentsClient';
 import type { Appointment } from '@/types/fhir';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Appointments Management',
+  description: 'View and manage clinic appointments',
+};
 
 interface AppointmentStats {
   today: number;

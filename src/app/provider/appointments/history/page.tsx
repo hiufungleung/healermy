@@ -6,8 +6,14 @@ import { prepareToken } from '@/app/api/fhir/utils/auth';
 import { Layout } from '@/components/common/Layout';
 import HistoryClient from './HistoryClient';
 import type { Appointment } from '@/types/fhir';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Appointment History',
+  description: 'View past appointments and records',
+};
 
 export default async function ProviderAppointmentsHistoryPage() {
   // Get session from middleware headers

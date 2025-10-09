@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="48" fill="#3B82F6"/>
+
+  <!-- Medical cross in white -->
+  <rect x="42" y="25" width="16" height="50" rx="2" fill="white"/>
+  <rect x="25" y="42" width="50" height="16" rx="2" fill="white"/>
+
+  <!-- Small heart accent (optional, adds medical care feel) -->
+  <circle cx="50" cy="50" r="6" fill="#60A5FA" opacity="0.3"/>
+</svg>
