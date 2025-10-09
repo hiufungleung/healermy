@@ -10,9 +10,9 @@ export async function GET(request: NextRequest) {
   try {
     // Extract session from middleware headers
     const session = await getSessionFromCookies();
-    
+
     // Parse query parameters
-    const { searchParams } = new URL(request.url);
+    const searchParams = request.nextUrl.searchParams;
     const givenName = searchParams.get('givenName');
     const familyName = searchParams.get('familyName');
     const phone = searchParams.get('phone');

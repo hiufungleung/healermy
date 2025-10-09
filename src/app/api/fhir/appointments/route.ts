@@ -11,9 +11,9 @@ export async function GET(request: NextRequest) {
   try {
     // Extract session from middleware headers
     const session = await getSessionFromCookies();
-    
+
     // Parse query parameters
-    const { searchParams } = new URL(request.url);
+    const searchParams = request.nextUrl.searchParams;
     const patientId = searchParams.get('patient');
     const practitionerId = searchParams.get('practitioner');
     const status = searchParams.get('status');

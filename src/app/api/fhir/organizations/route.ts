@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const session = await getSessionFromCookies();
     const token = prepareToken(session.accessToken);
 
-    const { searchParams } = new URL(request.url);
+    const searchParams = request.nextUrl.searchParams;
 
     const params = {
       name: searchParams.get('name') || undefined,
