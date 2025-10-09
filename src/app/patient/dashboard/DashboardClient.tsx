@@ -43,6 +43,8 @@ export default function DashboardClient({
   const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
   const [cancellingAppointments, setCancellingAppointments] = useState<Set<string>>(new Set());
   const [reschedulingAppointments, setReschedulingAppointments] = useState<Set<string>>(new Set());
+  const [queuePosition, setQueuePosition] = useState<number | null>(null);
+  const [loadingQueue, setLoadingQueue] = useState(false);
 
   // Client-side data fetching
   useEffect(() => {
@@ -292,9 +294,76 @@ export default function DashboardClient({
         minute: '2-digit',
         hour12: true
       }) : null,
-    queuePosition: null,
+    queuePosition: queuePosition,
     waitTime: null
   };
+
+  // Calculate queue position for next appointment on the same day with same doctor
+  useEffect(() => {
+    const calculateQueuePosition = async () => {
+      if (!nextTodayAppointment || !nextTodayAppointment.start) {
+        setQueuePosition(null);
+        return;
+      }
+
+      setLoadingQueue(true);
+      try {
+        // Extract practitioner from the appointment
+        const practitionerParticipant = nextTodayAppointment.participant?.find(
+          (p: any) => p.actor?.reference?.startsWith('Practitioner/')
+        );
+
+        if (!practitionerParticipant || !practitionerParticipant.actor?.reference) {
+          setQueuePosition(null);
+          return;
+        }
+
+        const practitionerReference = practitionerParticipant.actor.reference;
+        const practitionerId = practitionerReference.replace('Practitioner/', '');
+
+        // Get the date of MY appointment
+        const appointmentDate = new Date(nextTodayAppointment.start);
+        const appointmentDateStr = appointmentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+
+        // Fetch all appointments for this practitioner on the SAME date as my appointment
+        const response = await fetch(
+          `/api/fhir/appointments?practitioner=${practitionerId}&date=${appointmentDateStr}&status=booked,pending,arrived,checked-in`,
+          {
+            credentials: 'include'
+          }
+        );
+
+        if (!response.ok) {
+          console.error('Failed to fetch practitioner appointments for queue calculation');
+          setQueuePosition(null);
+          return;
+        }
+
+        const data = await response.json();
+        const practitionerAppointments = data.appointments || [];
+
+        // Sort all appointments on that day by start time
+        const sortedAppointments = practitionerAppointments
+          .filter((apt: any) => apt.start)
+          .sort((a: any, b: any) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+        // Count how many appointments are BEFORE mine (same day, same doctor, earlier time)
+        const myAppointmentTime = new Date(nextTodayAppointment.start).getTime();
+        const appointmentsBeforeMe = sortedAppointments.filter(
+          (apt: any) => new Date(apt.start).getTime() < myAppointmentTime
+        );
+
+        setQueuePosition(appointmentsBeforeMe.length);
+      } catch (error) {
+        console.error('Error calculating queue position:', error);
+        setQueuePosition(null);
+      } finally {
+        setLoadingQueue(false);
+      }
+    };
+
+    calculateQueuePosition();
+  }, [nextTodayAppointment?.id, nextTodayAppointment?.start]);
 
   return (
     <>
@@ -576,14 +645,10 @@ export default function DashboardClient({
           </div>
         </div>
 
-        {/* Today's Status */}
+        {/* Next Appointment Queue Status */}
         <div>
-          {/* TODO: Add loading state when implementing real today's status */}
-          {/* {loadingAppointments ? (
-            <TodayStatusSkeleton />
-          ) : ( */}
           <div className="bg-white rounded-lg border border-border p-6">
-            <h2 className="text-xl font-semibold mb-6">Today's Status</h2>
+            <h2 className="text-xl font-semibold mb-6">Next Appointment Status</h2>
             
             <div className="space-y-4">
               {todayStatus.nextAppointment ? (
@@ -593,12 +658,19 @@ export default function DashboardClient({
                     <p className="text-2xl font-bold text-primary">{todayStatus.nextAppointment}</p>
                   </div>
 
-                  {todayStatus.queuePosition && (
-                    <div>
-                      <p className="text-sm text-text-secondary mb-1">Queue Position</p>
-                      <p className="text-xl font-semibold">#{todayStatus.queuePosition}</p>
+                  {loadingQueue ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      <p className="text-sm text-text-secondary">Checking queue...</p>
                     </div>
-                  )}
+                  ) : todayStatus.queuePosition !== null && todayStatus.queuePosition !== undefined ? (
+                    <div>
+                      <p className="text-sm text-text-secondary mb-1">Patients Ahead of You</p>
+                      <p className="text-xl font-semibold text-amber-600">
+                        {todayStatus.queuePosition === 0 ? "You're first! 🎉" : todayStatus.queuePosition}
+                      </p>
+                    </div>
+                  ) : null}
 
                   {todayStatus.waitTime && (
                     <div>
