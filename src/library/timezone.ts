@@ -8,10 +8,17 @@ export const APP_TIMEZONE = process.env.NEXT_PUBLIC_APP_TIMEZONE || Intl.DateTim
 
 /**
  * Get the user's locale from their computer/browser
+ * Always returns English locale variant to ensure consistent date/time format
  */
 function getUserLocale(): string {
   if (typeof window !== 'undefined') {
-    return navigator.language;
+    const locale = navigator.language;
+    // If Chinese locale, use en-US for consistent formatting
+    if (locale.startsWith('zh')) {
+      return 'en-US';
+    }
+    // For other locales, use English variant if available
+    return locale.startsWith('en') ? locale : 'en-US';
   }
   return 'en-AU'; // Server-side fallback
 }
@@ -76,9 +83,14 @@ export function formatDateForDisplay(date: string | Date): string {
 
 /**
  * Format a date for display in local timezone (time only)
+ * Always uses en-US locale to ensure consistent "4:00 PM" format
  */
 export function formatTimeForDisplay(date: string | Date): string {
-  return formatForDisplay(date, {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+
+  // Always use en-US locale for consistent time format regardless of browser language
+  return dateObj.toLocaleString('en-US', {
+    timeZone: APP_TIMEZONE,
     hour: '2-digit',
     minute: '2-digit',
     hour12: true

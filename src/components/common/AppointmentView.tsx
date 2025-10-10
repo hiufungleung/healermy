@@ -148,6 +148,7 @@ export default function AppointmentView(props: AppointmentViewProps) {
       let appointmentEndTime: string;
 
       try {
+        // Try direct date parsing first
         const startDate = new Date(`${selectedDate} ${selectedTime}`);
         if (isNaN(startDate.getTime())) {
           throw new Error('Invalid date format');
@@ -155,12 +156,43 @@ export default function AppointmentView(props: AppointmentViewProps) {
         appointmentStartTime = startDate.toISOString();
         appointmentEndTime = new Date(startDate.getTime() + (30 * 60 * 1000)).toISOString();
       } catch (dateError) {
-        console.warn('Date parsing failed, using fallback method');
-        const today = new Date();
+        console.warn('Date parsing failed, using fallback method. Selected time:', selectedTime);
+
+        // Parse the selected time - supports multiple formats
+        // Examples: "4:00 PM", "16:00", "4:00PM", "04:00 PM"
+        const time12HourMatch = selectedTime!.match(/(\d+):(\d+)\s*(AM|PM)/i);
+        const time24HourMatch = selectedTime!.match(/^(\d+):(\d+)$/);
+
+        let hours: number;
+        let minutes: number;
+
+        if (time12HourMatch) {
+          // 12-hour format (e.g., "4:00 PM")
+          hours = parseInt(time12HourMatch[1]);
+          minutes = parseInt(time12HourMatch[2]);
+          const isPM = time12HourMatch[3].toUpperCase() === 'PM';
+
+          // Convert to 24-hour format
+          if (isPM && hours !== 12) {
+            hours += 12;
+          } else if (!isPM && hours === 12) {
+            hours = 0;
+          }
+        } else if (time24HourMatch) {
+          // 24-hour format (e.g., "16:00")
+          hours = parseInt(time24HourMatch[1]);
+          minutes = parseInt(time24HourMatch[2]);
+        } else {
+          console.error('Could not parse time format:', selectedTime);
+          throw new Error(`Invalid time format: ${selectedTime}. Expected format like "4:00 PM" or "16:00"`);
+        }
+
         const fallbackDate = new Date(selectedDate!);
-        fallbackDate.setHours(today.getHours(), today.getMinutes(), 0, 0);
+        fallbackDate.setHours(hours, minutes, 0, 0);
         appointmentStartTime = fallbackDate.toISOString();
         appointmentEndTime = new Date(fallbackDate.getTime() + (30 * 60 * 1000)).toISOString();
+
+        console.log('Parsed time:', { selectedTime, hours, minutes, appointmentStartTime });
       }
 
       const appointmentRequestData = {
@@ -377,7 +409,7 @@ export default function AppointmentView(props: AppointmentViewProps) {
             </h2>
             <p className="text-text-secondary">{appointmentData.specialty}</p>
           </div>
-          <Badge variant={getStatusVariant(appointmentData.status)} size="lg">
+          <Badge variant={getStatusVariant(appointmentData.status)} size="md">
             {getStatusLabel(appointmentData.status)}
           </Badge>
         </div>

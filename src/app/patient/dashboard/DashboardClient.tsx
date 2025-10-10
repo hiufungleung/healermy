@@ -271,20 +271,18 @@ export default function DashboardClient({
     return true;
   });
   
-  // Calculate today's status from real appointments
+  // Calculate next upcoming appointment from real appointments
   const now = new Date();
-  const today = now.toISOString().split('T')[0]; // YYYY-MM-DD format
 
-  // Filter appointments for today that haven't started yet
-  const todayAppointments = appointments?.filter(apt => {
+  // Filter for all future appointments (not just today)
+  const futureAppointments = appointments?.filter(apt => {
     if (!apt.start) return false;
-    const aptDate = apt.start.split('T')[0];
     const aptDateTime = new Date(apt.start);
-    return aptDate === today && aptDateTime > now && (apt.status === 'booked' || apt.status === 'pending');
+    return aptDateTime > now && (apt.status === 'booked' || apt.status === 'pending');
   }) || [];
 
-  // Find the next appointment today
-  const nextTodayAppointment = todayAppointments
+  // Find the next upcoming appointment (could be today, tomorrow, or any future date)
+  const nextTodayAppointment = futureAppointments
     .sort((a, b) => new Date(a.start!).getTime() - new Date(b.start!).getTime())[0];
 
   const todayStatus = {
