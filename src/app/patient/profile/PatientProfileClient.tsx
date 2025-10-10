@@ -1902,6 +1902,7 @@ export default function PatientProfileClient({ patientName }: PatientProfileClie
             <p className="text-text-secondary">No diagnostic reports recorded</p>
           ) : null}
         </Card>
+        )}
 
         {/* Service Requests (Lab Orders) */}
         <Card>
