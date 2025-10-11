@@ -14,12 +14,20 @@ export async function GET(request: NextRequest) {
 
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams;
-    const patientId = searchParams.get('patient');
-    const practitionerId = searchParams.get('practitioner');
+    let patientId = searchParams.get('patient');
+    let practitionerId = searchParams.get('practitioner');
     const status = searchParams.get('status');
     const dateFrom = searchParams.get('date-from');
     const dateTo = searchParams.get('date-to');
     const date = searchParams.get('date'); // For single date queries like ?date=2025-01-15
+
+    // Auto-filter by patient based on session role (like Communications API)
+    // This prevents fetching all appointments without filter
+    // Note: Providers get clinic-wide view (no practitioner filter), but rely on date/status filters
+    if (session.role === 'patient' && !patientId) {
+      patientId = session.patient || null;
+    }
+    // Provider端不自动添加practitioner过滤，保持clinic-wide view
 
     // Call FHIR operations
     const token = prepareToken(session.accessToken);
@@ -128,13 +136,13 @@ export async function POST(request: NextRequest) {
         console.log(`[APPOINTMENT] Found participants - Patient: ${patientParticipant?.actor?.reference}, Practitioner: ${practitionerParticipant?.actor?.reference}`);
 
         if (patientParticipant && practitionerParticipant) {
-          // Only send notification when provider creates appointments
-          // Patients no longer receive automatic booking confirmation notifications
-          if (session.role === 'provider') {
-            const statusMessage = 'A new appointment has been scheduled.';
-            console.log(`[APPOINTMENT] Creating notification message: "${statusMessage}"`);
+          // Send notification based on who created the appointment
+          if (session.role === 'patient') {
+            // Patient creates appointment → notify provider ONLY (don't notify patient)
+            const statusMessage = `New appointment request from ${patientParticipant.actor!.display || 'patient'} - pending approval.`;
+            console.log(`[APPOINTMENT] Creating notification message for provider: "${statusMessage}"`);
 
-            // Create status update message
+            // Create status update message for provider
             const notificationResult = await createStatusUpdateMessage(
               token,
               session.fhirBaseUrl,
@@ -145,10 +153,10 @@ export async function POST(request: NextRequest) {
               'practitioner'
             );
 
-            console.log(`[APPOINTMENT] Notification created successfully:`, notificationResult.id);
-          } else {
-            console.log(`[APPOINTMENT] Patient booking - no automatic notification sent`);
+            console.log(`[APPOINTMENT] Provider notification created successfully:`, notificationResult.id);
           }
+          // Note: Provider creating appointments don't send automatic notifications
+          // Notifications are sent when appointment status changes (approve/reject)
         } else {
           console.log(`[APPOINTMENT] Missing participants - cannot send notification`);
         }

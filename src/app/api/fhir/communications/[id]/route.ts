@@ -80,6 +80,28 @@ export async function PATCH(
         id,
         userRef
       );
+    } else if (action === 'mark-deleted-by-provider') {
+      // Mark communication as deleted by provider (adds extension)
+      const existingCommunication = await getCommunication(token, session.fhirBaseUrl, id);
+
+      // Add extension to mark as deleted by provider
+      const updatedCommunication = {
+        ...existingCommunication,
+        extension: [
+          ...(existingCommunication.extension || []),
+          {
+            url: 'http://hl7.org/fhir/StructureDefinition/communication-deleted-by-provider',
+            valueBoolean: true
+          }
+        ]
+      };
+
+      result = await updateCommunication(
+        token,
+        session.fhirBaseUrl,
+        id,
+        updatedCommunication
+      );
     } else {
       // General update
       const existingCommunication = await getCommunication(token, session.fhirBaseUrl, id);

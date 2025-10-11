@@ -111,8 +111,12 @@ export async function createStatusUpdateMessage(
   patientRef: string,
   practitionerRef: string,
   statusMessage: string,
-  sender: 'system' | 'patient' | 'practitioner' = 'system'
+  recipientRole: 'patient' | 'practitioner' = 'patient'
 ): Promise<Communication> {
+  // Determine recipient and sender based on recipientRole
+  const recipient = recipientRole === 'patient' ? patientRef : practitionerRef;
+  const sender = recipientRole === 'patient' ? practitionerRef : patientRef;
+
   const communication: Partial<Communication> = {
     resourceType: 'Communication',
     status: 'completed',
@@ -126,9 +130,9 @@ export async function createStatusUpdateMessage(
     }],
     subject: { reference: patientRef },
     about: [{ reference: `Appointment/${appointmentId}` }],
-    recipient: [{ reference: patientRef }],
+    recipient: [{ reference: recipient }],
     sender: {
-      reference: sender === 'system' || sender === 'practitioner' ? practitionerRef : patientRef
+      reference: sender
     },
     sent: new Date().toISOString(),
     payload: [{

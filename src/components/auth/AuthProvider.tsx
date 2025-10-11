@@ -172,6 +172,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const filteredCommunications = allCommunications.filter((comm: any) => {
           if (hiddenNotifications.has(comm.id)) return false;
 
+          // Skip communications marked as deleted by provider
+          const deletedExtension = comm.extension?.find((ext: any) =>
+            ext.url === 'http://hl7.org/fhir/StructureDefinition/communication-deleted-by-provider'
+          );
+          if (deletedExtension?.valueBoolean) return false;
+
           const messageContent = comm.payload?.[0]?.contentString?.toLowerCase() || '';
 
           // Skip patient-facing messages (exact same logic as ProviderNotificationsClient)
@@ -202,37 +208,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         const isMessageRead = (comm: any): boolean => {
+          // Check localStorage-based read status first (persists across sessions)
+          if (readNotifications.has(comm.id)) {
+            return true;
+          }
+
+          // Then check FHIR extension
           const readExtension = comm.extension?.find((ext: any) =>
             ext.url === 'http://hl7.org/fhir/StructureDefinition/communication-read-status'
           );
           return !!readExtension?.valueDateTime;
         };
 
+        // Only count unread communications, not pending appointments
+        // Pending appointments are shown on the appointments page, not notifications page
         let count = filteredCommunications.filter((comm: any) => !isMessageRead(comm)).length;
 
-        // Add pending appointment count
-        try {
-          const aptResponse = await fetch('/api/fhir/appointments', {
-            method: 'GET',
-            credentials: 'include',
-          });
-
-          if (aptResponse.ok) {
-            const data = await aptResponse.json();
-            const appointments = data.appointments || [];
-
-            const pendingCount = appointments.filter((apt: any) => {
-              const notificationId = `apt-${apt.id}`;
-              return apt.status === 'pending' &&
-                     !hiddenNotifications.has(notificationId) &&
-                     !readNotifications.has(notificationId);
-            }).length;
-
-            count += pendingCount;
-          }
-        } catch (error) {
-          // Ignore appointment fetch errors
-        }
+        console.log('🔔 [AuthProvider] Provider unread count (communications only):', count);
 
         setUnreadCount(count);
       }

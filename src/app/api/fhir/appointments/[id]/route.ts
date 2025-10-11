@@ -199,10 +199,12 @@ export async function PATCH(
           
           if (patientParticipant && practitionerParticipant) {
             let statusMessage = '';
-            const sender: 'system' | 'patient' | 'practitioner' = session.role === 'patient' ? 'patient' : 'practitioner';
-            
+            let recipientRole: 'patient' | 'practitioner';
+
             // Different messages based on who initiated the change
             if (session.role === 'patient') {
+              // Patient updates appointment → notify provider
+              recipientRole = 'practitioner';
               switch (newStatus) {
                 case 'cancelled':
                   statusMessage = 'The patient has cancelled their appointment.';
@@ -214,7 +216,8 @@ export async function PATCH(
                   statusMessage = `The patient has updated their appointment status to ${newStatus}.`;
               }
             } else {
-              // Provider messages (existing logic)
+              // Provider updates appointment → notify patient
+              recipientRole = 'patient';
               switch (newStatus) {
                 case 'booked':
                   statusMessage = 'Your appointment request has been approved and confirmed.';
@@ -247,7 +250,7 @@ export async function PATCH(
                   statusMessage = `Your appointment status has been updated to ${newStatus}.`;
               }
             }
-            
+
             await createStatusUpdateMessage(
               token,
               session.fhirBaseUrl,
@@ -255,7 +258,7 @@ export async function PATCH(
               patientParticipant?.actor?.reference ?? '',
               practitionerParticipant?.actor?.reference ?? '',
               statusMessage,
-              sender
+              recipientRole
             );
           }
         }

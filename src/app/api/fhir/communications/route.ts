@@ -77,8 +77,18 @@ export async function GET(request: NextRequest) {
       // For providers, get all communications (clinic-wide view)
       const result = await searchCommunications(token, session.fhirBaseUrl, searchOptions);
       allCommunications = result.entry || [];
+
+      // Filter out communications marked as deleted by provider
+      allCommunications = allCommunications.filter(entry => {
+        const comm = entry.resource;
+        const deletedExtension = comm.extension?.find((ext: any) =>
+          ext.url === 'http://hl7.org/fhir/StructureDefinition/communication-deleted-by-provider'
+        );
+        return !deletedExtension?.valueBoolean;
+      });
     } else {
-      // For patients, get communications where patient is recipient or sender
+      // For patients, ONLY get communications where patient is recipient
+      // This prevents patients from seeing appointment-request notifications they sent to providers
       const patientRef = `Patient/${session.patient}`;
 
       const result = await searchCommunications(token, session.fhirBaseUrl, {
@@ -86,31 +96,12 @@ export async function GET(request: NextRequest) {
         recipient: patientRef
       });
 
-      const sentResult = await searchCommunications(token, session.fhirBaseUrl, {
-        ...searchOptions,
-        sender: patientRef
-      });
-
-      // Merge and deduplicate results
-      allCommunications = [
-        ...(result.entry || []),
-        ...(sentResult.entry || [])
-      ];
-    }
-    
-    // Remove duplicates and sort by sent date
-    let uniqueCommunications = allCommunications;
-
-    if (!isProvider) {
-      // Only deduplicate for patients (who get both sent and received messages)
-      uniqueCommunications = allCommunications
-        .filter((comm, index, arr) =>
-          arr.findIndex(c => c.resource.id === comm.resource.id) === index
-        );
+      allCommunications = result.entry || [];
+      // Patients can see all their communications, even if provider deleted them
     }
 
     // Sort by sent date (newest first)
-    uniqueCommunications = uniqueCommunications
+    const uniqueCommunications = allCommunications
       .sort((a, b) => new Date(b.resource.sent || 0).getTime() - new Date(a.resource.sent || 0).getTime());
     
     return NextResponse.json({
