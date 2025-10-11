@@ -4,6 +4,15 @@ import React from 'react';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { Badge } from '@/components/common/Badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 import type { Practitioner } from '@/types/fhir';
 
 interface ViewPractitionerDetailsProps {
@@ -14,7 +23,7 @@ interface ViewPractitionerDetailsProps {
 }
 
 export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit }: ViewPractitionerDetailsProps) {
-  if (!isOpen || !practitioner) return null;
+  if (!practitioner) return null;
 
   const name = practitioner.name?.[0];
   const displayName = name?.text || 
@@ -60,26 +69,16 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
   const versionId = practitioner.meta?.versionId;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold text-text-primary">Practitioner Details</h2>
-              <p className="text-sm text-text-secondary mt-1">ID: {practitioner.id}</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Practitioner Details</DialogTitle>
+          <DialogDescription>
+            ID: {practitioner.id}
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="p-6 space-y-6">
+        <div className="space-y-6">
           {/* Header Information */}
           <Card>
             <div className="flex items-start space-x-4">
@@ -307,19 +306,21 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
             </details>
           </Card>
 
-          {/* Form Actions */}
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-            <Button variant="outline" onClick={onClose}>
-              Close
-            </Button>
-            {isAppCreated && onEdit && (
-              <Button variant="primary" onClick={onEdit}>
-                Edit Practitioner
-              </Button>
-            )}
-          </div>
         </div>
-      </div>
-    </div>
+
+        <Separator className="my-4" />
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+          {isAppCreated && onEdit && (
+            <Button variant="primary" onClick={onEdit}>
+              Edit Practitioner
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

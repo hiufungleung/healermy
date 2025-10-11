@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  compiler: {
+    // Remove all console.* calls in production
+    removeConsole: true,
+  },
 };
 
 export default nextConfig;

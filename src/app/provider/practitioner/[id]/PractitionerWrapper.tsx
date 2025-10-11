@@ -78,8 +78,6 @@ export default function PractitionerWrapper({
         {/* Data content loads with skeleton then real data */}
         <PractitionerDetailClient
           practitionerId={practitionerId}
-          practitionerName={practitionerName}
-          session={session}
           onPractitionerNameUpdate={setPractitionerName}
           onStatsUpdate={handleStatsUpdate}
         />
