@@ -1,234 +1,261 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
 import { Card } from '@/components/common/Card';
-import { Button } from '@/components/common/Button';
-import { SlotCalendarDisplay } from '@/components/common/SlotDisplay';
+import { Badge } from '@/components/common/Badge';
 import type { Slot } from '@/types/fhir';
+import type { EventInput } from '@fullcalendar/core';
 
 interface SlotCalendarProps {
   slots: Slot[];
 }
 
-interface CalendarDay {
-  date: Date;
-  dateStr: string;
-  slots: Slot[];
-  isToday: boolean;
-  isCurrentMonth: boolean;
-}
-
 export function SlotCalendar({ slots }: SlotCalendarProps) {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'month' | 'week'>('week');
+  // Convert FHIR slots to FullCalendar events
+  const events: EventInput[] = useMemo(() => {
+    return slots.map((slot) => {
+      // Map slot status to colors
+      const getColorByStatus = (status: string) => {
+        switch (status) {
+          case 'free':
+            return '#22C55E'; // Green
+          case 'busy':
+            return '#EF4444'; // Red
+          case 'busy-unavailable':
+            return '#6B7280'; // Gray
+          case 'busy-tentative':
+            return '#FFC107'; // Yellow
+          case 'entered-in-error':
+            return '#DC2626'; // Dark red
+          default:
+            return '#3B82F6'; // Blue
+        }
+      };
 
-  // Get the first day of the current week
-  const getFirstDayOfWeek = (date: Date) => {
-    const firstDay = new Date(date);
-    firstDay.setDate(date.getDate() - date.getDay()); // Sunday as first day
-    firstDay.setHours(0, 0, 0, 0);
-    return firstDay;
-  };
-
-  const firstCalendarDay = viewMode === 'week'
-    ? getFirstDayOfWeek(currentDate)
-    : (() => {
-        const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-        const firstDay = new Date(firstDayOfMonth);
-        firstDay.setDate(firstDayOfMonth.getDate() - firstDayOfMonth.getDay());
-        return firstDay;
-      })();
-  
-  // Generate calendar days
-  const calendarDays = useMemo(() => {
-    const days: CalendarDay[] = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Group slots by date (using local timezone date)
-    const slotsByDate = slots.reduce((acc, slot) => {
-      // Convert slot start time to local timezone and get date string
-      const slotDate = new Date(slot.start);
-      const year = slotDate.getFullYear();
-      const month = String(slotDate.getMonth() + 1).padStart(2, '0');
-      const day = String(slotDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-
-      if (!acc[dateStr]) {
-        acc[dateStr] = [];
-      }
-      acc[dateStr].push(slot);
-      return acc;
-    }, {} as Record<string, Slot[]>);
-
-    // Generate days based on view mode
-    const numDays = viewMode === 'week' ? 7 : 42; // 7 days for week, 42 for month (6 weeks)
-
-    for (let i = 0; i < numDays; i++) {
-      const date = new Date(firstCalendarDay);
-      date.setDate(firstCalendarDay.getDate() + i);
-
-      // Format date consistently using local timezone
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-
-      const daySlots = slotsByDate[dateStr] || [];
-
-      days.push({
-        date: new Date(date),
-        dateStr,
-        slots: daySlots,
-        isToday: date.getTime() === today.getTime(),
-        isCurrentMonth: date.getMonth() === currentDate.getMonth(),
-      });
-    }
-
-    return days;
-  }, [slots, currentDate, firstCalendarDay, viewMode]);
-
-  const navigate = (direction: 'prev' | 'next') => {
-    setCurrentDate(prev => {
-      const newDate = new Date(prev);
-      if (viewMode === 'week') {
-        // Navigate by week
-        newDate.setDate(prev.getDate() + (direction === 'next' ? 7 : -7));
-      } else {
-        // Navigate by month
-        newDate.setMonth(prev.getMonth() + (direction === 'next' ? 1 : -1));
-      }
-      return newDate;
+      return {
+        id: slot.id,
+        title: slot.status === 'free' ? 'Available' : 'Booked',
+        start: slot.start,
+        end: slot.end,
+        backgroundColor: getColorByStatus(slot.status || 'free'),
+        borderColor: getColorByStatus(slot.status || 'free'),
+        extendedProps: {
+          status: slot.status,
+          slotId: slot.id,
+          schedule: slot.schedule?.reference,
+        },
+      };
     });
+  }, [slots]);
+
+  // Event content customization
+  const renderEventContent = (eventInfo: any) => {
+    return (
+      <div className="p-1 text-xs overflow-hidden">
+        <div className="font-medium truncate">{eventInfo.event.title}</div>
+        <div className="text-[10px] opacity-90">
+          {new Date(eventInfo.event.start).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </div>
+      </div>
+    );
   };
-
-  const goToToday = () => {
-    setCurrentDate(new Date());
-  };
-
-
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <div className="space-y-4">
-      {/* Calendar Header */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center space-x-4">
-          <h3 className="text-lg font-semibold text-text-primary">
-            {viewMode === 'month' ? `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}` : ''}
-          </h3>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('prev')}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={goToToday}
-            >
-              Today
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('next')}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Button>
+    <Card className="p-4">
+      {/* Legend */}
+      <div className="flex flex-wrap gap-3 mb-4 pb-4 border-b">
+        <div className="flex items-center space-x-2">
+          <div className="w-4 h-4 rounded bg-green-500"></div>
+          <span className="text-sm">Available</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-4 h-4 rounded bg-red-500"></div>
+          <span className="text-sm">Booked</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-4 h-4 rounded bg-yellow-500"></div>
+          <span className="text-sm">Tentative</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-4 h-4 rounded bg-gray-500"></div>
+          <span className="text-sm">Unavailable</span>
+        </div>
+      </div>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div className="bg-gray-50 p-3 rounded-lg">
+          <div className="text-sm text-gray-600">Total Slots</div>
+          <div className="text-2xl font-bold">{slots.length}</div>
+        </div>
+        <div className="bg-green-50 p-3 rounded-lg">
+          <div className="text-sm text-green-600">Available</div>
+          <div className="text-2xl font-bold text-green-600">
+            {slots.filter((s) => s.status === 'free').length}
           </div>
         </div>
-        
-        <div className="flex items-center space-x-2">
-          {/* View Mode Toggle */}
-          <div className="flex items-center space-x-2 mr-4">
-            <Button
-              variant={viewMode === 'week' ? 'primary' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('week')}
-            >
-              Week
-            </Button>
-            <Button
-              variant={viewMode === 'month' ? 'primary' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('month')}
-            >
-              Month
-            </Button>
+        <div className="bg-red-50 p-3 rounded-lg">
+          <div className="text-sm text-red-600">Booked</div>
+          <div className="text-2xl font-bold text-red-600">
+            {slots.filter((s) => s.status === 'busy').length}
           </div>
-
-          <div className="flex items-center space-x-4 text-sm">
-            <div className="flex items-center space-x-1">
-              <div className="w-3 h-3 bg-green-500 rounded"></div>
-              <span>Free ({slots.filter(s => s.status === 'free').length})</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <div className="w-3 h-3 bg-red-500 rounded"></div>
-              <span>Busy ({slots.filter(s => s.status === 'busy').length})</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <div className="w-3 h-3 bg-gray-500 rounded"></div>
-              <span>Past ({slots.filter(s => s.status === 'busy-unavailable').length})</span>
-            </div>
+        </div>
+        <div className="bg-yellow-50 p-3 rounded-lg">
+          <div className="text-sm text-yellow-600">Tentative</div>
+          <div className="text-2xl font-bold text-yellow-600">
+            {slots.filter((s) => s.status === 'busy-tentative').length}
           </div>
         </div>
       </div>
 
-      {/* Calendar Grid */}
-      <Card>
-        <div className="p-4">
-          {/* Day Headers */}
-          <div className="grid grid-cols-7 gap-px mb-2">
-            {dayNames.map((day: string) => (
-              <div key={day} className="p-2 text-center text-sm font-medium text-text-secondary bg-gray-50">
-                {day}
-              </div>
-            ))}
-          </div>
+      {/* FullCalendar */}
+      <div className="fullcalendar-wrapper">
+        <FullCalendar
+          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+          initialView="timeGridWeek"
+          headerToolbar={{
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay',
+          }}
+          events={events}
+          eventContent={renderEventContent}
+          slotMinTime="09:00:00"
+          slotMaxTime="17:00:00"
+          allDaySlot={false}
+          height="auto"
+          expandRows={true}
+          nowIndicator={true}
+          slotDuration="00:30:00"
+          slotLabelInterval="01:00:00"
+          eventTimeFormat={{
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          }}
+          slotLabelFormat={{
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          }}
+          eventClick={(info) => {
+            // Handle event click - could show slot details
+            console.log('Slot clicked:', info.event.extendedProps);
+          }}
+          dateClick={(info) => {
+            // Handle date click - could create new slot
+            console.log('Date clicked:', info.dateStr);
+          }}
+        />
+      </div>
 
-          {/* Calendar Days */}
-          <div className="grid grid-cols-7 gap-px bg-gray-200">
-            {calendarDays.map((day: CalendarDay, index: number) => (
-              <div
-                key={index}
-                className={`
-                  ${viewMode === 'week' ? 'min-h-[200px]' : 'min-h-[120px]'} p-2 bg-white relative
-                  ${day.isCurrentMonth ? '' : 'bg-gray-50'}
-                  ${day.isToday ? 'ring-2 ring-primary ring-inset' : ''}
-                `}
-              >
-                {/* Date Number */}
-                <div className={`
-                  text-sm font-medium mb-1
-                  ${day.isCurrentMonth ? 'text-text-primary' : 'text-text-secondary'}
-                  ${day.isToday ? 'text-primary font-bold' : ''}
-                `}>
-                  {day.date.getDate()}
-                </div>
+      <style jsx global>{`
+        .fullcalendar-wrapper {
+          font-family: inherit;
+        }
 
-                {/* Slots for this day */}
-                <SlotCalendarDisplay
-                  slots={day.slots}
-                  maxDisplay={viewMode === 'week' ? 8 : 3}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      </Card>
-    </div>
+        .fc {
+          font-size: 0.875rem;
+        }
+
+        .fc .fc-button {
+          padding: 0.5rem 1rem;
+          font-size: 0.875rem;
+          text-transform: capitalize;
+          background-color: #3B82F6;
+          border-color: #3B82F6;
+        }
+
+        .fc .fc-button:hover {
+          background-color: #2563EB;
+          border-color: #2563EB;
+        }
+
+        .fc .fc-button:disabled {
+          background-color: #9CA3AF;
+          border-color: #9CA3AF;
+        }
+
+        .fc .fc-button-primary:not(:disabled).fc-button-active {
+          background-color: #1E40AF;
+          border-color: #1E40AF;
+        }
+
+        .fc-theme-standard td,
+        .fc-theme-standard th {
+          border-color: #E5E7EB;
+        }
+
+        .fc-theme-standard .fc-scrollgrid {
+          border-color: #E5E7EB;
+        }
+
+        .fc .fc-col-header-cell {
+          background-color: #F9FAFB;
+          font-weight: 600;
+          padding: 0.75rem 0.5rem;
+        }
+
+        .fc .fc-daygrid-day-number {
+          padding: 0.5rem;
+        }
+
+        .fc .fc-timegrid-slot {
+          height: 3rem;
+        }
+
+        .fc-event {
+          cursor: pointer;
+          border-radius: 4px;
+          padding: 2px;
+        }
+
+        .fc-event:hover {
+          opacity: 0.9;
+        }
+
+        .fc .fc-timegrid-now-indicator-line {
+          border-color: #EF4444;
+          border-width: 2px;
+        }
+
+        .fc .fc-timegrid-now-indicator-arrow {
+          border-color: #EF4444;
+        }
+
+        .fc-day-today {
+          background-color: #EFF6FF !important;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+          .fc .fc-toolbar {
+            flex-direction: column;
+            gap: 0.5rem;
+          }
+
+          .fc .fc-toolbar-chunk {
+            display: flex;
+            justify-content: center;
+          }
+
+          .fc .fc-button {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.75rem;
+          }
+
+          .fc .fc-timegrid-slot {
+            height: 2rem;
+          }
+        }
+      `}</style>
+    </Card>
   );
 }

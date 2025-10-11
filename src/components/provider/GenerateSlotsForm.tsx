@@ -1,8 +1,31 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card } from '@/components/common/Card';
-import { Button } from '@/components/common/Button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DatePicker } from '@/components/ui/date-picker';
+import { TimePicker } from '@/components/ui/time-picker';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { format } from 'date-fns';
 import { createFHIRDateTime } from '@/library/timezone';
 import type { Schedule, Slot } from '@/types/fhir';
 
@@ -206,164 +229,109 @@ export function GenerateSlotsForm({
     return Array.from(daysInRange);
   };
 
-  // Check if a day is allowed for the current schedule and date range
-  const isDayAllowedForSchedule = (dayValue: string): boolean => {
-    if (!formData.scheduleId) return true; // All days allowed when no schedule selected
-
-    // First check if the day occurs in the selected date range
+  // Check if a day is allowed for the current schedule
+  const isDayAllowedForSchedule = (day: string): boolean => {
+    const scheduleAllowedDays = getScheduleAllowedDays();
     const daysInRange = getDaysInDateRange();
-    if (daysInRange.length > 0 && !daysInRange.includes(dayValue)) {
-      return false; // Day doesn't occur in selected date range
+
+    // If no date range is selected, consider all schedule allowed days
+    if (daysInRange.length === 0) {
+      return scheduleAllowedDays.includes(day);
     }
 
-    // Then check if the day is allowed by the schedule
-    const allowedDays = getScheduleAllowedDays();
-    return allowedDays.includes(dayValue);
+    // Day must be both in the date range AND allowed by schedule
+    return daysInRange.includes(day) && scheduleAllowedDays.includes(day);
   };
 
-  // Filter schedules to only show non-past ones
-  const getAvailableSchedules = () => {
-    const today = new Date().toISOString().split('T')[0];
+  // Filter schedules to only show those with active periods (not completely in the past)
+  const getAvailableSchedules = (): Schedule[] => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     return schedules.filter(schedule => {
-      // Schedule is available if its end date is today or in the future
-      return schedule.planningHorizon?.end && schedule.planningHorizon.end >= today;
+      if (!schedule.planningHorizon?.end) return false;
+      const scheduleEndDate = new Date(schedule.planningHorizon.end);
+      scheduleEndDate.setHours(0, 0, 0, 0);
+      return scheduleEndDate >= today;
     });
   };
 
+  // Auto-populate date range when schedule is selected
+  useEffect(() => {
+    if (!formData.scheduleId) return;
+
+    const selectedSchedule = schedules.find(s => s.id === formData.scheduleId);
+    if (!selectedSchedule?.planningHorizon) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const scheduleStart = new Date(selectedSchedule.planningHorizon.start);
+    scheduleStart.setHours(0, 0, 0, 0);
+
+    const scheduleEnd = new Date(selectedSchedule.planningHorizon.end);
+    scheduleEnd.setHours(0, 0, 0, 0);
+
+    // Use today if it's after the schedule start date
+    const effectiveStartDate = scheduleStart < today ? today : scheduleStart;
+
+    // Convert dates to YYYY-MM-DD format
+    const startDateStr = effectiveStartDate.toISOString().split('T')[0];
+    const endDateStr = scheduleEnd.toISOString().split('T')[0];
+
+    // Only update if dates are different from current values
+    if (formData.startDate !== startDateStr || formData.endDate !== endDateStr) {
+      setFormData(prev => ({
+        ...prev,
+        startDate: startDateStr,
+        endDate: endDateStr
+      }));
+    }
+  }, [formData.scheduleId, schedules]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
-    // Auto-populate dates when schedule is selected
-    if (name === 'scheduleId') {
-      const selectedSchedule = schedules.find(s => s.id === value);
-      const newFormData: Partial<SlotGenerationData> = { [name]: value };
-
-      if (selectedSchedule?.planningHorizon) {
-        // Set dates to schedule's planning horizon, but prefer today over past dates
-        const today = new Date().toISOString().split('T')[0];
-
-        if (selectedSchedule.planningHorizon.start) {
-          // If schedule starts in the past, use today; otherwise use schedule start
-          const effectiveStartDate = selectedSchedule.planningHorizon.start <= today ? today : selectedSchedule.planningHorizon.start;
-          newFormData.startDate = effectiveStartDate;
-        }
-        if (selectedSchedule.planningHorizon.end) {
-          newFormData.endDate = selectedSchedule.planningHorizon.end;
-        }
-
-        // Auto-select schedule's allowed days
-        const allowedDays = getScheduleAllowedDays();
-        if (allowedDays.length > 0) {
-          newFormData.daysOfWeek = allowedDays;
-        }
-
-        // Auto-adjust times for the new start date if needed
-        const startDateToUse = newFormData.startDate || formData.startDate;
-        if (startDateToUse) {
-          const minTime = getMinTimeForDate(startDateToUse);
-
-          if (isTimeDisabled(formData.startTime, startDateToUse)) {
-            newFormData.startTime = minTime;
-          }
-
-          if (isTimeDisabled(formData.endTime, startDateToUse)) {
-            const minStartTime = new Date(`2000-01-01T${newFormData.startTime || formData.startTime}:00`);
-            const minEndTime = new Date(minStartTime.getTime() + 60 * 60 * 1000);
-            const endHours = minEndTime.getHours().toString().padStart(2, '0');
-            const endMinutes = minEndTime.getMinutes().toString().padStart(2, '0');
-            newFormData.endTime = `${endHours}:${endMinutes}`;
-          }
-        }
-      }
-
-      setFormData(prev => ({ ...prev, ...newFormData }));
-      return;
-    }
-
-    // Auto-adjust times and days when start date changes
-    if (name === 'startDate') {
-      const minTime = getMinTimeForDate(value);
-      const newFormData: Partial<SlotGenerationData> = { [name]: value };
-
-      // If current start time is before minimum allowed time, update it
-      if (isTimeDisabled(formData.startTime, value)) {
-        newFormData.startTime = minTime;
-      }
-
-      // If current end time is before minimum allowed time, set it to at least 1 hour after start
-      if (isTimeDisabled(formData.endTime, value)) {
-        const minStartTime = new Date(`2000-01-01T${newFormData.startTime || formData.startTime}:00`);
-        const minEndTime = new Date(minStartTime.getTime() + 60 * 60 * 1000); // 1 hour later
-        const endHours = minEndTime.getHours().toString().padStart(2, '0');
-        const endMinutes = minEndTime.getMinutes().toString().padStart(2, '0');
-        newFormData.endTime = `${endHours}:${endMinutes}`;
-      }
-
-      setFormData(prev => ({ ...prev, ...newFormData }));
-      return;
-    }
-
-    // Auto-adjust days when end date changes
-    if (name === 'endDate') {
-      setFormData(prev => ({ ...prev, [name]: value }));
-      return;
-    }
-
-    // Validate time inputs for current date
-    if ((name === 'startTime' || name === 'endTime') && formData.startDate) {
-      if (isTimeDisabled(value, formData.startDate)) {
-        // Show warning but don't prevent the change - let the HTML min attribute handle it
-        console.warn(`Time ${value} is in the past for selected date ${formData.startDate}`);
-      }
-    }
-
+  const handleDayChange = (day: string) => {
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'slotDuration' ? parseInt(value) : value
+      daysOfWeek: prev.daysOfWeek.includes(day)
+        ? prev.daysOfWeek.filter(d => d !== day)
+        : [...prev.daysOfWeek, day]
     }));
   };
 
-  const handleDayChange = (dayValue: string) => {
-    // Don't allow changes for disabled days
-    if (formData.scheduleId && !isDayAllowedForSchedule(dayValue)) {
-      return;
-    }
-
-    setFormData(prev => ({
-      ...prev,
-      daysOfWeek: prev.daysOfWeek.includes(dayValue)
-        ? prev.daysOfWeek.filter(d => d !== dayValue)
-        : [...prev.daysOfWeek, dayValue]
-    }));
-  };
-
-  const generateTimeSlots = (startTime: string, endTime: string, duration: number, breakStart?: string, breakEnd?: string): string[] => {
+  const generateTimeSlots = (): string[] => {
     const slots: string[] = [];
-    const start = new Date(`2000-01-01T${startTime}:00`);
-    const end = new Date(`2000-01-01T${endTime}:00`);
-    const breakStartTime = breakStart ? new Date(`2000-01-01T${breakStart}:00`) : null;
-    const breakEndTime = breakEnd ? new Date(`2000-01-01T${breakEnd}:00`) : null;
+    const startTime = new Date(`2000-01-01T${formData.startTime}:00`);
+    const endTime = new Date(`2000-01-01T${formData.endTime}:00`);
+    const breakStart = formData.breakStartTime ? new Date(`2000-01-01T${formData.breakStartTime}:00`) : null;
+    const breakEnd = formData.breakEndTime ? new Date(`2000-01-01T${formData.breakEndTime}:00`) : null;
 
-    let current = new Date(start);
-    while (current < end) {
-      const slotEnd = new Date(current.getTime() + duration * 60000);
-      
-      // Skip slots that overlap with break time
-      const skipSlot = breakStartTime && breakEndTime &&
-        ((current >= breakStartTime && current < breakEndTime) ||
-         (slotEnd > breakStartTime && slotEnd <= breakEndTime));
+    const slotDurationMs = formData.slotDuration * 60 * 1000;
 
-      if (!skipSlot && slotEnd <= end) {
-        const startStr = current.toTimeString().slice(0, 5);
-        const endStr = slotEnd.toTimeString().slice(0, 5);
-        slots.push(`${startStr}-${endStr}`);
+    for (let current = new Date(startTime); current < endTime; current.setTime(current.getTime() + slotDurationMs)) {
+      const slotEnd = new Date(current.getTime() + slotDurationMs);
+
+      // Skip if slot overlaps with break time
+      if (breakStart && breakEnd) {
+        if ((current >= breakStart && current < breakEnd) || (slotEnd > breakStart && slotEnd <= breakEnd)) {
+          continue;
+        }
       }
-      
-      current = slotEnd;
+
+      // Ensure slot doesn't exceed end time
+      if (slotEnd > endTime) {
+        break;
+      }
+
+      const startStr = `${current.getHours().toString().padStart(2, '0')}:${current.getMinutes().toString().padStart(2, '0')}`;
+      const endStr = `${slotEnd.getHours().toString().padStart(2, '0')}:${slotEnd.getMinutes().toString().padStart(2, '0')}`;
+      slots.push(`${startStr}-${endStr}`);
     }
-    
+
     return slots;
   };
 
@@ -373,29 +341,10 @@ export function GenerateSlotsForm({
     setError(null);
 
     try {
-      if (!formData.scheduleId) {
-        throw new Error('Please select a schedule');
-      }
-
-      if (!formData.startDate || !formData.endDate) {
-        throw new Error('Please select start and end dates');
-      }
-
-      if (formData.daysOfWeek.length === 0) {
-        throw new Error('Please select at least one day of the week');
-      }
-
-      // Generate time slots for each day
-      const timeSlots = generateTimeSlots(
-        formData.startTime,
-        formData.endTime,
-        formData.slotDuration,
-        formData.breakStartTime || undefined,
-        formData.breakEndTime || undefined
-      );
+      const timeSlots = generateTimeSlots();
 
       if (timeSlots.length === 0) {
-        throw new Error('No valid time slots can be generated with the current settings');
+        throw new Error('No time slots could be generated with the selected settings');
       }
 
       const startDate = new Date(formData.startDate);
@@ -406,13 +355,13 @@ export function GenerateSlotsForm({
       // Generate slots for each day in the date range
       for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
         const dayOfWeek = date.getDay().toString();
-        
+
         if (formData.daysOfWeek.includes(dayOfWeek)) {
           const dateStr = date.toISOString().split('T')[0];
-          
+
           for (const timeSlot of timeSlots) {
             const [startTime, endTime] = timeSlot.split('-');
-            
+
             // Use local timezone for slot creation
             const slotStart = createFHIRDateTime(dateStr, startTime);
             const slotEnd = createFHIRDateTime(dateStr, endTime);
@@ -563,7 +512,7 @@ export function GenerateSlotsForm({
       }
       onClose();
       setError(null);
-      
+
       // Reset form
       setFormData({
         scheduleId: '',
@@ -585,381 +534,256 @@ export function GenerateSlotsForm({
     }
   };
 
-  if (!isOpen) return null;
+  const progressPercent = progress ? (progress.current / progress.total) * 100 : 0;
 
   return (
-    <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-      onClick={(e) => {
-        // Prevent closing when clicking backdrop during loading
-        if (e.target === e.currentTarget && !loading) {
-          onClose();
-        }
-      }}
-    >
-      <div className="max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        <Card>
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-text-primary">Generate Available Slots</h2>
-              <button
-                onClick={onClose}
-                disabled={loading}
-                className={`${loading ? 'text-gray-400 cursor-not-allowed' : 'text-text-secondary hover:text-text-primary'}`}
-                title={loading ? "Cannot close while slots are being created" : "Close"}
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Generate Available Slots</DialogTitle>
+          <DialogDescription>
+            Create available appointment slots for your schedule
+          </DialogDescription>
+        </DialogHeader>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="whitespace-pre-line">{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {progress && (
+          <div className="space-y-2">
+            <Progress value={progressPercent} />
+            <p className="text-sm text-muted-foreground text-center">
+              Creating slots: {progress.current}/{progress.total}
+            </p>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Schedule Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="scheduleId">
+              Schedule <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={formData.scheduleId}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, scheduleId: value }))}
+              required
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a schedule" />
+              </SelectTrigger>
+              <SelectContent>
+                {getAvailableSchedules().map((schedule) => (
+                  <SelectItem key={schedule.id} value={schedule.id || ''}>
+                    Schedule {schedule.id} ({schedule.planningHorizon?.start} - {schedule.planningHorizon?.end})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {getAvailableSchedules().length === 0
+                ? 'No active schedules available (all schedules are in the past)'
+                : `${getAvailableSchedules().length} active schedule(s) available`
+              }
+            </p>
+          </div>
+
+          {/* Date Range */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="startDate">
+                Start Date <span className="text-destructive">*</span>
+                {formData.scheduleId && (
+                  <span className="text-primary text-xs ml-2">(Auto-set from schedule)</span>
+                )}
+              </Label>
+              <DatePicker
+                date={formData.startDate ? new Date(formData.startDate) : undefined}
+                onDateChange={(date) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    startDate: date ? format(date, 'yyyy-MM-dd') : ''
+                  }));
+                }}
+                minDate={getEffectiveDateConstraints().minDate ? new Date(getEffectiveDateConstraints().minDate) : undefined}
+                maxDate={getEffectiveDateConstraints().maxDate ? new Date(getEffectiveDateConstraints().maxDate) : undefined}
+                disabled={!formData.scheduleId}
+                className={formData.scheduleId ? 'border-primary bg-primary/5' : ''}
+              />
+              {formData.scheduleId && (
+                <p className="text-xs text-primary">
+                  Schedule allows: {getScheduleDateConstraints()?.minDate} to {getScheduleDateConstraints()?.maxDate}
+                </p>
+              )}
             </div>
 
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p className="text-red-800 text-sm">{error}</p>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Schedule Selection */}
-                <div className="md:col-span-2">
-                  <label htmlFor="scheduleId" className="block text-sm font-medium text-text-primary mb-1">
-                    Schedule <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    id="scheduleId"
-                    name="scheduleId"
-                    value={formData.scheduleId}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                  >
-                    <option value="">Select a schedule</option>
-                    {getAvailableSchedules().map((schedule) => (
-                      <option key={schedule.id} value={schedule.id}>
-                        Schedule {schedule.id} ({schedule.planningHorizon?.start} - {schedule.planningHorizon?.end})
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {getAvailableSchedules().length === 0
-                      ? 'No active schedules available (all schedules are in the past)'
-                      : `${getAvailableSchedules().length} active schedule(s) available`
-                    }
-                  </p>
-                </div>
-
-                {/* Date Range */}
-                <div>
-                  <label htmlFor="startDate" className="block text-sm font-medium text-text-primary mb-1">
-                    Start Date <span className="text-red-500">*</span>
-                    {formData.scheduleId && (
-                      <span className="text-blue-600 text-xs ml-2">
-                        (Auto-set from schedule)
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="date"
-                    id="startDate"
-                    name="startDate"
-                    value={formData.startDate}
-                    min={getEffectiveDateConstraints().minDate}
-                    max={getEffectiveDateConstraints().maxDate}
-                    onChange={handleInputChange}
-                    disabled={!formData.scheduleId}
-                    required
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
-                      !formData.scheduleId
-                        ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : formData.scheduleId
-                        ? 'border-blue-300 bg-blue-50'
-                        : 'border-gray-300'
-                    }`}
-                  />
-                  {formData.scheduleId && (
-                    <p className="text-xs text-blue-600 mt-1">
-                      Schedule allows: {getScheduleDateConstraints()?.minDate} to {getScheduleDateConstraints()?.maxDate}
-                    </p>
-                  )}
-                  {!formData.scheduleId && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Select a schedule first to see available date range
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label htmlFor="endDate" className="block text-sm font-medium text-text-primary mb-1">
-                    End Date <span className="text-red-500">*</span>
-                    {formData.scheduleId && (
-                      <span className="text-blue-600 text-xs ml-2">
-                        (Auto-set from schedule)
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="date"
-                    id="endDate"
-                    name="endDate"
-                    value={formData.endDate}
-                    min={formData.startDate || getEffectiveDateConstraints().minDate}
-                    max={getEffectiveDateConstraints().maxDate}
-                    onChange={handleInputChange}
-                    disabled={!formData.scheduleId}
-                    required
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
-                      !formData.scheduleId
-                        ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : formData.scheduleId
-                        ? 'border-blue-300 bg-blue-50'
-                        : 'border-gray-300'
-                    }`}
-                  />
-                  {formData.scheduleId && (
-                    <p className="text-xs text-blue-600 mt-1">
-                      Must be within schedule range and after start date
-                    </p>
-                  )}
-                  {!formData.scheduleId && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Select a schedule first to enable date selection
-                    </p>
-                  )}
-                </div>
-
-                {/* Time Settings */}
-                <div>
-                  <label htmlFor="startTime" className="block text-sm font-medium text-text-primary mb-1">
-                    Daily Start Time <span className="text-red-500">*</span>
-                    {formData.startDate && isTimeDisabled(formData.startTime, formData.startDate) && (
-                      <span className="text-orange-600 text-xs ml-2">
-                        (Auto-adjusted to avoid past times)
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="time"
-                    id="startTime"
-                    name="startTime"
-                    value={formData.startTime}
-                    min={formData.startDate ? getMinTimeForDate(formData.startDate) : undefined}
-                    onChange={handleInputChange}
-                    required
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
-                      formData.startDate && isTimeDisabled(formData.startTime, formData.startDate)
-                        ? 'border-orange-300 bg-orange-50 text-orange-700'
-                        : 'border-gray-300'
-                    }`}
-                  />
-                  {formData.startDate && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      {formData.startDate === new Date().toISOString().split('T')[0]
-                        ? `Minimum time for today: ${getMinTimeForDate(formData.startDate)}`
-                        : 'Future date selected - all times available'
-                      }
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label htmlFor="endTime" className="block text-sm font-medium text-text-primary mb-1">
-                    Daily End Time <span className="text-red-500">*</span>
-                    {formData.startDate && isTimeDisabled(formData.endTime, formData.startDate) && (
-                      <span className="text-orange-600 text-xs ml-2">
-                        (Auto-adjusted to avoid past times)
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="time"
-                    id="endTime"
-                    name="endTime"
-                    value={formData.endTime}
-                    min={formData.startDate ? getMinTimeForDate(formData.startDate) : undefined}
-                    onChange={handleInputChange}
-                    required
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
-                      formData.startDate && isTimeDisabled(formData.endTime, formData.startDate)
-                        ? 'border-orange-300 bg-orange-50 text-orange-700'
-                        : 'border-gray-300'
-                    }`}
-                  />
-                  {formData.startDate && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Must be after start time
-                      {formData.startDate === new Date().toISOString().split('T')[0] &&
-                        ` and after ${getMinTimeForDate(formData.startDate)}`
-                      }
-                    </p>
-                  )}
-                </div>
-
-                {/* Slot Duration */}
-                <div>
-                  <label htmlFor="slotDuration" className="block text-sm font-medium text-text-primary mb-1">
-                    Slot Duration (minutes) <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    id="slotDuration"
-                    name="slotDuration"
-                    value={formData.slotDuration}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                  >
-                    <option value={15}>15 minutes</option>
-                    <option value={30}>30 minutes</option>
-                    <option value={45}>45 minutes</option>
-                    <option value={60}>1 hour</option>
-                    <option value={90}>1.5 hours</option>
-                    <option value={120}>2 hours</option>
-                  </select>
-                </div>
-
-                {/* Break Times (Optional) */}
-                <div>
-                  <label htmlFor="breakStartTime" className="block text-sm font-medium text-text-primary mb-1">
-                    Break Start Time (Optional)
-                  </label>
-                  <input
-                    type="time"
-                    id="breakStartTime"
-                    name="breakStartTime"
-                    value={formData.breakStartTime}
-                    min={formData.startDate ? getMinTimeForDate(formData.startDate) : undefined}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
-                      formData.startDate && formData.breakStartTime && isTimeDisabled(formData.breakStartTime, formData.startDate)
-                        ? 'border-orange-300 bg-orange-50 text-orange-700'
-                        : 'border-gray-300'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="breakEndTime" className="block text-sm font-medium text-text-primary mb-1">
-                    Break End Time (Optional)
-                  </label>
-                  <input
-                    type="time"
-                    id="breakEndTime"
-                    name="breakEndTime"
-                    value={formData.breakEndTime}
-                    min={formData.startDate ? getMinTimeForDate(formData.startDate) : undefined}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
-                      formData.startDate && formData.breakEndTime && isTimeDisabled(formData.breakEndTime, formData.startDate)
-                        ? 'border-orange-300 bg-orange-50 text-orange-700'
-                        : 'border-gray-300'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              {/* Days of Week */}
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-text-primary mb-2">
-                  Days of Week <span className="text-red-500">*</span>
-                  {formData.scheduleId && (
-                    <span className="text-blue-600 text-xs ml-2">
-                      (Based on schedule availability)
-                    </span>
-                  )}
-                </label>
-                <div className="grid grid-cols-4 md:grid-cols-7 gap-4">
-                  {DAYS_OF_WEEK.map((day) => {
-                    const isAllowed = isDayAllowedForSchedule(day.value);
-                    const isDisabled = formData.scheduleId && !isAllowed;
-
-                    return (
-                      <label
-                        key={day.value}
-                        className={`flex items-center cursor-pointer ${
-                          isDisabled ? 'cursor-not-allowed' : ''
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={formData.daysOfWeek.includes(day.value)}
-                          onChange={() => handleDayChange(day.value)}
-                          disabled={isDisabled}
-                          className={`mr-2 ${
-                            isDisabled
-                              ? 'text-gray-300 cursor-not-allowed'
-                              : 'text-primary cursor-pointer'
-                          }`}
-                        />
-                        <span className={`text-sm ${
-                          isDisabled
-                            ? 'text-gray-400'
-                            : formData.scheduleId && isAllowed
-                            ? 'text-blue-700 font-medium'
-                            : 'text-text-primary'
-                        }`}>
-                          {day.label}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-                {formData.scheduleId && formData.startDate && formData.endDate && (
-                  <p className="text-xs text-blue-600 mt-2">
-                    ✓ Available days in selected date range: {getDaysInDateRange().filter(day =>
-                      getScheduleAllowedDays().includes(day)
-                    ).map(day =>
-                      DAYS_OF_WEEK.find(d => d.value === day)?.label
-                    ).join(', ') || 'None'}
-                  </p>
+            <div className="space-y-2">
+              <Label htmlFor="endDate">
+                End Date <span className="text-destructive">*</span>
+                {formData.scheduleId && (
+                  <span className="text-primary text-xs ml-2">(Auto-set from schedule)</span>
                 )}
-                {formData.scheduleId && (!formData.startDate || !formData.endDate) && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    Select start and end dates to see available days in that range
-                  </p>
-                )}
-                {!formData.scheduleId && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    Select a schedule first to see available days for slot generation
-                  </p>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onClose}
-                  disabled={loading}
-                  title={loading ? "Cannot cancel while slots are being created" : "Cancel"}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  disabled={loading}
-                  className="flex items-center"
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      {progress ? `Creating slots: ${progress.current}/${progress.total}...` : 'Generating...'}
-                    </>
-                  ) : (
-                    'Generate Slots'
-                  )}
-                </Button>
-              </div>
-            </form>
+              </Label>
+              <DatePicker
+                date={formData.endDate ? new Date(formData.endDate) : undefined}
+                onDateChange={(date) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    endDate: date ? format(date, 'yyyy-MM-dd') : ''
+                  }));
+                }}
+                minDate={formData.startDate ? new Date(formData.startDate) : (getEffectiveDateConstraints().minDate ? new Date(getEffectiveDateConstraints().minDate) : undefined)}
+                maxDate={getEffectiveDateConstraints().maxDate ? new Date(getEffectiveDateConstraints().maxDate) : undefined}
+                disabled={!formData.scheduleId}
+                className={formData.scheduleId ? 'border-primary bg-primary/5' : ''}
+              />
+            </div>
           </div>
-        </Card>
-      </div>
 
-    </div>
+          {/* Time Settings */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="startTime">
+                Daily Start Time <span className="text-destructive">*</span>
+              </Label>
+              <TimePicker
+                value={formData.startTime}
+                onChange={(value) => setFormData(prev => ({ ...prev, startTime: value }))}
+                minTime={formData.startDate ? getMinTimeForDate(formData.startDate) : undefined}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="endTime">
+                Daily End Time <span className="text-destructive">*</span>
+              </Label>
+              <TimePicker
+                value={formData.endTime}
+                onChange={(value) => setFormData(prev => ({ ...prev, endTime: value }))}
+                minTime={formData.startDate ? getMinTimeForDate(formData.startDate) : undefined}
+              />
+            </div>
+          </div>
+
+          {/* Slot Duration */}
+          <div className="space-y-2">
+            <Label htmlFor="slotDuration">
+              Slot Duration (minutes) <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={formData.slotDuration.toString()}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, slotDuration: parseInt(value) }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="15">15 minutes</SelectItem>
+                <SelectItem value="30">30 minutes</SelectItem>
+                <SelectItem value="45">45 minutes</SelectItem>
+                <SelectItem value="60">1 hour</SelectItem>
+                <SelectItem value="90">1.5 hours</SelectItem>
+                <SelectItem value="120">2 hours</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Break Times (Optional) */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="breakStartTime">Break Start Time (Optional)</Label>
+              <TimePicker
+                value={formData.breakStartTime}
+                onChange={(value) => setFormData(prev => ({ ...prev, breakStartTime: value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="breakEndTime">Break End Time (Optional)</Label>
+              <TimePicker
+                value={formData.breakEndTime}
+                onChange={(value) => setFormData(prev => ({ ...prev, breakEndTime: value }))}
+              />
+            </div>
+          </div>
+
+          {/* Days of Week */}
+          <div className="space-y-2">
+            <Label>
+              Days of Week <span className="text-destructive">*</span>
+              {formData.scheduleId && (
+                <span className="text-primary text-xs ml-2">(Based on schedule availability)</span>
+              )}
+            </Label>
+            <div className="grid grid-cols-4 md:grid-cols-7 gap-4">
+              {DAYS_OF_WEEK.map((day) => {
+                const isAllowed = isDayAllowedForSchedule(day.value);
+                const isDisabled = formData.scheduleId && !isAllowed;
+
+                return (
+                  <div key={day.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={day.value}
+                      checked={formData.daysOfWeek.includes(day.value)}
+                      onCheckedChange={() => handleDayChange(day.value)}
+                      disabled={isDisabled}
+                    />
+                    <Label
+                      htmlFor={day.value}
+                      className={`text-sm ${
+                        isDisabled
+                          ? 'text-muted-foreground'
+                          : formData.scheduleId && isAllowed
+                          ? 'text-primary font-medium'
+                          : ''
+                      }`}
+                    >
+                      {day.label}
+                    </Label>
+                  </div>
+                );
+              })}
+            </div>
+            {formData.scheduleId && formData.startDate && formData.endDate && (
+              <p className="text-xs text-primary">
+                ✓ Available days in selected date range: {getDaysInDateRange().filter(day =>
+                  getScheduleAllowedDays().includes(day)
+                ).map(day =>
+                  DAYS_OF_WEEK.find(d => d.value === day)?.label
+                ).join(', ') || 'None'}
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {progress ? `Creating slots: ${progress.current}/${progress.total}...` : 'Generating...'}
+                </>
+              ) : (
+                'Generate Slots'
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

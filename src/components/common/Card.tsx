@@ -1,5 +1,6 @@
 import React from 'react';
-import clsx from 'clsx';
+import { Card as ShadcnCard } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
@@ -16,8 +17,12 @@ export function Card({ children, className, padding = 'md', ...rest }: CardProps
   };
 
   return (
-    <div className={clsx('bg-white rounded-lg shadow-sm', paddingClasses[padding], className)} {...rest}>
+    <ShadcnCard className={cn(
+      'bg-white shadow-sm',
+      paddingClasses[padding],
+      className
+    )}>
       {children}
-    </div>
+    </ShadcnCard>
   );
 }

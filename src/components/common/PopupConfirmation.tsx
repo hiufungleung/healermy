@@ -1,8 +1,18 @@
 'use client';
 
 import React from 'react';
-import { Button } from './Button';
-import { Card } from './Card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface PopupConfirmationProps {
   isOpen: boolean;
@@ -38,8 +48,6 @@ export function PopupConfirmation({
   loadingText,
   progressMessage
 }: PopupConfirmationProps) {
-  if (!isOpen) return null;
-
   // Default logout icon
   const defaultIcon = variant === 'danger' && !icon ? (
     <svg
@@ -61,77 +69,78 @@ export function PopupConfirmation({
     </svg>
   );
 
+  const variantActionClasses = {
+    danger: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+    primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+    warning: 'bg-yellow-500 text-white hover:bg-yellow-600',
+    success: 'bg-green-500 text-white hover:bg-green-600',
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
-        <Card padding="none">
-          <div className="text-center p-6">
+    <AlertDialog open={isOpen}>
+      <AlertDialogContent className="sm:max-w-md">
+        <AlertDialogHeader>
+          <div className="flex items-center space-x-3">
             {/* Icon */}
-            <div className={`mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-4 ${
+            <div className={cn(
+              'flex items-center justify-center h-12 w-12 rounded-full',
               variant === 'danger' ? 'bg-red-100' : 'bg-blue-100'
-            }`}>
+            )}>
               {defaultIcon}
             </div>
-
-            {/* Title */}
-            <h3 className="text-lg font-semibold text-text-primary mb-2">
-              {title}
-            </h3>
-
-            {/* Loading State with Progress */}
-            {isLoading && progressMessage ? (
-              <div className="mb-6">
-                <div className="flex items-center justify-center mb-3">
-                  <div className={`animate-spin rounded-full h-5 w-5 border-b-2 mr-3 ${
-                    variant === 'danger' ? 'border-red-600' : 'border-blue-600'
-                  }`}></div>
-                  <span className="text-sm text-gray-700">{loadingText || 'Processing...'}</span>
-                </div>
-                <div className="bg-gray-50 rounded-md p-3 text-left">
-                  <p className="text-sm text-gray-600">{progressMessage}</p>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* Message */}
-                <p className="text-text-secondary mb-4">
-                  {message}
-                </p>
-
-                {/* Details */}
-                {details && (
-                  <div className="mb-6 text-left">
-                    {details}
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Buttons */}
-            <div className="flex space-x-3">
-              {showCancel && onCancel && (
-                <Button
-                  variant="outline"
-                  fullWidth
-                  onClick={onCancel}
-                  disabled={isLoading}
-                >
-                  {cancelText}
-                </Button>
-              )}
-              <Button
-                variant={variant}
-                fullWidth
-                onClick={onConfirm}
-                loading={isLoading}
-                disabled={isLoading}
-              >
-                {isLoading ? (loadingText || 'Processing...') : confirmText}
-              </Button>
-            </div>
+            <AlertDialogTitle>{title}</AlertDialogTitle>
           </div>
-        </Card>
-      </div>
-    </div>
+
+          {/* Loading State with Progress */}
+          {isLoading && progressMessage ? (
+            <div className="mt-4">
+              <div className="flex items-center justify-center mb-3">
+                <Loader2 className={cn(
+                  'animate-spin h-5 w-5 mr-3',
+                  variant === 'danger' ? 'text-red-600' : 'text-blue-600'
+                )} />
+                <span className="text-sm text-gray-700">{loadingText || 'Processing...'}</span>
+              </div>
+              <div className="bg-gray-50 rounded-md p-3">
+                <p className="text-sm text-gray-600">{progressMessage}</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <AlertDialogDescription>
+                {message}
+              </AlertDialogDescription>
+
+              {/* Details */}
+              {details && (
+                <div className="mt-4">
+                  {details}
+                </div>
+              )}
+            </>
+          )}
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          {showCancel && onCancel && (
+            <AlertDialogCancel onClick={onCancel} disabled={isLoading}>
+              {cancelText}
+            </AlertDialogCancel>
+          )}
+          <AlertDialogAction
+            onClick={onConfirm}
+            disabled={isLoading}
+            className={cn(variantActionClasses[variant])}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {loadingText || 'Processing...'}
+              </>
+            ) : confirmText}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

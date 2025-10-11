@@ -6,6 +6,10 @@ import { Card } from '@/components/common/Card';
 import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { FormNavigationButtons } from '@/components/common/NavigationButtons';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { createFHIRDateTime } from '@/library/timezone';
 import type { Practitioner, Appointment, Slot } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
@@ -189,44 +193,43 @@ export default function VisitInfoClient({
         </div>
 
         {/* Reason for Visit */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-text-primary mb-2">
+        <div className="mb-6 space-y-2">
+          <Label htmlFor="reasonText">
             Reason for Visit *
-          </label>
-          <textarea
+          </Label>
+          <Textarea
+            id="reasonText"
             value={reasonText}
             onChange={(e) => setReasonText(e.target.value)}
             placeholder="Please describe the reason for your visit..."
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             rows={3}
             required
           />
         </div>
 
         {/* Additional Information */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-text-primary mb-2">
+        <div className="mb-6 space-y-2">
+          <Label htmlFor="symptoms">
             Symptoms (Optional)
-          </label>
-          <textarea
+          </Label>
+          <Textarea
+            id="symptoms"
             value={symptoms}
             onChange={(e) => setSymptoms(e.target.value)}
             placeholder="Describe any symptoms you're experiencing..."
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             rows={2}
           />
         </div>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-text-primary mb-2">
+        <div className="mb-6 space-y-2">
+          <Label>
             Duration of Symptoms (Optional)
-          </label>
-          <input
+          </Label>
+          <Input
             type="text"
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
             placeholder="e.g., 3 days, 2 weeks"
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
           />
         </div>
 
@@ -284,15 +287,15 @@ export default function VisitInfoClient({
           </div>
         </div>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-text-primary mb-2">
+        <div className="mb-6 space-y-2">
+          <Label htmlFor="patientInstruction">
             Special Instructions (Optional)
-          </label>
-          <textarea
+          </Label>
+          <Textarea
+            id="patientInstruction"
             value={patientInstruction}
             onChange={(e) => setPatientInstruction(e.target.value)}
             placeholder="Any special instructions or requests..."
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             rows={2}
           />
         </div>

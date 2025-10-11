@@ -1,8 +1,29 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card } from '@/components/common/Card';
-import { Button } from '@/components/common/Button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { format } from 'date-fns';
 import type { Schedule } from '@/types/fhir';
 
 interface CreateScheduleFormProps {
@@ -51,11 +72,11 @@ interface ScheduleFormData {
   comment: string;
 }
 
-export function CreateScheduleForm({ 
-  practitionerId, 
-  isOpen, 
-  onClose, 
-  onSuccess 
+export function CreateScheduleForm({
+  practitionerId,
+  isOpen,
+  onClose,
+  onSuccess
 }: CreateScheduleFormProps) {
   const [formData, setFormData] = useState<ScheduleFormData>({
     serviceCategory: '',
@@ -85,7 +106,7 @@ export function CreateScheduleForm({
     }
   }, [formData.serviceCategory, formData.serviceType]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -165,7 +186,7 @@ export function CreateScheduleForm({
       const createdSchedule = await response.json();
       onSuccess(createdSchedule);
       onClose();
-      
+
       // Reset form
       setFormData({
         serviceCategory: '',
@@ -184,203 +205,175 @@ export function CreateScheduleForm({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <Card>
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-text-primary">Create New Schedule</h2>
-              <button
-                onClick={onClose}
-                className="text-text-secondary hover:text-text-primary"
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create New Schedule</DialogTitle>
+          <DialogDescription>
+            Define a new schedule for managing appointment availability
+          </DialogDescription>
+        </DialogHeader>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Service Category */}
+            <div className="space-y-2">
+              <Label htmlFor="serviceCategory">Service Category</Label>
+              <Select
+                value={formData.serviceCategory}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, serviceCategory: value }))}
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select service category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="outpatient">Outpatient Consultation (In-clinic visits)</SelectItem>
+                  <SelectItem value="home-health">Home Visit (At patient's home)</SelectItem>
+                  <SelectItem value="telehealth">Telehealth (Virtual appointments)</SelectItem>
+                  <SelectItem value="wellness">Preventive Care/Wellness</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p className="text-red-800 text-sm">{error}</p>
-              </div>
-            )}
+            {/* Service Type */}
+            <div className="space-y-2">
+              <Label htmlFor="serviceType">Service Type</Label>
+              <Select
+                value={formData.serviceType}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, serviceType: value }))}
+                disabled={!formData.serviceCategory}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={!formData.serviceCategory ? 'Select service category first' : 'Select service type'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableServiceTypes.map((serviceType) => (
+                    <SelectItem key={serviceType.value} value={serviceType.value}>
+                      {serviceType.label}
+                      {serviceType.description ? ` - ${serviceType.description}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {formData.serviceCategory && availableServiceTypes.length > 0 && (
+                <p className="text-xs text-primary">
+                  ✓ {availableServiceTypes.length} service types available for {formData.serviceCategory}
+                </p>
+              )}
+            </div>
 
-            <form onSubmit={handleSubmit}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Service Category */}
-                <div>
-                  <label htmlFor="serviceCategory" className="block text-sm font-medium text-text-primary mb-1">
-                    Service Category
-                  </label>
-                  <select
-                    id="serviceCategory"
-                    name="serviceCategory"
-                    value={formData.serviceCategory}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                  >
-                    <option value="">Select service category</option>
-                    <option value="outpatient">Outpatient Consultation (In-clinic visits)</option>
-                    <option value="home-health">Home Visit (At patient's home)</option>
-                    <option value="telehealth">Telehealth (Virtual appointments)</option>
-                    <option value="wellness">Preventive Care/Wellness</option>
-                  </select>
-                </div>
+            {/* Specialty */}
+            <div className="space-y-2">
+              <Label htmlFor="specialty">Specialty</Label>
+              <Select
+                value={formData.specialty}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, specialty: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select specialty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="general-practice">General Practice</SelectItem>
+                  <SelectItem value="cardiology">Cardiology</SelectItem>
+                  <SelectItem value="dermatology">Dermatology</SelectItem>
+                  <SelectItem value="endocrinology">Endocrinology</SelectItem>
+                  <SelectItem value="family-medicine">Family Medicine</SelectItem>
+                  <SelectItem value="internal-medicine">Internal Medicine</SelectItem>
+                  <SelectItem value="neurology">Neurology</SelectItem>
+                  <SelectItem value="pediatrics">Pediatrics</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-                {/* Service Type */}
-                <div>
-                  <label htmlFor="serviceType" className="block text-sm font-medium text-text-primary mb-1">
-                    Service Type
-                  </label>
-                  <select
-                    id="serviceType"
-                    name="serviceType"
-                    value={formData.serviceType}
-                    onChange={handleInputChange}
-                    disabled={!formData.serviceCategory}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
-                      !formData.serviceCategory
-                        ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'border-gray-300'
-                    }`}
-                  >
-                    <option value="">
-                      {!formData.serviceCategory
-                        ? 'Select service category first'
-                        : 'Select service type'}
-                    </option>
-                    {availableServiceTypes.map((serviceType) => (
-                      <option key={serviceType.value} value={serviceType.value}>
-                        {serviceType.label}
-                        {serviceType.description ? ` - ${serviceType.description}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {formData.serviceCategory && availableServiceTypes.length > 0 && (
-                    <p className="text-xs text-blue-600 mt-1">
-                      ✓ {availableServiceTypes.length} service types available for {formData.serviceCategory}
-                    </p>
-                  )}
-                </div>
+            {/* Planning Horizon Start */}
+            <div className="space-y-2">
+              <Label htmlFor="planningHorizonStart">
+                Start Date <span className="text-destructive">*</span>
+              </Label>
+              <DatePicker
+                date={formData.planningHorizonStart ? new Date(formData.planningHorizonStart) : undefined}
+                onDateChange={(date) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    planningHorizonStart: date ? format(date, 'yyyy-MM-dd') : ''
+                  }));
+                }}
+                minDate={new Date()}
+                placeholder="Select start date"
+              />
+              <p className="text-xs text-muted-foreground">
+                Cannot select dates before today
+              </p>
+            </div>
 
-                {/* Specialty */}
-                <div>
-                  <label htmlFor="specialty" className="block text-sm font-medium text-text-primary mb-1">
-                    Specialty
-                  </label>
-                  <select
-                    id="specialty"
-                    name="specialty"
-                    value={formData.specialty}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                  >
-                    <option value="">Select specialty</option>
-                    <option value="general-practice">General Practice</option>
-                    <option value="cardiology">Cardiology</option>
-                    <option value="dermatology">Dermatology</option>
-                    <option value="endocrinology">Endocrinology</option>
-                    <option value="family-medicine">Family Medicine</option>
-                    <option value="internal-medicine">Internal Medicine</option>
-                    <option value="neurology">Neurology</option>
-                    <option value="pediatrics">Pediatrics</option>
-                  </select>
-                </div>
-
-                {/* Planning Horizon Start */}
-                <div>
-                  <label htmlFor="planningHorizonStart" className="block text-sm font-medium text-text-primary mb-1">
-                    Start Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    id="planningHorizonStart"
-                    name="planningHorizonStart"
-                    value={formData.planningHorizonStart}
-                    min={new Date().toISOString().split('T')[0]}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Cannot select dates before today
-                  </p>
-                </div>
-
-                {/* Planning Horizon End */}
-                <div>
-                  <label htmlFor="planningHorizonEnd" className="block text-sm font-medium text-text-primary mb-1">
-                    End Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    id="planningHorizonEnd"
-                    name="planningHorizonEnd"
-                    value={formData.planningHorizonEnd}
-                    min={formData.planningHorizonStart || new Date().toISOString().split('T')[0]}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Must be after or equal to start date
-                  </p>
-                </div>
-              </div>
-
-              {/* Comment */}
-              <div className="mt-4">
-                <label htmlFor="comment" className="block text-sm font-medium text-text-primary mb-1">
-                  Comment / Description
-                </label>
-                <textarea
-                  id="comment"
-                  name="comment"
-                  value={formData.comment}
-                  onChange={handleInputChange}
-                  rows={3}
-                  placeholder="Optional description or notes about this schedule..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onClose}
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  disabled={loading}
-                  className="flex items-center"
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Schedule'
-                  )}
-                </Button>
-              </div>
-            </form>
+            {/* Planning Horizon End */}
+            <div className="space-y-2">
+              <Label htmlFor="planningHorizonEnd">
+                End Date <span className="text-destructive">*</span>
+              </Label>
+              <DatePicker
+                date={formData.planningHorizonEnd ? new Date(formData.planningHorizonEnd) : undefined}
+                onDateChange={(date) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    planningHorizonEnd: date ? format(date, 'yyyy-MM-dd') : ''
+                  }));
+                }}
+                minDate={formData.planningHorizonStart ? new Date(formData.planningHorizonStart) : new Date()}
+                placeholder="Select end date"
+              />
+              <p className="text-xs text-muted-foreground">
+                Must be after or equal to start date
+              </p>
+            </div>
           </div>
-        </Card>
-      </div>
-    </div>
+
+          {/* Comment */}
+          <div className="space-y-2">
+            <Label htmlFor="comment">Comment / Description</Label>
+            <Textarea
+              id="comment"
+              name="comment"
+              value={formData.comment}
+              onChange={handleInputChange}
+              rows={3}
+              placeholder="Optional description or notes about this schedule..."
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Schedule'
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

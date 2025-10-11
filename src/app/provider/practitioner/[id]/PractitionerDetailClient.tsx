@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { Badge } from '@/components/common/Badge';
@@ -11,6 +12,30 @@ import {
 import { CreateScheduleForm } from '@/components/provider/CreateScheduleForm';
 import { GenerateSlotsForm } from '@/components/provider/GenerateSlotsForm';
 import { SlotCalendar } from '@/components/provider/SlotCalendar';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
 import { formatDateForDisplay } from '@/library/timezone';
 import type { Schedule, Slot } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
@@ -107,6 +132,9 @@ export default function PractitionerDetailClient({
   onPractitionerNameUpdate,
   onStatsUpdate
 }: PractitionerDetailClientProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   // State management - start empty, load via API
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -121,8 +149,11 @@ export default function PractitionerDetailClient({
   const [schedulesError, setSchedulesError] = useState<string | null>(null);
   const [slotsError, setSlotsError] = useState<string | null>(null);
 
-  // UI state
-  const [activeTab, setActiveTab] = useState<'schedules' | 'slots'>('schedules');
+  // UI state - Initialize from URL params
+  const [activeTab, setActiveTab] = useState<'schedules' | 'slots'>(() => {
+    const tabParam = searchParams.get('tab');
+    return tabParam === 'slots' ? 'slots' : 'schedules';
+  });
   const [selectedScheduleFilter, setSelectedScheduleFilter] = useState<string>('all');
   const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
   const [showCreateSchedule, setShowCreateSchedule] = useState(false);
@@ -509,19 +540,17 @@ export default function PractitionerDetailClient({
   };
 
   // Tab content rendering
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'schedules':
-        return (
-          <div className="space-y-4">
-            <div className="flex justify-end items-center">
-              <Button
-                onClick={() => setShowCreateSchedule(true)}
-                variant="primary"
-              >
-                Create New Schedule
-              </Button>
-            </div>
+  const renderSchedulesContent = () => {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-end items-center">
+          <Button
+            onClick={() => setShowCreateSchedule(true)}
+            variant="primary"
+          >
+            Create New Schedule
+          </Button>
+        </div>
 
             {loadingSchedules ? (
               <div className="space-y-4">
@@ -747,96 +776,85 @@ export default function PractitionerDetailClient({
             )}
           </div>
         );
+  };
 
-      case 'slots':
+  const renderSlotsContent = () => {
         // Filter slots based on selected schedule
         const filteredSlots = selectedScheduleFilter === 'all'
           ? slots
           : slots.filter(slot => slot.schedule?.reference === `Schedule/${selectedScheduleFilter}`);
 
-        return (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-4">
-                <h2 className="text-lg font-semibold">Slot Calendar</h2>
-                {schedules.length > 0 && (
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm font-medium text-gray-700">Filter by Schedule:</label>
-                    <select
-                      value={selectedScheduleFilter}
-                      onChange={(e) => setSelectedScheduleFilter(e.target.value)}
-                      className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                    >
-                      <option value="all">All Schedules ({slots.length} slots)</option>
-                      {schedules.map((schedule) => {
-                        const scheduleSlots = slots.filter(slot => slot.schedule?.reference === `Schedule/${schedule.id}`);
-                        return (
-                          <option key={schedule.id} value={schedule.id}>
-                            Schedule {schedule.id} ({scheduleSlots.length} slots)
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                )}
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-4">
+            <h2 className="text-lg font-semibold">Slot Calendar</h2>
+            {schedules.length > 0 && (
+              <div className="flex items-center space-x-2">
+                <Label className="text-sm font-medium">Filter by Schedule:</Label>
+                <Select
+                  value={selectedScheduleFilter}
+                  onValueChange={(value) => setSelectedScheduleFilter(value)}
+                >
+                  <SelectTrigger className="w-[300px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Schedules ({slots.length} slots)</SelectItem>
+                    {schedules.map((schedule) => {
+                      const scheduleSlots = slots.filter(slot => slot.schedule?.reference === `Schedule/${schedule.id}`);
+                      return (
+                        <SelectItem key={schedule.id} value={schedule.id || ''}>
+                          Schedule {schedule.id} ({scheduleSlots.length} slots)
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
-              <Button
-                onClick={() => setShowGenerateSlots(true)}
-                variant="primary"
-              >
-                Generate Slots
-              </Button>
-            </div>
-
-            {loadingSlots ? (
-              <SlotCalendarSkeleton />
-            ) : slotsError ? (
-              <Card>
-                <div className="p-6 text-center">
-                  <div className="text-red-600 mb-2">Failed to load slots</div>
-                  <div className="text-sm text-gray-500">{slotsError}</div>
-                </div>
-              </Card>
-            ) : (
-              <SlotCalendar slots={filteredSlots} />
             )}
           </div>
-        );
+          <Button
+            onClick={() => setShowGenerateSlots(true)}
+            variant="primary"
+          >
+            Generate Slots
+          </Button>
+        </div>
 
-      default:
-        return null;
-    }
+        {loadingSlots ? (
+          <SlotCalendarSkeleton />
+        ) : slotsError ? (
+          <Card>
+            <div className="p-6 text-center">
+              <div className="text-red-600 mb-2">Failed to load slots</div>
+              <div className="text-sm text-gray-500">{slotsError}</div>
+            </div>
+          </Card>
+        ) : (
+          <SlotCalendar slots={filteredSlots} />
+        )}
+      </div>
+    );
   };
 
   return (
     <>
       {/* Tab Content */}
-      <div className="space-y-6">
-        {/* Tab Navigation */}
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            {[
-              { key: 'schedules', label: 'Schedules' },
-              { key: 'slots', label: 'Slots' }
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key as typeof activeTab)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.key
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-text-secondary hover:text-text-primary hover:border-gray-300'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'schedules' | 'slots')} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+          <TabsTrigger value="schedules">Schedules</TabsTrigger>
+          <TabsTrigger value="slots">Slots</TabsTrigger>
+        </TabsList>
 
-        {/* Tab Content */}
-        {renderTabContent()}
-      </div>
+        <TabsContent value="schedules">
+          {renderSchedulesContent()}
+        </TabsContent>
+
+        <TabsContent value="slots">
+          {renderSlotsContent()}
+        </TabsContent>
+      </Tabs>
 
       {/* Modals */}
       <CreateScheduleForm
