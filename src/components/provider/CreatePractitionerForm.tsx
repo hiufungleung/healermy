@@ -3,6 +3,26 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 interface CreatePractitionerFormProps {
   isOpen: boolean;
@@ -16,11 +36,11 @@ interface PractitionerFormData {
   given: string;
   family: string;
   suffix: string;
-  
+
   // Contact
   phone: string;
   email: string;
-  
+
   // Address
   addressLine1: string;
   addressLine2: string;
@@ -28,10 +48,10 @@ interface PractitionerFormData {
   state: string;
   postalCode: string;
   country: string;
-  
+
   // Professional Info
   gender: string;
-  
+
   // Status
   active: boolean;
 }
@@ -85,7 +105,7 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
     }
-    
+
     // Address validation
     if (!formData.addressLine1.trim()) {
       newErrors.addressLine1 = 'Street address is required';
@@ -96,12 +116,12 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
     if (!formData.postalCode.trim()) {
       newErrors.postalCode = 'Postal code is required';
     }
-    
+
     // Professional info
     if (!formData.gender) {
       newErrors.gender = 'Gender is required';
     }
-    
+
     // Validate phone format (basic)
     if (formData.phone && !/^[\+]?[0-9\s\-\(\)]+$/.test(formData.phone)) {
       newErrors.phone = 'Please enter a valid phone number';
@@ -113,13 +133,13 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     setLoading(true);
-    
+
     try {
       // Construct FHIR Practitioner resource with address
       const practitionerResource = {
@@ -196,10 +216,10 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
 
       const result = await response.json();
       console.log('Practitioner created successfully:', result);
-      
+
       onSuccess();
       onClose();
-      
+
       // Reset form
       setFormData({
         prefix: '',
@@ -217,7 +237,7 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
         gender: '',
         active: true,
       });
-      
+
     } catch (error) {
       console.error('Error creating practitioner:', error);
       setErrors({ submit: error instanceof Error ? error.message : 'An unexpected error occurred' });
@@ -226,115 +246,97 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-text-primary">Create New Practitioner</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-              disabled={loading}
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create New Practitioner</DialogTitle>
+          <DialogDescription>
+            Fill in the practitioner information below. Fields marked with * are required.
+          </DialogDescription>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Personal Information */}
           <Card>
             <h3 className="text-lg font-semibold text-text-primary mb-4">Personal Information</h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Prefix
-                </label>
-                <select
+              <div className="space-y-2">
+                <Label htmlFor="prefix">Prefix</Label>
+                <Select
                   value={formData.prefix}
-                  onChange={(e) => handleInputChange('prefix', e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  onValueChange={(value) => handleInputChange('prefix', value)}
                 >
-                  <option value="">Select...</option>
-                  <option value="Dr">Dr</option>
-                  <option value="Prof">Prof</option>
-                  <option value="Mr">Mr</option>
-                  <option value="Ms">Ms</option>
-                  <option value="Mrs">Mrs</option>
-                </select>
+                  <SelectTrigger id="prefix">
+                    <SelectValue placeholder="Select..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Dr">Dr</SelectItem>
+                    <SelectItem value="Prof">Prof</SelectItem>
+                    <SelectItem value="Mr">Mr</SelectItem>
+                    <SelectItem value="Ms">Ms</SelectItem>
+                    <SelectItem value="Mrs">Mrs</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Given Name *
-                </label>
-                <input
+
+              <div className="space-y-2">
+                <Label htmlFor="given">Given Name *</Label>
+                <Input
+                  id="given"
                   type="text"
                   value={formData.given}
                   onChange={(e) => handleInputChange('given', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                    errors.given ? 'border-red-500' : ''
-                  }`}
                   placeholder="First name"
+                  className={errors.given ? 'border-red-500' : ''}
                 />
-                {errors.given && <p className="text-red-500 text-xs mt-1">{errors.given}</p>}
+                {errors.given && <p className="text-red-500 text-xs">{errors.given}</p>}
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Family Name *
-                </label>
-                <input
+
+              <div className="space-y-2">
+                <Label htmlFor="family">Family Name *</Label>
+                <Input
+                  id="family"
                   type="text"
                   value={formData.family}
                   onChange={(e) => handleInputChange('family', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                    errors.family ? 'border-red-500' : ''
-                  }`}
                   placeholder="Last name"
+                  className={errors.family ? 'border-red-500' : ''}
                 />
-                {errors.family && <p className="text-red-500 text-xs mt-1">{errors.family}</p>}
+                {errors.family && <p className="text-red-500 text-xs">{errors.family}</p>}
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Suffix
-                </label>
-                <input
+
+              <div className="space-y-2">
+                <Label htmlFor="suffix">Suffix</Label>
+                <Input
+                  id="suffix"
                   type="text"
                   value={formData.suffix}
                   onChange={(e) => handleInputChange('suffix', e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="Jr, Sr, III, etc."
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Gender *
-                </label>
-                <select
+              <div className="space-y-2">
+                <Label htmlFor="gender">Gender *</Label>
+                <Select
                   value={formData.gender}
-                  onChange={(e) => handleInputChange('gender', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                    errors.gender ? 'border-red-500' : ''
-                  }`}
+                  onValueChange={(value) => handleInputChange('gender', value)}
                 >
-                  <option value="">Select gender...</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                  <option value="unknown">Unknown</option>
-                </select>
-                {errors.gender && <p className="text-red-500 text-xs mt-1">{errors.gender}</p>}
+                  <SelectTrigger id="gender" className={errors.gender ? 'border-red-500' : ''}>
+                    <SelectValue placeholder="Select gender..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="unknown">Unknown</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.gender && <p className="text-red-500 text-xs">{errors.gender}</p>}
               </div>
             </div>
           </Card>
@@ -342,38 +344,32 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
           {/* Contact Information */}
           <Card>
             <h3 className="text-lg font-semibold text-text-primary mb-4">Contact Information</h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Phone Number *
-                </label>
-                <input
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number *</Label>
+                <Input
+                  id="phone"
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                    errors.phone ? 'border-red-500' : ''
-                  }`}
                   placeholder="+61 400 123 456"
+                  className={errors.phone ? 'border-red-500' : ''}
                 />
-                {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+                {errors.phone && <p className="text-red-500 text-xs">{errors.phone}</p>}
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Email Address *
-                </label>
-                <input
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address *</Label>
+                <Input
+                  id="email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                    errors.email ? 'border-red-500' : ''
-                  }`}
                   placeholder="doctor@clinic.com.au"
+                  className={errors.email ? 'border-red-500' : ''}
                 />
-                {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+                {errors.email && <p className="text-red-500 text-xs">{errors.email}</p>}
               </div>
             </div>
           </Card>
@@ -381,92 +377,77 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
           {/* Address Information */}
           <Card>
             <h3 className="text-lg font-semibold text-text-primary mb-4">Address Information</h3>
-            
+
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Street Address Line 1 *
-                </label>
-                <input
+              <div className="space-y-2">
+                <Label htmlFor="addressLine1">Street Address Line 1 *</Label>
+                <Input
+                  id="addressLine1"
                   type="text"
                   value={formData.addressLine1}
                   onChange={(e) => handleInputChange('addressLine1', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                    errors.addressLine1 ? 'border-red-500' : ''
-                  }`}
                   placeholder="44 High Street"
+                  className={errors.addressLine1 ? 'border-red-500' : ''}
                 />
-                {errors.addressLine1 && <p className="text-red-500 text-xs mt-1">{errors.addressLine1}</p>}
+                {errors.addressLine1 && <p className="text-red-500 text-xs">{errors.addressLine1}</p>}
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Street Address Line 2
-                </label>
-                <input
+
+              <div className="space-y-2">
+                <Label htmlFor="addressLine2">Street Address Line 2</Label>
+                <Input
+                  id="addressLine2"
                   type="text"
                   value={formData.addressLine2}
                   onChange={(e) => handleInputChange('addressLine2', e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="Unit 999"
                 />
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">
-                    City *
-                  </label>
-                  <input
+                <div className="space-y-2">
+                  <Label htmlFor="city">City *</Label>
+                  <Input
+                    id="city"
                     type="text"
                     value={formData.city}
                     onChange={(e) => handleInputChange('city', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                      errors.city ? 'border-red-500' : ''
-                    }`}
                     placeholder="City name"
+                    className={errors.city ? 'border-red-500' : ''}
                   />
-                  {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+                  {errors.city && <p className="text-red-500 text-xs">{errors.city}</p>}
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">
-                    State/Province
-                  </label>
-                  <input
+
+                <div className="space-y-2">
+                  <Label htmlFor="state">State/Province</Label>
+                  <Input
+                    id="state"
                     type="text"
                     value={formData.state}
                     onChange={(e) => handleInputChange('state', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="State or province"
                   />
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">
-                    Postal Code *
-                  </label>
-                  <input
+
+                <div className="space-y-2">
+                  <Label htmlFor="postalCode">Postal Code *</Label>
+                  <Input
+                    id="postalCode"
                     type="text"
                     value={formData.postalCode}
                     onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                      errors.postalCode ? 'border-red-500' : ''
-                    }`}
                     placeholder="Postal/ZIP code"
+                    className={errors.postalCode ? 'border-red-500' : ''}
                   />
-                  {errors.postalCode && <p className="text-red-500 text-xs mt-1">{errors.postalCode}</p>}
+                  {errors.postalCode && <p className="text-red-500 text-xs">{errors.postalCode}</p>}
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">
-                    Country
-                  </label>
-                  <input
+
+                <div className="space-y-2">
+                  <Label htmlFor="country">Country</Label>
+                  <Input
+                    id="country"
                     type="text"
                     value={formData.country}
                     onChange={(e) => handleInputChange('country', e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Country code (e.g., US, AU, CA)"
                   />
                 </div>
@@ -477,49 +458,49 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
           {/* Professional Information */}
           <Card>
             <h3 className="text-lg font-semibold text-text-primary mb-4">Professional Information</h3>
-            
-            <div className="flex items-center">
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.active}
-                  onChange={(e) => handleInputChange('active', e.target.checked)}
-                  className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2"
-                />
-                <span className="ml-2 text-sm font-medium text-text-secondary">
-                  Active practitioner
-                </span>
-              </label>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="active"
+                checked={formData.active}
+                onCheckedChange={(checked) => handleInputChange('active', checked as boolean)}
+              />
+              <Label
+                htmlFor="active"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Active practitioner
+              </Label>
             </div>
           </Card>
 
           {/* Submit Error */}
           {errors.submit && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-600 text-sm">{errors.submit}</p>
-            </div>
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{errors.submit}</AlertDescription>
+            </Alert>
           )}
 
-          {/* Form Actions */}
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-            <Button 
-              type="button" 
-              variant="outline" 
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
               onClick={onClose}
               disabled={loading}
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               variant="primary"
               disabled={loading}
             >
               {loading ? 'Creating...' : 'Create Practitioner'}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
