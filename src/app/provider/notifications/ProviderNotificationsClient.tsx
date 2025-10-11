@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
@@ -47,6 +47,8 @@ export default function ProviderNotificationsClient() {
   const [selectedMessage, setSelectedMessage] = useState<Communication | null>(null);
   const [displayCount, setDisplayCount] = useState(10); // Show 10 notifications initially
   const [appointmentStatuses, setAppointmentStatuses] = useState<Record<string, string>>({});
+  const [deletedAppointments, setDeletedAppointments] = useState<Set<string>>(new Set()); // Cache deleted appointments
+  const [loadingStatuses, setLoadingStatuses] = useState(false); // Track if we're loading appointment statuses
 
   // Function to check if appointment needs handling (is pending)
   const needsHandling = (comm: Communication): boolean => {
@@ -162,13 +164,101 @@ export default function ProviderNotificationsClient() {
     }
   };
 
-  // Fetch Communications data on component mount (optimized for performance)
+  // Remove duplicate useEffect - communications are fetched in the main useEffect below
+
+
+  // Optimized appointment status fetching - batch requests with higher concurrency
   useEffect(() => {
-    const fetchCommunicationsData = async () => {
+    const fetchAppointmentStatuses = async () => {
+      const appointmentIds = new Set<string>();
+
+      // Extract appointment IDs from ALL communications (no artificial limit)
+      localCommunications.forEach(comm => {
+        const appointmentRef = comm.about?.[0]?.reference;
+        if (appointmentRef?.startsWith('Appointment/')) {
+          const appointmentId = appointmentRef.replace('Appointment/', '');
+          // Skip if already marked as deleted or already have status
+          if (!deletedAppointments.has(appointmentId) && !appointmentStatuses[appointmentId]) {
+            appointmentIds.add(appointmentId);
+          }
+        }
+      });
+
+      // Only fetch if we have appointment IDs - increased concurrency to 15 for faster loading
+      if (appointmentIds.size > 0) {
+        setLoadingStatuses(true);
+        const appointmentIdsArray = Array.from(appointmentIds);
+        const newDeletedAppointments = new Set(deletedAppointments);
+
+        // Process in batches of 15 for optimal performance
+        const batchSize = 15;
+        const batches = [];
+        for (let i = 0; i < appointmentIdsArray.length; i += batchSize) {
+          batches.push(appointmentIdsArray.slice(i, i + batchSize));
+        }
+
+        // Process batches sequentially to avoid overwhelming the server
+        for (const batch of batches) {
+          const statusPromises = batch.map(async appointmentId => {
+            try {
+              const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+                credentials: 'include'
+              });
+              if (response.ok) {
+                const appointment = await response.json();
+                return { id: appointmentId, status: appointment.status };
+              } else if (response.status === 410) {
+                // Appointment was deleted, cache it and mark as cancelled
+                console.log(`Appointment ${appointmentId} was deleted, caching to prevent future 410 errors`);
+                newDeletedAppointments.add(appointmentId);
+                return { id: appointmentId, status: 'cancelled' };
+              }
+            } catch (error) {
+              // Silently handle errors to prevent performance issues
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              console.warn(`Failed to fetch status for appointment ${appointmentId}:`, errorMessage);
+            }
+            return null;
+          });
+
+          const results = await Promise.all(statusPromises);
+
+          // Update statuses incrementally for better UX
+          setAppointmentStatuses(prev => {
+            const newStatuses = { ...prev };
+            results.forEach(result => {
+              if (result) {
+                newStatuses[result.id] = result.status;
+              }
+            });
+            return newStatuses;
+          });
+        }
+
+        // Update deleted appointments cache if any were found
+        if (newDeletedAppointments.size > deletedAppointments.size) {
+          setDeletedAppointments(newDeletedAppointments);
+        }
+
+        setLoadingStatuses(false);
+      }
+    };
+
+    if (localCommunications.length > 0) {
+      fetchAppointmentStatuses();
+    }
+  }, [localCommunications, deletedAppointments]); // Run when communications or deleted appointments change
+
+  // Fetch communications (which already includes appointment-related notifications)
+  // Communications API has better filtering and prevents data overload
+  useEffect(() => {
+    const fetchCommunicationNotifications = async () => {
       try {
+        setIsLoading(true);
+
         console.log('[ProviderNotifications] Fetching Communications data...');
-        // Reduce to 15 most recent communications for faster loading
-        const response = await fetch('/api/fhir/communications?_count=15&_sort=-sent', {
+        // Fetch communications (clinic-wide view for providers, with reasonable limits)
+        const response = await fetch('/api/fhir/communications', {
           method: 'GET',
           credentials: 'include',
         });
@@ -176,289 +266,97 @@ export default function ProviderNotificationsClient() {
         if (response.ok) {
           const data = await response.json();
           console.log('[ProviderNotifications] Communications data received:', data);
-
-          if (data.entry && Array.isArray(data.entry)) {
-            const communications = data.entry.map((entry: any) => entry.resource);
-            console.log('[ProviderNotifications] Setting localCommunications:', communications.length, 'items');
-            setLocalCommunications(communications);
-          }
+          const communications = (data.entry || []).map((entry: any) => entry.resource);
+          console.log('[ProviderNotifications] Setting localCommunications:', communications.length, 'items');
+          setLocalCommunications(communications);
+          setIsLoading(false);
         } else {
-          console.error('[ProviderNotifications] Failed to fetch communications:', response.status);
-        }
-      } catch (error) {
-        console.error('[ProviderNotifications] Error fetching communications:', error);
-      }
-    };
-
-    fetchCommunicationsData();
-  }, []); // Run once on mount
-
-
-  // Optimized appointment status fetching - batch requests and limit to 10
-  useEffect(() => {
-    const fetchAppointmentStatuses = async () => {
-      const appointmentIds = new Set<string>();
-
-      // Extract appointment IDs from communications (limit to first 10 for performance)
-      localCommunications.slice(0, 10).forEach(comm => {
-        const appointmentRef = comm.about?.[0]?.reference;
-        if (appointmentRef?.startsWith('Appointment/')) {
-          const appointmentId = appointmentRef.replace('Appointment/', '');
-          appointmentIds.add(appointmentId);
-        }
-      });
-
-      // Only fetch if we have appointment IDs and limit concurrent requests to 5
-      if (appointmentIds.size > 0) {
-        const appointmentIdsArray = Array.from(appointmentIds).slice(0, 5);
-
-        const statusPromises = appointmentIdsArray.map(async appointmentId => {
-          try {
-            const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
-              credentials: 'include'
-            });
-            if (response.ok) {
-              const appointment = await response.json();
-              return { id: appointmentId, status: appointment.status };
-            } else if (response.status === 410) {
-              // Appointment was deleted, mark as cancelled to prevent further processing
-              console.log(`Appointment ${appointmentId} was deleted, marking as cancelled`);
-              return { id: appointmentId, status: 'cancelled' };
-            }
-          } catch (error) {
-            // Silently handle errors to prevent performance issues
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.warn(`Failed to fetch status for appointment ${appointmentId}:`, errorMessage);
-          }
-          return null;
-        });
-
-        const results = await Promise.all(statusPromises);
-        const statusMap: Record<string, string> = {};
-
-        results.forEach(result => {
-          if (result) {
-            statusMap[result.id] = result.status;
-          }
-        });
-
-        setAppointmentStatuses(statusMap);
-      }
-    };
-
-    if (localCommunications.length > 0) {
-      fetchAppointmentStatuses();
-    }
-  }, [localCommunications]); // Run when communications change
-
-  // Optimized initial appointment data fetching - load appointments first, then fetch names in background
-  useEffect(() => {
-    const fetchAppointmentNotifications = async () => {
-      try {
-        setIsLoading(true);
-
-        // Fetch all appointments
-        const response = await fetch('/api/fhir/appointments', {
-          method: 'GET',
-          credentials: 'include',
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const appointments = data.appointments || [];
-
-          // Show appointments immediately with placeholder names, then fetch real names
-          const initialNotifications = appointments
-            .map((appointment: any): ProviderNotification => {
-              const patientParticipant = appointment.participant?.find((p: any) =>
-                p.actor?.reference?.startsWith('Patient/')
-              );
-
-              const patientId = patientParticipant?.actor?.reference?.replace('Patient/', '');
-              const appointmentDate = new Date(appointment.start).toLocaleDateString();
-              const appointmentTime = new Date(appointment.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
-              const notificationId = `apt-${appointment.id}`;
-
-              return {
-                id: notificationId,
-                type: 'appointment_request',
-                title: getNotificationTitle(appointment.status),
-                message: getNotificationMessage(appointment.status, `Patient ${patientId}`, appointmentDate, appointmentTime),
-                timestamp: appointment.meta?.lastUpdated || appointment.created || new Date().toISOString(),
-                read: readNotifications.has(notificationId) || appointment.status !== 'pending',
-                actionRequired: appointment.status === 'pending',
-                priority: appointment.status === 'pending' ? 'high' : 'medium',
-                patientName: `Patient ${patientId}`, // Placeholder name
-                appointmentId: appointment.id,
-                appointmentStatus: appointment.status
-              };
-            });
-
-          // Set initial notifications immediately
-          setProviderNotifications(initialNotifications);
-          setIsLoading(false); // Stop loading indicator early
-
-          // Then fetch patient names in background and update
-          const patientIds = new Set<string>();
-          appointments.forEach((appointment: any) => {
-            const patientParticipant = appointment.participant?.find((p: any) =>
-              p.actor?.reference?.startsWith('Patient/')
-            );
-            if (patientParticipant?.actor?.reference) {
-              const patientId = patientParticipant.actor.reference.replace('Patient/', '');
-              patientIds.add(patientId);
-            }
-          });
-
-          // Fetch patient names in background (limit to 8 concurrent)
-          const patientIdsArray = Array.from(patientIds).slice(0, 8);
-          const namePromises = patientIdsArray.map(async (patientId) => {
-            try {
-              const name = await fetchPatientName(patientId);
-              return { patientId, name };
-            } catch (error) {
-              console.warn(`Failed to fetch name for patient ${patientId}:`, error);
-              return { patientId, name: `Patient ${patientId}` };
-            }
-          });
-
-          // Update names as they come in
-          const nameResults = await Promise.all(namePromises);
-          const updatedPatientNames: Record<string, string> = {};
-          nameResults.forEach(result => {
-            updatedPatientNames[result.patientId] = result.name;
-          });
-
-          setPatientNames(updatedPatientNames);
-
-          // Update notifications with real patient names
-          setProviderNotifications(prevNotifications =>
-            prevNotifications.map(notif => {
-              const appointmentId = notif.appointmentId;
-              const appointment = appointments.find((apt: any) => apt.id === appointmentId);
-              if (appointment) {
-                const patientParticipant = appointment.participant?.find((p: any) =>
-                  p.actor?.reference?.startsWith('Patient/')
-                );
-                const patientId = patientParticipant?.actor?.reference?.replace('Patient/', '');
-                const realPatientName = patientId && updatedPatientNames[patientId] ?
-                  updatedPatientNames[patientId] : notif.patientName;
-
-                const appointmentDate = new Date(appointment.start).toLocaleDateString();
-                const appointmentTime = new Date(appointment.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
-                return {
-                  ...notif,
-                  patientName: realPatientName,
-                  message: getNotificationMessage(appointment.status, realPatientName || notif.patientName || `Patient ${patientId}`, appointmentDate, appointmentTime)
-                };
-              }
-              return notif;
-            })
-          );
-
-        } else {
-          console.error('Failed to fetch appointments:', response.status);
+          console.error('Failed to fetch communications:', response.status);
           setIsLoading(false);
         }
       } catch (error) {
-        console.error('Error fetching appointments:', error);
+        console.error('Error fetching communications:', error);
         setIsLoading(false);
       }
     };
 
-    fetchAppointmentNotifications();
-  }, [readNotifications]); // Add readNotifications dependency to re-run when localStorage data is loaded
+    fetchCommunicationNotifications();
+  }, []); // Run only once on mount - removing readNotifications dependency to prevent infinite loop
 
   // Optimized periodic refresh - less frequent updates
   useEffect(() => {
     const interval = setInterval(() => {
-      const fetchUpdatedAppointments = async () => {
+      const fetchUpdatedCommunications = async () => {
         try {
-          const response = await fetch('/api/fhir/appointments', {
+          const response = await fetch('/api/fhir/communications', {
             method: 'GET',
             credentials: 'include',
           });
 
           if (response.ok) {
             const data = await response.json();
-            const appointments = data.appointments || [];
+            const communications = (data.entry || []).map((entry: any) => entry.resource);
 
-            // Quick check - only update if appointment count changed significantly
-            const significantChange = Math.abs(appointments.length - providerNotifications.length) > 2;
+            // Quick check - only update if count changed significantly
+            const significantChange = Math.abs(communications.length - localCommunications.length) > 2;
 
             if (significantChange) {
-              // Extract unique patient IDs (limit to first 10 for performance)
-              const patientIds = new Set<string>();
-              appointments.slice(0, 10).forEach((appointment: any) => {
-                const patientParticipant = appointment.participant?.find((p: any) =>
-                  p.actor?.reference?.startsWith('Patient/')
-                );
-                if (patientParticipant?.actor?.reference) {
-                  const patientId = patientParticipant.actor.reference.replace('Patient/', '');
-                  patientIds.add(patientId);
-                }
-              });
-
-              // Only fetch new patient names (not all)
-              const newPatientNames: Record<string, string> = { ...patientNames };
-              const missingPatientIds = Array.from(patientIds).filter(id => !newPatientNames[id]);
-
-              // Limit patient name fetching to 3 new patients per refresh
-              for (const patientId of missingPatientIds.slice(0, 3)) {
-                const patientName = await fetchPatientName(patientId);
-                newPatientNames[patientId] = patientName;
-              }
-
-              setPatientNames(newPatientNames);
-
-              // Generate notifications for appointments
-              const updatedNotifications = appointments
-                .map((appointment: any): ProviderNotification => {
-                  const patientParticipant = appointment.participant?.find((p: any) =>
-                    p.actor?.reference?.startsWith('Patient/')
-                  );
-
-                  const patientId = patientParticipant?.actor?.reference?.replace('Patient/', '');
-                  const patientName = patientId && newPatientNames[patientId] ? newPatientNames[patientId] : `Patient ${patientId}`;
-                  const appointmentDate = new Date(appointment.start).toLocaleDateString();
-                  const appointmentTime = new Date(appointment.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
-                  // Check if this notification already exists and preserve its read status
-                  const existingNotif = providerNotifications.find((n: ProviderNotification) => n.appointmentId === appointment.id);
-                  const notificationId = `apt-${appointment.id}`;
-
-                  return {
-                    id: notificationId,
-                    type: 'appointment_request',
-                    title: getNotificationTitle(appointment.status),
-                    message: getNotificationMessage(appointment.status, patientName, appointmentDate, appointmentTime),
-                    timestamp: appointment.meta?.lastUpdated || appointment.created || new Date().toISOString(),
-                    read: readNotifications.has(notificationId) || existingNotif?.read || (appointment.status !== 'pending'),
-                    actionRequired: appointment.status === 'pending',
-                    priority: appointment.status === 'pending' ? 'high' : 'medium',
-                    patientName: patientName,
-                    appointmentId: appointment.id,
-                    appointmentStatus: appointment.status
-                  };
-                });
-
-              setProviderNotifications(updatedNotifications);
+              setLocalCommunications(communications);
             }
           }
         } catch (error) {
-          console.error('Error refreshing appointments:', error);
+          console.error('Error refreshing communications:', error);
         }
       };
 
-      fetchUpdatedAppointments();
+      fetchUpdatedCommunications();
     }, 60000); // Check every 60 seconds (less frequent)
 
     return () => clearInterval(interval);
-  }, [providerNotifications, patientNames, readNotifications]); // Add readNotifications dependency
+  }, [localCommunications.length]); // Only depend on communications length to prevent infinite loops
 
-  // This useEffect is no longer needed as we now regenerate notifications immediately after fetching patient names
+  // Fetch patient names when communications change
+  useEffect(() => {
+    const fetchPatientNames = async () => {
+      const patientIds = new Set<string>();
+
+      // Extract patient IDs from communications
+      localCommunications.forEach(comm => {
+        const senderRef = comm.sender?.reference || '';
+        if (senderRef.startsWith('Patient/')) {
+          const patientId = senderRef.replace('Patient/', '');
+          patientIds.add(patientId);
+        }
+      });
+
+      // Fetch patient names for new patient IDs
+      const namesToFetch = Array.from(patientIds).filter(id => !patientNames[id]);
+
+      if (namesToFetch.length > 0) {
+        const namePromises = namesToFetch.slice(0, 10).map(async (patientId) => {
+          try {
+            const name = await fetchPatientName(patientId);
+            return { id: patientId, name };
+          } catch (error) {
+            console.error(`Failed to fetch patient ${patientId}:`, error);
+            return { id: patientId, name: `Patient ${patientId}` };
+          }
+        });
+
+        const results = await Promise.all(namePromises);
+        const newNames: Record<string, string> = {};
+        results.forEach(result => {
+          newNames[result.id] = result.name;
+        });
+
+        setPatientNames(prev => ({ ...prev, ...newNames }));
+      }
+    };
+
+    if (localCommunications.length > 0) {
+      fetchPatientNames();
+    }
+  }, [localCommunications, patientNames]);
 
   // Load hidden notifications and read status from localStorage on mount
   useEffect(() => {
@@ -485,11 +383,45 @@ export default function ProviderNotificationsClient() {
     }
   }, [searchParams]);
 
+  // Refresh appointment statuses when returning to notifications page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Re-fetch communications and appointment statuses when page becomes visible again
+        const refreshData = async () => {
+          try {
+            const response = await fetch('/api/fhir/communications', {
+              method: 'GET',
+              credentials: 'include',
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              const communications = (data.entry || []).map((entry: any) => entry.resource);
+              setLocalCommunications(communications);
+            }
+          } catch (error) {
+            console.error('Error refreshing communications:', error);
+          }
+        };
+
+        refreshData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   // Function to check if message is read
   const isMessageRead = (comm: Communication): boolean => {
+    // Check localStorage-based read status first (persists across sessions)
+    if (readNotifications.has(comm.id)) {
+      return true;
+    }
+
     // For clinic-wide provider view, check if communication has read extension
     // Don't filter by specific practitioner since providers see all communications
-
     const localComm = localCommunications.find(c => c.id === comm.id);
     if (localComm) {
       const readExtension = localComm.extension?.find(ext =>
@@ -509,6 +441,17 @@ export default function ProviderNotificationsClient() {
     if (markingAsRead.has(communicationId)) return;
 
     setMarkingAsRead(prev => new Set([...prev, communicationId]));
+
+    // Immediately update localStorage for instant UI feedback
+    const updatedReadNotifications = new Set(readNotifications);
+    updatedReadNotifications.add(communicationId);
+    setReadNotifications(updatedReadNotifications);
+
+    try {
+      localStorage.setItem('healermy-provider-read-notifications', JSON.stringify(Array.from(updatedReadNotifications)));
+    } catch (error) {
+      console.warn('Failed to save read status to localStorage:', error);
+    }
 
     try {
       const response = await fetch(`/api/fhir/communications/${communicationId}`, {
@@ -556,30 +499,57 @@ export default function ProviderNotificationsClient() {
     }
   };
 
-  // Function to hide notification for provider (provider-specific hiding)
-  const hideNotification = (id: string, type: 'communication' | 'provider') => {
+  // Function to delete notification for provider (marks as deleted without affecting patient)
+  const deleteNotification = async (id: string, type: 'communication' | 'provider') => {
     try {
-      // Add to hidden notifications set
-      const newHiddenNotifications = new Set([...hiddenNotifications, id]);
-      setHiddenNotifications(newHiddenNotifications);
+      if (type === 'communication') {
+        // Mark the communication as deleted by provider using PATCH (adds extension)
+        // This way patient can still see it, but provider won't
+        const response = await fetch(`/api/fhir/communications/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            action: 'mark-deleted-by-provider'
+          }),
+        });
 
-      // Save to localStorage
-      localStorage.setItem('healermy-provider-hidden-notifications',
-        JSON.stringify(Array.from(newHiddenNotifications)));
+        if (!response.ok) {
+          console.error('Failed to mark communication as deleted:', response.status);
+          alert('Failed to delete notification. Please try again.');
+          return;
+        }
 
-      // Clear selected message if it's the one being hidden
-      if (selectedMessage?.id === id) {
-        setSelectedMessage(null);
+        // Remove from local state immediately
+        setLocalCommunications(prev => prev.filter(comm => comm.id !== id));
+
+        // Clear selected message if it's the one being deleted
+        if (selectedMessage?.id === id) {
+          setSelectedMessage(null);
+        }
+
+        console.log(`Communication ${id} marked as deleted for provider`);
+      } else {
+        // For provider-specific notifications, add to hidden set
+        const newHiddenNotifications = new Set([...hiddenNotifications, id]);
+        setHiddenNotifications(newHiddenNotifications);
+
+        localStorage.setItem('healermy-provider-hidden-notifications',
+          JSON.stringify(Array.from(newHiddenNotifications)));
+
+        if (selectedMessage?.id === id) {
+          setSelectedMessage(null);
+        }
+
+        console.log(`Provider notification ${id} hidden`);
       }
 
       // Dispatch event to update notification bell
       window.dispatchEvent(new CustomEvent('messageUpdate'));
 
-      console.log(`Notification ${id} hidden for provider (type: ${type})`);
-
     } catch (error) {
-      console.error('Error hiding notification:', error);
-      alert('Failed to hide notification. Please try again.');
+      console.error('Error deleting notification:', error);
+      alert('Failed to delete notification. Please try again.');
     }
   };
 
@@ -692,26 +662,30 @@ export default function ProviderNotificationsClient() {
     }
   };
 
-  // Filter notifications (exclude hidden ones)
-  const filteredProviderNotifications = providerNotifications.filter(notif => {
-    // Skip hidden notifications
-    if (hiddenNotifications.has(notif.id)) {
-      return false;
-    }
+  // Filter notifications (exclude hidden ones) - memoized to prevent recalculation
+  const filteredProviderNotifications = useMemo(() => {
+    return providerNotifications.filter(notif => {
+      // Skip hidden notifications
+      if (hiddenNotifications.has(notif.id)) {
+        return false;
+      }
 
-    switch (activeFilter) {
-      case 'unread':
-        return !notif.read;
-      case 'action_required':
-        return notif.actionRequired;
-      case 'urgent':
-        return notif.priority === 'urgent';
-      default:
-        return true;
-    }
-  });
+      switch (activeFilter) {
+        case 'unread':
+          return !notif.read;
+        case 'action_required':
+          return notif.actionRequired;
+        case 'urgent':
+          return notif.priority === 'urgent';
+        default:
+          return true;
+      }
+    });
+  }, [providerNotifications, hiddenNotifications, activeFilter]);
 
-  const filteredCommunications = localCommunications.filter(comm => {
+  // Base filtered communications (excluding hidden and patient-facing messages, but not filtered by activeFilter)
+  const baseCommunications = useMemo(() => {
+    return localCommunications.filter(comm => {
     // Skip hidden notifications
     if (hiddenNotifications.has(comm.id)) {
       return false;
@@ -745,21 +719,61 @@ export default function ProviderNotificationsClient() {
       return false;
     }
 
+    return true;
+    });
+  }, [localCommunications, hiddenNotifications]);
+
+  const filteredCommunications = useMemo(() => {
+    return baseCommunications.filter(comm => {
     // Apply filter logic
     switch (activeFilter) {
       case 'unread':
         return !isMessageRead(comm);
       case 'action_required':
-        return false; // Communications don't have actionRequired flag
+        // Communications that need handling (pending appointments) are action required
+        return needsHandling(comm);
       case 'urgent':
         return false; // Communications don't have priority
       default:
         return true;
-    }
-  });
+      }
+    });
+  }, [baseCommunications, activeFilter, readNotifications, appointmentStatuses]);
 
-  // Group communications by appointment ID to reduce duplicates
-  const groupedCommunications = filteredCommunications.reduce((acc, comm) => {
+  // Base deduplicated communications (for total count calculation) - not filtered by activeFilter
+  const baseDeduplicatedCommunications = useMemo(() => {
+    const groupedCommunications = baseCommunications.reduce((acc, comm) => {
+    const appointmentRef = comm.about?.[0]?.reference;
+    if (appointmentRef?.startsWith('Appointment/')) {
+      const appointmentId = appointmentRef.replace('Appointment/', '');
+
+      // Check if we already have a provider notification for this appointment
+      const hasProviderNotification = providerNotifications.some(notif =>
+        notif.appointmentId === appointmentId
+      );
+
+      // If we have a provider notification, skip this communication to avoid duplicates
+      if (hasProviderNotification) {
+        return acc;
+      }
+
+      // Keep only the most recent communication for each appointment
+      if (!acc[appointmentId] || new Date(comm.sent || 0) > new Date(acc[appointmentId].sent || 0)) {
+        acc[appointmentId] = comm;
+      }
+    } else {
+      // Keep non-appointment communications as-is
+      acc[`non-appointment-${comm.id}`] = comm;
+    }
+    return acc;
+    }, {} as Record<string, any>);
+
+    return Object.values(groupedCommunications);
+  }, [baseCommunications, providerNotifications]);
+
+  // Group communications by appointment ID to reduce duplicates - memoized (filtered version for display)
+  const deduplicatedCommunications = useMemo(() => {
+    const groupedCommunications = filteredCommunications.reduce((acc, comm) => {
     const appointmentRef = comm.about?.[0]?.reference;
     if (appointmentRef?.startsWith('Appointment/')) {
       const appointmentId = appointmentRef.replace('Appointment/', '');
@@ -783,9 +797,10 @@ export default function ProviderNotificationsClient() {
       acc[`non-appointment-${comm.id}`] = comm;
     }
     return acc;
-  }, {} as Record<string, any>);
+    }, {} as Record<string, any>);
 
-  const deduplicatedCommunications = Object.values(groupedCommunications);
+    return Object.values(groupedCommunications);
+  }, [filteredCommunications, filteredProviderNotifications]);
 
   // Combine and sort all notifications by timestamp
   const allFilteredItems = [
@@ -806,15 +821,41 @@ export default function ProviderNotificationsClient() {
     setDisplayCount(prev => prev + 10); // Load 10 more items each time
   };
 
-  // Calculate counts based on deduplicated communications (excluding hidden ones)
-  const visibleCommunications = deduplicatedCommunications.filter(comm => !hiddenNotifications.has(comm.id));
-  const visibleProviderNotifications = providerNotifications.filter(notif => !hiddenNotifications.has(notif.id));
+  // Calculate counts based on base deduplicated communications (excluding hidden ones) - memoized
+  // Use baseDeduplicatedCommunications to ensure total count is not affected by activeFilter
+  const { visibleCommunications, visibleProviderNotifications, unreadCount, actionRequiredCount, urgentCount, totalCount } = useMemo(() => {
+    const visibleComms = baseDeduplicatedCommunications.filter(comm => !hiddenNotifications.has(comm.id));
+    const visibleProviderNotifs = providerNotifications.filter(notif => !hiddenNotifications.has(notif.id));
 
-  const unreadCount = visibleCommunications.filter(comm => !isMessageRead(comm)).length +
-                     visibleProviderNotifications.filter(notif => !notif.read).length;
-  const actionRequiredCount = visibleProviderNotifications.filter(notif => notif.actionRequired).length;
-  const urgentCount = visibleProviderNotifications.filter(notif => notif.priority === 'urgent').length;
-  const totalCount = visibleCommunications.length + visibleProviderNotifications.length;
+    const unreadMessages = visibleComms.filter(comm => !isMessageRead(comm));
+    const unreadCnt = unreadMessages.length + visibleProviderNotifs.filter(notif => !notif.read).length;
+
+    // Count communications that need handling + provider notifications that need action
+    const commsNeedingAction = visibleComms.filter(comm => needsHandling(comm)).length;
+    const actionRequiredCnt = visibleProviderNotifs.filter(notif => notif.actionRequired).length + commsNeedingAction;
+
+    const urgentCnt = visibleProviderNotifs.filter(notif => notif.priority === 'urgent').length;
+    const totalCnt = visibleComms.length + visibleProviderNotifs.length;
+
+    return {
+      visibleCommunications: visibleComms,
+      visibleProviderNotifications: visibleProviderNotifs,
+      unreadCount: unreadCnt,
+      actionRequiredCount: actionRequiredCnt,
+      urgentCount: urgentCnt,
+      totalCount: totalCnt
+    };
+  }, [baseDeduplicatedCommunications, providerNotifications, hiddenNotifications, readNotifications, appointmentStatuses]);
+
+  // Debug logging - only when unreadCount changes
+  useEffect(() => {
+    console.log('🔔 Unread Count Debug:', {
+      totalCommunications: visibleCommunications.length,
+      unreadCount: unreadCount,
+      readNotificationsSize: readNotifications.size,
+      deduplicatedCount: deduplicatedCommunications.length,
+    });
+  }, [unreadCount]);
 
   const markAllAsRead = () => {
     try {
@@ -1019,7 +1060,7 @@ export default function ProviderNotificationsClient() {
                             </button>
                           )}
                           <button
-                            onClick={() => hideNotification(notif.id, 'provider')}
+                            onClick={() => deleteNotification(notif.id, 'provider')}
                             className="text-sm text-text-secondary hover:text-red-600"
                           >
                             Delete
@@ -1083,14 +1124,78 @@ export default function ProviderNotificationsClient() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <h3 className={`font-semibold mb-2 ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
-                            Healthcare Communication
-                            {!isMessageRead(comm) && (
-                              <div className="w-2 h-2 bg-primary rounded-full inline-block ml-2"></div>
-                            )}
+                            {/* Get appointment status to determine notification type */}
+                            {(() => {
+                              const appointmentRef = comm.about?.[0]?.reference;
+                              const appointmentId = appointmentRef?.replace('Appointment/', '');
+                              const appointmentStatus = appointmentId ? appointmentStatuses[appointmentId] : null;
+
+                              // Determine notification title based on status
+                              let title = 'Appointment Notification';
+                              let statusBadge = null;
+
+                              if (appointmentStatus === 'pending') {
+                                title = 'New Appointment Request';
+                                statusBadge = (
+                                  <span className="ml-2 text-xs px-2 py-1 rounded font-normal bg-yellow-100 text-yellow-800">
+                                    Pending
+                                  </span>
+                                );
+                              } else if (appointmentStatus) {
+                                // Any non-pending status is treated as "Processed"
+                                title = 'Appointment Request';
+                                statusBadge = (
+                                  <span className="ml-2 text-xs px-2 py-1 rounded font-normal bg-gray-100 text-gray-800">
+                                    Processed
+                                  </span>
+                                );
+                              }
+
+                              return (
+                                <>
+                                  {title}
+                                  {statusBadge}
+                                  {!isMessageRead(comm) && (
+                                    <div className="w-2 h-2 bg-primary rounded-full inline-block ml-2"></div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </h3>
+                          {/* Patient name section */}
+                          {(() => {
+                            const senderRef = comm.sender?.reference || '';
+                            const patientId = senderRef.replace('Patient/', '');
+                            const patientName = patientNames[patientId] || 'Loading...';
+
+                            if (patientId && patientId !== senderRef) {
+                              return (
+                                <p className="text-sm text-text-primary mb-2">
+                                  <span className="font-medium">Patient:</span> {patientName}
+                                </p>
+                              );
+                            }
+                            return null;
+                          })()}
                           <p className="text-text-secondary text-sm mb-2">
-                            {comm.payload?.[0]?.contentString?.substring(0, 100) || 'No content'}
-                            {(comm.payload?.[0]?.contentString?.length || 0) > 100 && '...'}
+                            {/* Display status-appropriate message */}
+                            {(() => {
+                              const appointmentRef = comm.about?.[0]?.reference;
+                              const appointmentId = appointmentRef?.replace('Appointment/', '');
+                              const appointmentStatus = appointmentId ? appointmentStatuses[appointmentId] : null;
+                              const messageContent = comm.payload?.[0]?.contentString || '';
+
+                              // Generate appropriate message based on status
+                              if (appointmentStatus === 'pending') {
+                                return 'Awaiting approval - Please review and respond to this appointment request.';
+                              } else if (appointmentStatus) {
+                                // Any non-pending status shows as processed
+                                return 'This appointment request has been processed.';
+                              }
+
+                              // Fallback to original message if no specific status
+                              return messageContent.substring(0, 150) || 'No additional details';
+                            })()}
                           </p>
                           <p className="text-xs text-text-secondary">
                             {formatDate(comm.sent)}
@@ -1130,7 +1235,7 @@ export default function ProviderNotificationsClient() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              hideNotification(comm.id, 'communication');
+                              deleteNotification(comm.id, 'communication');
                             }}
                             className="text-sm text-text-secondary hover:text-red-600"
                           >
@@ -1140,46 +1245,75 @@ export default function ProviderNotificationsClient() {
                       </div>
 
                       {/* Handle Appointment Button for Communications that need handling */}
-                      {needsHandling(comm) && (
-                        <div className="pt-3 border-t border-gray-100 mt-3">
-                          <div className="flex justify-center">
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const appointmentId = comm.about?.[0]?.reference?.replace('Appointment/', '');
-                                // Mark as read when handling
-                                if (comm.id && !isMessageRead(comm)) {
-                                  setLocalCommunications(prev =>
-                                    prev.map(localComm =>
-                                      localComm.id === comm.id
-                                        ? {
-                                            ...localComm,
-                                            extension: [
-                                              ...(localComm.extension || []),
-                                              {
-                                                url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
-                                                valueDateTime: new Date().toISOString()
+                      {(() => {
+                        const appointmentRef = comm.about?.[0]?.reference;
+                        if (!appointmentRef?.startsWith('Appointment/')) return null;
+
+                        const appointmentId = appointmentRef.replace('Appointment/', '');
+                        const status = appointmentStatuses[appointmentId];
+
+                        // Show loading state if we don't have status yet and are loading
+                        if (!status && loadingStatuses) {
+                          return (
+                            <div className="pt-3 border-t border-gray-100 mt-3">
+                              <div className="flex justify-center items-center text-text-secondary text-sm">
+                                <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Loading status...
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // Show button only if status is pending or we don't have status yet
+                        if (status === 'pending' || (!status && needsHandling(comm))) {
+                          return (
+                            <div className="pt-3 border-t border-gray-100 mt-3">
+                              <div className="flex justify-center">
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    // Always mark as read when handling appointment (regardless of current read status)
+                                    if (comm.id) {
+                                      // Update local state immediately for instant UI feedback
+                                      setLocalCommunications(prev =>
+                                        prev.map(localComm =>
+                                          localComm.id === comm.id
+                                            ? {
+                                                ...localComm,
+                                                extension: [
+                                                  ...(localComm.extension?.filter(ext =>
+                                                    ext.url !== 'http://hl7.org/fhir/StructureDefinition/communication-read-status'
+                                                  ) || []),
+                                                  {
+                                                    url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
+                                                    valueDateTime: new Date().toISOString()
+                                                  }
+                                                ]
                                               }
-                                            ]
-                                          }
-                                        : localComm
-                                    )
-                                  );
-                                  markAsRead(comm.id);
-                                }
-                                // Navigate to appointments page with focus on specific appointment
-                                if (appointmentId) {
-                                  window.location.href = `/provider/appointments?highlight=${appointmentId}`;
-                                }
-                              }}
-                            >
-                              Handle Appointment
-                            </Button>
-                          </div>
-                        </div>
-                      )}
+                                            : localComm
+                                        )
+                                      );
+                                      // Mark as read (this will update localStorage and call API)
+                                      markAsRead(comm.id);
+                                    }
+                                    // Navigate to appointments page with focus on specific appointment
+                                    window.location.href = `/provider/appointments?highlight=${appointmentId}`;
+                                  }}
+                                >
+                                  Handle Appointment
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return null;
+                      })()}
                     </div>
                   </div>
                 </Card>
