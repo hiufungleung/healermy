@@ -1,20 +1,24 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { Card } from '@/components/common/Card';
 import { Badge } from '@/components/common/Badge';
+import { SlotDetailDialog } from '@/components/provider/SlotDetailDialog';
 import type { Slot } from '@/types/fhir';
 import type { EventInput } from '@fullcalendar/core';
 
 interface SlotCalendarProps {
   slots: Slot[];
+  onSlotUpdate?: () => void;
 }
 
-export function SlotCalendar({ slots }: SlotCalendarProps) {
+export function SlotCalendar({ slots, onSlotUpdate }: SlotCalendarProps) {
+  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
+  const [showSlotDetail, setShowSlotDetail] = useState(false);
   // Convert FHIR slots to FullCalendar events
   const events: EventInput[] = useMemo(() => {
     return slots.map((slot) => {
@@ -146,8 +150,13 @@ export function SlotCalendar({ slots }: SlotCalendarProps) {
             hour12: false,
           }}
           eventClick={(info) => {
-            // Handle event click - could show slot details
-            console.log('Slot clicked:', info.event.extendedProps);
+            // Find the slot by ID
+            const slotId = info.event.extendedProps.slotId;
+            const slot = slots.find(s => s.id === slotId);
+            if (slot) {
+              setSelectedSlot(slot);
+              setShowSlotDetail(true);
+            }
           }}
           dateClick={(info) => {
             // Handle date click - could create new slot
@@ -256,6 +265,26 @@ export function SlotCalendar({ slots }: SlotCalendarProps) {
           }
         }
       `}</style>
+
+      {/* Slot Detail Dialog */}
+      <SlotDetailDialog
+        slot={selectedSlot}
+        isOpen={showSlotDetail}
+        onClose={() => {
+          setShowSlotDetail(false);
+          setSelectedSlot(null);
+        }}
+        onSlotDeleted={() => {
+          setShowSlotDetail(false);
+          setSelectedSlot(null);
+          onSlotUpdate?.();
+        }}
+        onAppointmentCancelled={() => {
+          setShowSlotDetail(false);
+          setSelectedSlot(null);
+          onSlotUpdate?.();
+        }}
+      />
     </Card>
   );
 }

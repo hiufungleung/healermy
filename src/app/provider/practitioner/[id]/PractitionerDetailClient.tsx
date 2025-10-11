@@ -165,6 +165,24 @@ export default function PractitionerDetailClient({
   const [clearingScheduleSlots, setClearingScheduleSlots] = useState<Set<string>>(new Set());
   const [deletingSchedules, setDeletingSchedules] = useState<Set<string>>(new Set());
 
+  // AlertDialog states
+  const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
+  const [scheduleToClearSlots, setScheduleToClearSlots] = useState<string | null>(null);
+
+  // Filter states
+  const [scheduleFilterValid, setScheduleFilterValid] = useState<'valid' | 'expired'>('valid');
+
+  // Update URL when tab changes
+  const handleTabChange = (value: string) => {
+    const newTab = value as 'schedules' | 'slots';
+    setActiveTab(newTab);
+
+    // Update URL without page reload
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', newTab);
+    router.push(`/provider/practitioner/${practitionerId}?${params.toString()}`, { scroll: false });
+  };
+
   // Function to mark past free slots as busy-unavailable
   const markPastSlotsAsBusy = async (allSlots: Slot[]) => {
     const now = new Date();
@@ -244,13 +262,29 @@ export default function PractitionerDetailClient({
     fetchPractitionerName();
   }, [practitionerId, onPractitionerNameUpdate]);
 
-  // Load schedules in background
+  // Load schedules with date filtering
   useEffect(() => {
     const fetchSchedules = async () => {
       try {
         console.log('🔄 Loading schedules...');
         setSchedulesError(null);
-        const response = await fetch(`/api/fhir/schedules?actor=Practitioner/${practitionerId}`, {
+
+        // Build query params based on filter
+        const params = new URLSearchParams();
+        params.append('actor', `Practitioner/${practitionerId}`);
+        params.append('_count', '1000'); // Ensure we get all results
+
+        // Add date filter based on valid/expired selection
+        const now = new Date().toISOString();
+        if (scheduleFilterValid === 'valid') {
+          // Get schedules that haven't ended yet
+          params.append('date', `ge${now.split('T')[0]}`);
+        } else {
+          // Get schedules that have ended
+          params.append('date', `lt${now.split('T')[0]}`);
+        }
+
+        const response = await fetch(`/api/fhir/schedules?${params.toString()}`, {
           method: 'GET',
           credentials: 'include',
         });
@@ -260,8 +294,15 @@ export default function PractitionerDetailClient({
         }
 
         const data = await response.json();
-        setSchedules(data.schedules || []);
-        console.log('✅ Loaded schedules:', data.schedules?.length || 0);
+        // Sort schedules in descending order (newest first)
+        const sortedSchedules = (data.schedules || []).sort((a: Schedule, b: Schedule) => {
+          const dateA = a.planningHorizon?.end || a.planningHorizon?.start || '';
+          const dateB = b.planningHorizon?.end || b.planningHorizon?.start || '';
+          return dateB.localeCompare(dateA); // Descending order
+        });
+
+        setSchedules(sortedSchedules);
+        console.log('✅ Loaded schedules:', sortedSchedules.length);
       } catch (error) {
         console.error('Error fetching schedules:', error);
         setSchedulesError(error instanceof Error ? error.message : 'Failed to load schedules');
@@ -271,7 +312,7 @@ export default function PractitionerDetailClient({
     };
 
     fetchSchedules();
-  }, [practitionerId]);
+  }, [practitionerId, scheduleFilterValid]);
 
 
   // Fetch slots - only when slots tab is active and slots haven't been loaded yet
@@ -434,11 +475,6 @@ export default function PractitionerDetailClient({
     const scheduleSlots = slots.filter(slot => slot.schedule?.reference === `Schedule/${scheduleId}`);
 
     if (scheduleSlots.length === 0) {
-      alert('No slots to delete for this schedule.');
-      return;
-    }
-
-    if (!confirm(`Are you sure you want to delete all ${scheduleSlots.length} slots for this schedule? This action cannot be undone.`)) {
       return;
     }
 
@@ -460,8 +496,7 @@ export default function PractitionerDetailClient({
 
       // Remove all slots for this schedule from local state
       setSlots(prevSlots => prevSlots.filter(slot => slot.schedule?.reference !== `Schedule/${scheduleId}`));
-
-      alert(`Successfully deleted ${scheduleSlots.length} slots from the schedule.`);
+      setScheduleToClearSlots(null); // Close dialog
     } catch (error) {
       console.error('Error clearing schedule slots:', error);
       alert(`Failed to clear schedule slots: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -499,16 +534,7 @@ export default function PractitionerDetailClient({
           newSet.delete(scheduleId);
           return newSet;
         });
-        return;
-      }
-
-      // Confirm deletion
-      if (!confirm(`Are you sure you want to delete Schedule ${scheduleId}? This action cannot be undone.`)) {
-        setDeletingSchedules(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(scheduleId);
-          return newSet;
-        });
+        setScheduleToDelete(null);
         return;
       }
 
@@ -525,8 +551,7 @@ export default function PractitionerDetailClient({
 
       // Remove schedule from local state
       setSchedules(prevSchedules => prevSchedules.filter(s => s.id !== scheduleId));
-
-      alert(`Successfully deleted Schedule ${scheduleId}.`);
+      setScheduleToDelete(null); // Close dialog
     } catch (error) {
       console.error('Error deleting schedule:', error);
       alert(`Failed to delete schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -539,11 +564,33 @@ export default function PractitionerDetailClient({
     }
   };
 
+  // Function to jump to slots tab with schedule filter
+  const handleShowSlots = (scheduleId: string) => {
+    setSelectedScheduleFilter(scheduleId);
+    handleTabChange('slots');
+  };
+
   // Tab content rendering
   const renderSchedulesContent = () => {
     return (
       <div className="space-y-4">
-        <div className="flex justify-end items-center">
+        {/* Header with filters and create button */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex items-center gap-4">
+            <Select
+              value={scheduleFilterValid}
+              onValueChange={(value) => setScheduleFilterValid(value as 'valid' | 'expired')}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="valid">Valid Schedules</SelectItem>
+                <SelectItem value="expired">Expired Schedules</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <Button
             onClick={() => setShowCreateSchedule(true)}
             variant="primary"
@@ -602,22 +649,16 @@ export default function PractitionerDetailClient({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                  const newExpandedId = expandedScheduleId === schedule.id ? null : schedule.id;
-                                  setExpandedScheduleId(newExpandedId);
-
-                                  // Load slots if expanding and slots haven't been loaded yet
-                                  if (newExpandedId && !slotsLoaded) {
-                                    fetchSlotsForStats();
-                                  }
-                                }}
+                                onClick={() => schedule.id && handleShowSlots(schedule.id)}
+                                disabled={!schedule.id}
+                                title="View slots for this schedule in the Slots tab"
                               >
-                                {expandedScheduleId === schedule.id ? 'Hide' : 'Show'} Slots
+                                Show Slots
                               </Button>
                               <Button
                                 variant="danger"
                                 size="sm"
-                                onClick={() => schedule.id && handleClearScheduleSlots(schedule.id)}
+                                onClick={() => schedule.id && setScheduleToClearSlots(schedule.id)}
                                 disabled={!schedule.id || clearingScheduleSlots.has(schedule.id || '')}
                                 title="Delete all slots for this schedule"
                               >
@@ -630,7 +671,7 @@ export default function PractitionerDetailClient({
                               <Button
                                 variant="danger"
                                 size="sm"
-                                onClick={() => schedule.id && handleDeleteSchedule(schedule.id)}
+                                onClick={() => schedule.id && setScheduleToDelete(schedule.id)}
                                 disabled={!schedule.id || deletingSchedules.has(schedule.id || '')}
                                 title="Delete this schedule (must have no slots)"
                               >
@@ -832,7 +873,17 @@ export default function PractitionerDetailClient({
             </div>
           </Card>
         ) : (
-          <SlotCalendar slots={filteredSlots} />
+          <SlotCalendar
+            slots={filteredSlots}
+            onSlotUpdate={() => {
+              // Refresh slots when a slot is updated/deleted
+              setSlotsLoaded(false);
+              if (activeTab === 'slots') {
+                // Will trigger re-fetch via useEffect
+                setSlotsLoaded(false);
+              }
+            }}
+          />
         )}
       </div>
     );
@@ -841,7 +892,7 @@ export default function PractitionerDetailClient({
   return (
     <>
       {/* Tab Content */}
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'schedules' | 'slots')} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
           <TabsTrigger value="schedules">Schedules</TabsTrigger>
           <TabsTrigger value="slots">Slots</TabsTrigger>
@@ -855,6 +906,49 @@ export default function PractitionerDetailClient({
           {renderSlotsContent()}
         </TabsContent>
       </Tabs>
+
+      {/* AlertDialogs */}
+      <AlertDialog open={!!scheduleToClearSlots} onOpenChange={(open) => !open && setScheduleToClearSlots(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear All Slots</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete all {slots.filter(s => s.schedule?.reference === `Schedule/${scheduleToClearSlots}`).length} slots for this schedule?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => scheduleToClearSlots && handleClearScheduleSlots(scheduleToClearSlots)}
+              className="bg-danger hover:bg-danger-hover"
+            >
+              Clear All Slots
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!scheduleToDelete} onOpenChange={(open) => !open && setScheduleToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Schedule</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete Schedule {scheduleToDelete}?
+              This action cannot be undone. The schedule must have no slots to be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => scheduleToDelete && handleDeleteSchedule(scheduleToDelete)}
+              className="bg-danger hover:bg-danger-hover"
+            >
+              Delete Schedule
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Modals */}
       <CreateScheduleForm

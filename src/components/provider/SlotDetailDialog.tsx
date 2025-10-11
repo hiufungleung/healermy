@@ -1,0 +1,323 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/common/Button';
+import { Badge } from '@/components/common/Badge';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { formatDateForDisplay } from '@/library/timezone';
+import type { Slot, Appointment } from '@/types/fhir';
+
+interface SlotDetailDialogProps {
+  slot: Slot | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSlotDeleted?: () => void;
+  onAppointmentCancelled?: () => void;
+}
+
+export function SlotDetailDialog({
+  slot,
+  isOpen,
+  onClose,
+  onSlotDeleted,
+  onAppointmentCancelled,
+}: SlotDetailDialogProps) {
+  const [loading, setLoading] = useState(false);
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [patientName, setPatientName] = useState<string>('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+  // Fetch appointment details if slot is booked
+  useEffect(() => {
+    if (!slot || slot.status !== 'busy' || !slot.id) {
+      setAppointment(null);
+      setPatientName('');
+      return;
+    }
+
+    const fetchAppointmentDetails = async () => {
+      setLoading(true);
+      try {
+        // Find appointment that references this slot
+        const response = await fetch(`/api/fhir/appointments?slot=Slot/${slot.id}`, {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const appointments = data.appointments || [];
+
+          if (appointments.length > 0) {
+            const apt = appointments[0];
+            setAppointment(apt);
+
+            // Fetch patient name if appointment has patient reference
+            const patientRef = apt.participant?.find((p: any) =>
+              p.actor?.reference?.startsWith('Patient/')
+            )?.actor?.reference;
+
+            if (patientRef) {
+              const patientId = patientRef.split('/')[1];
+              const patientResponse = await fetch(`/api/fhir/patients/${patientId}`, {
+                method: 'GET',
+                credentials: 'include',
+              });
+
+              if (patientResponse.ok) {
+                const patient = await patientResponse.json();
+                const name = patient.name?.[0];
+                if (name) {
+                  const fullName = `${name.given?.join(' ') || ''} ${name.family || ''}`.trim();
+                  setPatientName(fullName || 'Unknown Patient');
+                }
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching appointment details:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAppointmentDetails();
+  }, [slot]);
+
+  const handleDeleteSlot = async () => {
+    if (!slot?.id) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/fhir/slots/${slot.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        onSlotDeleted?.();
+        onClose();
+      } else {
+        throw new Error(`Failed to delete slot: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Error deleting slot:', error);
+      alert('Failed to delete slot');
+    } finally {
+      setLoading(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  const handleCancelAppointment = async () => {
+    if (!appointment?.id) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/fhir/appointments/${appointment.id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json-patch+json' },
+        body: JSON.stringify([
+          { op: 'replace', path: '/status', value: 'cancelled' }
+        ]),
+      });
+
+      if (response.ok) {
+        onAppointmentCancelled?.();
+        onClose();
+      } else {
+        throw new Error(`Failed to cancel appointment: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+      alert('Failed to cancel appointment');
+    } finally {
+      setLoading(false);
+      setShowCancelConfirm(false);
+    }
+  };
+
+  if (!slot) return null;
+
+  const isBooked = slot.status === 'busy' && appointment;
+  const isFree = slot.status === 'free';
+
+  return (
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Slot Details</DialogTitle>
+            <DialogDescription>
+              {slot.start && formatDateForDisplay(slot.start)} - {slot.end && formatDateForDisplay(slot.end)}
+            </DialogDescription>
+          </DialogHeader>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Slot Status */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Status:</span>
+                <Badge
+                  variant={
+                    slot.status === 'free' ? 'success' :
+                    slot.status === 'busy' ? 'danger' :
+                    slot.status === 'busy-tentative' ? 'warning' :
+                    'info'
+                  }
+                >
+                  {slot.status}
+                </Badge>
+              </div>
+
+              {/* Schedule Reference */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Schedule:</span>
+                <span className="text-sm">{slot.schedule?.reference?.split('/')[1] || 'Unknown'}</span>
+              </div>
+
+              {/* Appointment Details (if booked) */}
+              {isBooked && (
+                <>
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium mb-2">Appointment Details</h4>
+
+                    {/* Patient Name */}
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Patient:</span>
+                      <span className="text-sm">{patientName || 'Loading...'}</span>
+                    </div>
+
+                    {/* Appointment Status */}
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Appointment Status:</span>
+                      <Badge variant={appointment.status === 'booked' ? 'success' : 'warning'}>
+                        {appointment.status}
+                      </Badge>
+                    </div>
+
+                    {/* Reason */}
+                    {appointment.reasonCode?.[0]?.text && (
+                      <div className="flex flex-col gap-1 mb-2">
+                        <span className="text-sm font-medium">Reason:</span>
+                        <span className="text-sm bg-gray-50 p-2 rounded">
+                          {appointment.reasonCode[0].text}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Description */}
+                    {appointment.description && (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm font-medium">Description:</span>
+                        <span className="text-sm bg-gray-50 p-2 rounded">
+                          {appointment.description}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            {isBooked && appointment && (
+              <Button
+                variant="danger"
+                onClick={() => setShowCancelConfirm(true)}
+                disabled={loading}
+              >
+                Cancel Appointment
+              </Button>
+            )}
+            {isFree && (
+              <Button
+                variant="danger"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={loading}
+              >
+                Delete Slot
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Slot Confirmation */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Slot</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this slot? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSlot}
+              className="bg-danger hover:bg-danger-hover"
+            >
+              Delete Slot
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Appointment Confirmation */}
+      <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Appointment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel this appointment for {patientName}?
+              This will free up the slot for other patients.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Appointment</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelAppointment}
+              className="bg-danger hover:bg-danger-hover"
+            >
+              Cancel Appointment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}

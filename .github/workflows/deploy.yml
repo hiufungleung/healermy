@@ -18,7 +18,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      digest: ${{ steps.build.outputs.digest }} # image digest（單架構也會有）
+      digest: ${{ steps.build.outputs.digest }}
       image_ref: ${{ steps.meta.outputs.image_ref }}
     steps:
       - name: Checkout
@@ -64,13 +64,16 @@ jobs:
             CONTAINER=healermy
             PORT=3000
 
-            IMAGE_NAME="${{ needs.build.outputs.image_name }}"
-            IMAGE_TAG="${{ needs.build.outputs.image_tag }}"
-            DIGEST="${{ needs.build.outputs.digest }}"  # multi-arch manifest digest
-            IMAGE_BY_DIGEST="${IMAGE_NAME}@${DIGEST}"
-            echo "IMAGE_NAME=$IMAGE_NAME"
-            echo "DIGEST=[$DIGEST]"
-            echo "IMAGE_BY_DIGEST=$IMAGE_BY_DIGEST"
+            IMAGE_NAME="${{ env.IMAGE_NAME }}"
+            RAW_DIGEST="${{ needs.build.outputs.digest }}"
+            DIGEST="$(printf '%s' "$RAW_DIGEST" | tr -d '\r\n')"
+
+            if [ -n "$DIGEST" ]; then
+              IMAGE_REF="${IMAGE_NAME}@${DIGEST}"
+            else
+              IMAGE_REF="${IMAGE_NAME}:${{ github.sha }}"
+            fi
+            echo "Using image: $IMAGE_REF"
 
             # Login on EC2 (needed if repo is private)
             echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ vars.DOCKER_USERNAME }}" --password-stdin
