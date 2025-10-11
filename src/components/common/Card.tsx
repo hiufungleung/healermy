@@ -17,11 +17,14 @@ export function Card({ children, className, padding = 'md', ...rest }: CardProps
   };
 
   return (
-    <ShadcnCard className={cn(
-      'bg-white shadow-sm',
-      paddingClasses[padding],
-      className
-    )}>
+    <ShadcnCard
+      className={cn(
+        'bg-white shadow-sm',
+        paddingClasses[padding],
+        className
+      )}
+      {...rest}
+    >
       {children}
     </ShadcnCard>
   );

@@ -790,9 +790,10 @@ export default function NotificationsClient({
                 }}
               >
                 <Card
-                  className={`transition-all duration-200 ${
+                  className={`transition-all duration-200 cursor-pointer ${
                     !isMessageRead(comm) ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
                   } ${isExpanded ? 'shadow-lg ring-2 ring-primary/30' : 'hover:shadow-md'}`}
+                  onClick={() => handleMessageClick(comm)}
                 >
                   <div className="flex items-start space-x-4">
                   {/* Icon */}
@@ -869,10 +870,7 @@ export default function NotificationsClient({
                     </div>
 
                     {/* Message Preview/Full Content */}
-                    <div
-                      className="cursor-pointer"
-                      onClick={() => handleMessageClick(comm)}
-                    >
+                    <div>
                       <p className={`text-text-secondary text-sm mb-2 ${isExpanded ? '' : 'line-clamp-3'}`}>
                         {isExpanded ? messageContent : `${messageContent.substring(0, 150)}${isLongMessage ? '...' : ''}`}
                       </p>
