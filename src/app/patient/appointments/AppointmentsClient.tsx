@@ -206,63 +206,26 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
   return (
     <>
       {/* Page Header */}
-      <div className="mb-6">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-          <div className="flex-1">
-            <h1 className="text-2xl sm:text-3xl font-bold text-text-primary mb-2">My Appointments</h1>
-            <p className="text-text-secondary text-sm sm:text-base">Manage your appointments and schedule new ones</p>
-          </div>
-          <Button
-            variant="primary"
+      <div className="mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-text-primary">My Appointments</h1>
+
+          {/* Book Appointment Button - Dashboard Style */}
+          <button
             onClick={() => router.push('/patient/book-appointment')}
-            className="flex items-center justify-center space-x-2 px-4 py-3 sm:px-6 w-full sm:w-auto"
+            className="group bg-white rounded-lg border-2 border-blue-200 p-4 hover:border-blue-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 w-full sm:w-auto"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <span>Add New Appointment</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="mb-4">
-        <div className="relative">
-          <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search by doctor name or specialty"
-            className="pl-10 pr-4 py-3 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-base"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {/* Status Filter Pills */}
-      <div className="mb-6">
-        <div className="flex flex-wrap gap-2">
-          {[
-            { key: 'all', label: 'All' },
-            { key: 'pending', label: 'Pending' },
-            { key: 'booked', label: 'Confirmed' },
-            { key: 'completed', label: 'Completed' },
-            { key: 'cancelled', label: 'Cancelled' }
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setFilterStatus(key as FilterStatus)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors min-w-0 ${
-                filterStatus === key
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                <svg className="w-6 h-6 text-blue-600 group-hover:animate-spin-once" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-gray-900 group-hover:text-blue-700">Book Appointment</p>
+              </div>
+            </div>
+          </button>
         </div>
       </div>
 
@@ -271,15 +234,39 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
         <AppointmentSkeleton count={4} />
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
             <h2 className="text-xl font-semibold">
               {filterStatus === 'all' ? 'All Appointments' :
                filterStatus === 'booked' ? 'Confirmed Appointments' :
                `${filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)} Appointments`}
             </h2>
-            <div className="text-sm text-gray-500">
-              {filteredAppointments.length} appointment{filteredAppointments.length !== 1 ? 's' : ''}
+
+            {/* Status Filter Pills */}
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: 'all', label: 'All' },
+                { key: 'pending', label: 'Pending' },
+                { key: 'booked', label: 'Confirmed' },
+                { key: 'completed', label: 'Completed' },
+                { key: 'cancelled', label: 'Cancelled' }
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setFilterStatus(key as FilterStatus)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors min-w-0 ${
+                    filterStatus === key
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
+          </div>
+
+          <div className="text-sm text-gray-500 mb-6">
+            {filteredAppointments.length} appointment{filteredAppointments.length !== 1 ? 's' : ''}
           </div>
 
           {filteredAppointments.length === 0 ? (

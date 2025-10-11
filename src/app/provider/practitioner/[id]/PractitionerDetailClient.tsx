@@ -444,6 +444,15 @@ export default function PractitionerDetailClient({
 
   // Handle slot deletion
   const handleDeleteSlot = async (slotId: string) => {
+    // Find the slot to check its status
+    const slot = slots.find(s => s.id === slotId);
+
+    // Only allow deletion of free slots
+    if (slot && slot.status !== 'free') {
+      alert(`Cannot delete ${slot.status} slots. Only free slots can be deleted. Please cancel the associated appointment first or change the slot status to 'free'.`);
+      return;
+    }
+
     setDeletingSlots(prev => new Set(prev).add(slotId));
 
     try {
@@ -453,11 +462,13 @@ export default function PractitionerDetailClient({
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       // Remove slot from local state
       setSlots(prevSlots => prevSlots.filter(slot => slot.id !== slotId));
+      alert('Slot deleted successfully.');
     } catch (error) {
       console.error('Error deleting slot:', error);
       alert(`Failed to delete slot: ${error instanceof Error ? error.message : 'Unknown error'}`);

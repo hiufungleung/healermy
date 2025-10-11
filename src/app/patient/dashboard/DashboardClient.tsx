@@ -687,29 +687,6 @@ export default function DashboardClient({
               )}
             </div>
 
-            <div className="mt-6 pt-6 border-t">
-              <h3 className="font-semibold mb-3">Quick Links</h3>
-              <div className="space-y-2">
-                <button
-                  onClick={() => router.push('/patient/medical-history')}
-                  className="w-full text-left text-sm text-primary hover:underline"
-                >
-                  View Medical History →
-                </button>
-                <button
-                  onClick={() => router.push('/patient/prescriptions')}
-                  className="w-full text-left text-sm text-primary hover:underline"
-                >
-                  Active Prescriptions →
-                </button>
-                <button
-                  onClick={() => router.push('/patient/test-results')}
-                  className="w-full text-left text-sm text-primary hover:underline"
-                >
-                  Recent Test Results →
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </div>
