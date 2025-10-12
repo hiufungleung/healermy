@@ -4,13 +4,13 @@ import { getBasicSessionData } from './actions';
 import PractitionerWrapper from './PractitionerWrapper';
 
 interface PractitionerDetailPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default async function PractitionerDetailPage({ params }: PractitionerDetailPageProps) {
-  const practitionerId = params.id;
+  const { id: practitionerId } = await params;
   const { session, error } = await getBasicSessionData();
 
   // If no session or error, redirect to login
