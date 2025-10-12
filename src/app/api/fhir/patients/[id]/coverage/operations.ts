@@ -1,4 +1,4 @@
-import { FHIRClient } from '../../../client';
+import { FHIRClient } from '@/app/api/fhir/client';
 // Inline types to avoid import issues
 interface Coverage {
   resourceType: 'Coverage';

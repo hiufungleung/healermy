@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, prepareToken } from '../../../utils/auth';
-import { getPatientExplanationOfBenefit } from '../../operations';
+import { getSessionFromHeaders, prepareToken } from '@/app/api/fhir/utils/auth';
+import { getPatientExplanationOfBenefit } from '@/app/api/fhir/patients/operations';
 
 /**
  * GET /api/fhir/patients/[id]/explanation-of-benefit - Get patient explanation of benefit records

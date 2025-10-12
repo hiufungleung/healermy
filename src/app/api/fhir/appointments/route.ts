@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromCookies, prepareToken } from '../utils/auth';
-import { searchAppointments, createAppointment } from './operations';
-import { createStatusUpdateMessage } from '../communications/operations';
-import type { Appointment } from '../../../../types/fhir';
+import { getSessionFromCookies, prepareToken } from '@/app/api/fhir/utils/auth';
+import { searchAppointments, createAppointment } from '@/app/api/fhir/appointments/operations';
+import { createStatusUpdateMessage } from '@/app/api/fhir/communications/operations';
+import type { Appointment } from '@/types/fhir';
 
 /**
  * GET /api/fhir/appointments - Search appointments

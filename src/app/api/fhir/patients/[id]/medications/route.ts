@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromCookies, prepareToken } from '../../../utils/auth';
-import { getPatientMedications } from '../../operations';
+import { getSessionFromCookies, prepareToken } from '@/app/api/fhir/utils/auth';
+import { getPatientMedications } from '@/app/api/fhir/patients/operations';
 
 /**
  * GET /api/fhir/patients/[id]/medications - Get patient medications (MedicationRequest)

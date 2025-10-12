@@ -12,6 +12,8 @@ import {
 import { CreateScheduleForm } from '@/components/provider/CreateScheduleForm';
 import { GenerateSlotsForm } from '@/components/provider/GenerateSlotsForm';
 import { SlotCalendar } from '@/components/provider/SlotCalendar';
+import { SlotFilters } from '@/components/provider/SlotFilters';
+import { ScheduleFilters } from '@/components/provider/ScheduleFilters';
 import {
   Tabs,
   TabsContent,
@@ -37,7 +39,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { formatDateForDisplay } from '@/library/timezone';
-import type { Schedule, Slot } from '@/types/fhir';
+import type { Schedule, Slot, Appointment, Encounter } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
 
 // Custom skeleton component for schedule cards - matches exact layout
@@ -138,21 +140,27 @@ export default function PractitionerDetailClient({
   // State management - start empty, load via API
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   // Loading states - everything loads client-side now for faster initial render
   const [loadingSchedules, setLoadingSchedules] = useState(true);
   const [loadingSlots, setLoadingSlots] = useState(false); // Only load when slots tab is clicked
   const [slotsLoaded, setSlotsLoaded] = useState(false); // Track if slots have been loaded
   const [loadingSlotsForStats, setLoadingSlotsForStats] = useState(false); // Loading slots for schedule expansion
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
+  const [appointmentsLoaded, setAppointmentsLoaded] = useState(false);
 
   // Error states
   const [schedulesError, setSchedulesError] = useState<string | null>(null);
   const [slotsError, setSlotsError] = useState<string | null>(null);
+  const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
 
   // UI state - Initialize from URL params
-  const [activeTab, setActiveTab] = useState<'schedules' | 'slots'>(() => {
+  const [activeTab, setActiveTab] = useState<'schedules' | 'slots' | 'appointments'>(() => {
     const tabParam = searchParams.get('tab');
-    return tabParam === 'slots' ? 'slots' : 'schedules';
+    if (tabParam === 'slots') return 'slots';
+    if (tabParam === 'appointments') return 'appointments';
+    return 'schedules';
   });
   const [selectedScheduleFilter, setSelectedScheduleFilter] = useState<string>('all');
   const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
@@ -160,10 +168,27 @@ export default function PractitionerDetailClient({
   const [showGenerateSlots, setShowGenerateSlots] = useState(false);
   const [selectedScheduleForSlots, setSelectedScheduleForSlots] = useState<string>('');
 
+  // Slot filter states
+  const [selectedSchedules, setSelectedSchedules] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedServiceTypes, setSelectedServiceTypes] = useState<string[]>([]);
+  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
+
+  // Schedule filter states
+  const [scheduleFilterCategories, setScheduleFilterCategories] = useState<string[]>([]);
+  const [scheduleFilterServiceTypes, setScheduleFilterServiceTypes] = useState<string[]>([]);
+  const [scheduleFilterSpecialties, setScheduleFilterSpecialties] = useState<string[]>([]);
+  const [scheduleFilterStartDate, setScheduleFilterStartDate] = useState<string>('');
+  const [scheduleFilterEndDate, setScheduleFilterEndDate] = useState<string>('');
+
   // Slot deletion
   const [deletingSlots, setDeletingSlots] = useState<Set<string>>(new Set());
   const [clearingScheduleSlots, setClearingScheduleSlots] = useState<Set<string>>(new Set());
   const [deletingSchedules, setDeletingSchedules] = useState<Set<string>>(new Set());
+
+  // Appointment actions
+  const [processingAppointments, setProcessingAppointments] = useState<Set<string>>(new Set());
+  const [encounters, setEncounters] = useState<Record<string, Encounter>>({});
 
   // AlertDialog states
   const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
@@ -174,7 +199,7 @@ export default function PractitionerDetailClient({
 
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
-    const newTab = value as 'schedules' | 'slots';
+    const newTab = value as 'schedules' | 'slots' | 'appointments';
     setActiveTab(newTab);
 
     // Update URL without page reload
@@ -388,6 +413,126 @@ export default function PractitionerDetailClient({
     return () => clearInterval(refreshInterval);
   }, [activeTab, schedules, slotsLoaded]);
 
+  // Fetch appointments - only when appointments tab is active
+  useEffect(() => {
+    // Only fetch appointments when appointments tab is active and appointments haven't been loaded
+    if (activeTab !== 'appointments' || appointmentsLoaded) {
+      return;
+    }
+
+    const fetchAppointments = async () => {
+      setLoadingAppointments(true);
+      try {
+        setAppointmentsError(null);
+        console.log('🔄 Loading appointments and encounters in parallel...');
+
+        // Build query params to filter by practitioner
+        const appointmentParams = new URLSearchParams();
+        appointmentParams.append('actor', `Practitioner/${practitionerId}`);
+        appointmentParams.append('_count', '1000');
+        // Sort by date descending (newest first)
+        appointmentParams.append('_sort', '-date');
+
+        // Build query params for encounters - fetch all encounters for this practitioner
+        const encounterParams = new URLSearchParams();
+        encounterParams.append('practitioner', `Practitioner/${practitionerId}`);
+        encounterParams.append('_count', '1000');
+
+        // Fetch appointments AND encounters in parallel
+        const [appointmentsResponse, encountersResponse] = await Promise.all([
+          fetch(`/api/fhir/appointments?${appointmentParams.toString()}`, {
+            method: 'GET',
+            credentials: 'include',
+          }),
+          fetch(`/api/fhir/encounters?${encounterParams.toString()}`, {
+            method: 'GET',
+            credentials: 'include',
+          })
+        ]);
+
+        if (!appointmentsResponse.ok) {
+          throw new Error(`Failed to fetch appointments: HTTP ${appointmentsResponse.status}`);
+        }
+
+        const appointmentsData = await appointmentsResponse.json();
+        const appointmentsList = appointmentsData.appointments || [];
+
+        // Process encounters data
+        let encounterMap: Record<string, Encounter> = {};
+        if (encountersResponse.ok) {
+          const encountersData = await encountersResponse.json();
+          const encountersList = encountersData.encounters || [];
+
+          // Map encounters by appointment reference
+          encountersList.forEach((encounter: Encounter) => {
+            const appointmentRef = encounter.appointment?.[0]?.reference;
+            if (appointmentRef) {
+              // Extract appointment ID from reference (e.g., "Appointment/123" -> "123")
+              const appointmentId = appointmentRef.replace('Appointment/', '');
+              encounterMap[appointmentId] = encounter;
+            }
+          });
+
+          console.log('✅ Loaded encounters:', Object.keys(encounterMap).length);
+        } else {
+          console.warn('Failed to fetch encounters:', encountersResponse.status);
+        }
+
+        setEncounters(encounterMap);
+
+        // Enhance appointments with patient names only (practitioner is already known)
+        try {
+          const { extractParticipantIds, fetchPatientData, extractFullName } = await import('@/library/fhirNameResolver');
+
+          // Extract unique patient IDs
+          const { patientIds } = extractParticipantIds(appointmentsList);
+
+          // Fetch all patient data in parallel
+          const patientsMap = await fetchPatientData(patientIds);
+
+          // Update appointments with patient names
+          const enhancedAppointments = appointmentsList.map((appointment: Appointment) => {
+            const updatedAppointment = { ...appointment };
+            const patientParticipant = updatedAppointment.participant?.find(p =>
+              p.actor?.reference?.startsWith('Patient/')
+            );
+            if (patientParticipant?.actor?.reference) {
+              const patientId = patientParticipant.actor.reference.replace('Patient/', '');
+              const patientData = patientsMap.get(patientId);
+              const fullName = extractFullName(patientData);
+              if (fullName && patientParticipant.actor) {
+                patientParticipant.actor.display = fullName;
+              }
+            }
+            return updatedAppointment;
+          });
+
+          setAppointments(enhancedAppointments);
+        } catch (error) {
+          console.warn('Failed to enhance appointment names, using basic data:', error);
+          setAppointments(appointmentsList);
+        }
+
+        console.log('✅ Loaded appointments:', appointmentsList.length);
+      } catch (error) {
+        console.error('Error fetching appointments:', error);
+        setAppointmentsError(error instanceof Error ? error.message : 'Failed to load appointments');
+      } finally {
+        setLoadingAppointments(false);
+        setAppointmentsLoaded(true);
+      }
+    };
+
+    fetchAppointments();
+
+    // Auto-refresh appointments every 60 seconds
+    const refreshInterval = setInterval(() => {
+      fetchAppointments();
+    }, 60000);
+
+    return () => clearInterval(refreshInterval);
+  }, [activeTab, practitionerId, appointmentsLoaded]);
+
   // Update stats when schedules or slots change
   useEffect(() => {
     if (onStatsUpdate) {
@@ -583,34 +728,117 @@ export default function PractitionerDetailClient({
 
   // Tab content rendering
   const renderSchedulesContent = () => {
-    return (
-      <div className="space-y-4">
-        {/* Header with filters and create button */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex items-center gap-4">
-            <Select
-              value={scheduleFilterValid}
-              onValueChange={(value) => setScheduleFilterValid(value as 'valid' | 'expired')}
-            >
-              <SelectTrigger className="w-[150px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="valid">Valid Schedules</SelectItem>
-                <SelectItem value="expired">Expired Schedules</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    // Check if any filters are active
+    const hasActiveScheduleFilters =
+      scheduleFilterCategories.length > 0 ||
+      scheduleFilterServiceTypes.length > 0 ||
+      scheduleFilterSpecialties.length > 0 ||
+      scheduleFilterStartDate ||
+      scheduleFilterEndDate;
 
-          <Button
-            onClick={() => setShowCreateSchedule(true)}
-            variant="primary"
-          >
-            Create New Schedule
-          </Button>
+    // Filter schedules based on selected criteria
+    const filteredSchedules = schedules.filter(schedule => {
+      // Filter by category
+      if (scheduleFilterCategories.length > 0) {
+        const scheduleCategories = schedule.serviceCategory?.flatMap(cat =>
+          cat.coding?.map(code => code.display).filter(Boolean) || []
+        ) || [];
+        if (!scheduleFilterCategories.some(cat => scheduleCategories.includes(cat))) {
+          return false;
+        }
+      }
+
+      // Filter by service type
+      if (scheduleFilterServiceTypes.length > 0) {
+        const scheduleTypes = schedule.serviceType?.flatMap(type =>
+          type.coding?.map(code => code.display).filter(Boolean) || []
+        ) || [];
+        if (!scheduleFilterServiceTypes.some(type => scheduleTypes.includes(type))) {
+          return false;
+        }
+      }
+
+      // Filter by specialty
+      if (scheduleFilterSpecialties.length > 0) {
+        const scheduleSpecialties = schedule.specialty?.flatMap(spec =>
+          spec.coding?.map(code => code.display).filter(Boolean) || []
+        ) || [];
+        if (!scheduleFilterSpecialties.some(spec => scheduleSpecialties.includes(spec))) {
+          return false;
+        }
+      }
+
+      // Filter by date range
+      if (scheduleFilterStartDate || scheduleFilterEndDate) {
+        const scheduleStart = schedule.planningHorizon?.start ? new Date(schedule.planningHorizon.start) : null;
+        const scheduleEnd = schedule.planningHorizon?.end ? new Date(schedule.planningHorizon.end) : null;
+        const filterStart = scheduleFilterStartDate ? new Date(scheduleFilterStartDate) : null;
+        const filterEnd = scheduleFilterEndDate ? new Date(scheduleFilterEndDate) : null;
+
+        // Check if schedule overlaps with filter date range
+        if (filterStart && scheduleEnd && scheduleEnd < filterStart) {
+          return false;
+        }
+        if (filterEnd && scheduleStart && scheduleStart > filterEnd) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    return (
+      <div className="flex gap-4">
+        {/* Left Sidebar - Filters (hidden on mobile, shown on md+) */}
+        <div className="hidden md:block w-64 flex-shrink-0">
+          <ScheduleFilters
+            schedules={schedules}
+            selectedCategories={scheduleFilterCategories}
+            selectedServiceTypes={scheduleFilterServiceTypes}
+            selectedSpecialties={scheduleFilterSpecialties}
+            startDate={scheduleFilterStartDate}
+            endDate={scheduleFilterEndDate}
+            onCategoriesChange={setScheduleFilterCategories}
+            onServiceTypesChange={setScheduleFilterServiceTypes}
+            onSpecialtiesChange={setScheduleFilterSpecialties}
+            onStartDateChange={setScheduleFilterStartDate}
+            onEndDateChange={setScheduleFilterEndDate}
+          />
         </div>
 
-            {loadingSchedules ? (
+        {/* Main Content - Schedules List */}
+        <div className="flex-1 space-y-4">
+          {/* Header with filters and create button */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex items-center gap-4">
+              <Select
+                value={scheduleFilterValid}
+                onValueChange={(value) => setScheduleFilterValid(value as 'valid' | 'expired')}
+              >
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="valid">Valid Schedules</SelectItem>
+                  <SelectItem value="expired">Expired Schedules</SelectItem>
+                </SelectContent>
+              </Select>
+              {filteredSchedules.length < schedules.length && (
+                <span className="text-sm text-gray-500">
+                  ({filteredSchedules.length} of {schedules.length} schedules)
+                </span>
+              )}
+            </div>
+
+            <Button
+              onClick={() => setShowCreateSchedule(true)}
+              variant="primary"
+            >
+              Create New Schedule
+            </Button>
+          </div>
+
+          {loadingSchedules ? (
               <div className="space-y-4">
                 <ScheduleSkeleton />
                 <ScheduleSkeleton />
@@ -624,27 +852,42 @@ export default function PractitionerDetailClient({
                 </div>
               </Card>
             ) : (
-              <div className="space-y-4">
-                {schedules.length === 0 ? (
-                  <Card>
-                    <div className="p-8 text-center text-gray-500">
-                      No schedules found. Create your first schedule to get started.
+              <>
+                {filteredSchedules.length === 0 && hasActiveScheduleFilters && (
+                  <Card className="mb-4">
+                    <div className="p-4 text-center text-yellow-700 bg-yellow-50 rounded-lg">
+                      <p className="font-medium">No schedules match the selected filters</p>
+                      <p className="text-sm mt-1">Try adjusting your filter criteria or clear all filters.</p>
                     </div>
                   </Card>
-                ) : (
-                  schedules.map((schedule) => (
+                )}
+                <div className="space-y-4">
+                  {schedules.length === 0 ? (
+                    <Card>
+                      <div className="p-8 text-center text-gray-500">
+                        No schedules found. Create your first schedule to get started.
+                      </div>
+                    </Card>
+                  ) : filteredSchedules.length === 0 && !hasActiveScheduleFilters ? (
+                    <Card>
+                      <div className="p-8 text-center text-gray-500">
+                        No schedules found. Create your first schedule to get started.
+                      </div>
+                    </Card>
+                  ) : (
+                    filteredSchedules.map((schedule) => (
                       <Card key={schedule.id}>
-                        <div className="p-6">
+                        <div className="p-3 md:p-4">
                           {/* Header with Title and Actions */}
-                          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6">
-                            <div>
-                              <h3 className="text-xl font-bold text-text-primary mb-1">Schedule {schedule.id}</h3>
-                              <p className="text-sm text-gray-500">
+                          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-2 md:gap-3 mb-3 md:mb-4">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-base md:text-lg font-bold text-text-primary mb-0.5">Schedule {schedule.id}</h3>
+                              <p className="text-xs md:text-sm text-gray-500">
                                 {schedule.planningHorizon?.start && formatDateForDisplay(schedule.planningHorizon.start)} -{' '}
                                 {schedule.planningHorizon?.end && formatDateForDisplay(schedule.planningHorizon.end)}
                               </p>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
                               <Button
                                 variant="primary"
                                 size="sm"
@@ -695,79 +938,64 @@ export default function PractitionerDetailClient({
                             </div>
                           </div>
 
-                          {/* Details Grid */}
-                          <div className="mb-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {/* Details - Compressed into one row */}
+                          <div className="mb-2 md:mb-3">
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs md:text-sm">
                               {/* Service Category */}
                               {schedule.serviceCategory && schedule.serviceCategory.length > 0 && (
-                                <div className="bg-white rounded-md p-3">
-                                  <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Service Category</div>
-                                  <div className="text-base text-text-primary font-medium">
-                                    {schedule.serviceCategory.map((cat, idx) => (
-                                      <div key={idx}>{cat.coding?.[0]?.display || 'N/A'}</div>
-                                    ))}
-                                  </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-gray-500">Category:</span>
+                                  <span className="text-text-primary">
+                                    {schedule.serviceCategory.map((cat, idx) => cat.coding?.[0]?.display).filter(Boolean).join(', ') || 'N/A'}
+                                  </span>
                                 </div>
                               )}
 
                               {/* Service Type */}
                               {schedule.serviceType && schedule.serviceType.length > 0 && (
-                                <div className="bg-white rounded-md p-3">
-                                  <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Service Type</div>
-                                  <div className="text-base text-text-primary font-medium">
-                                    {schedule.serviceType.map((type, idx) => (
-                                      <div key={idx}>{type.coding?.[0]?.display || 'N/A'}</div>
-                                    ))}
-                                  </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-gray-500">Type:</span>
+                                  <span className="text-text-primary">
+                                    {schedule.serviceType.map((type, idx) => type.coding?.[0]?.display).filter(Boolean).join(', ') || 'N/A'}
+                                  </span>
                                 </div>
                               )}
 
                               {/* Specialty */}
                               {schedule.specialty && schedule.specialty.length > 0 && (
-                                <div className="bg-white rounded-md p-3">
-                                  <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Specialty</div>
-                                  <div className="text-base text-text-primary font-medium">
-                                    {schedule.specialty.map((spec, idx) => (
-                                      <div key={idx}>{spec.coding?.[0]?.display || 'N/A'}</div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Available Time */}
-                              {schedule.availableTime && schedule.availableTime.length > 0 && (
-                                <div className="bg-white rounded-md p-3 md:col-span-2 lg:col-span-3">
-                                  <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Available Times</div>
-                                  <div className="text-base text-text-primary">
-                                    {schedule.availableTime.map((time, idx) => {
-                                      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                                      const days = time.daysOfWeek?.map(day => dayNames[parseInt(day)]).join(', ');
-
-                                      return (
-                                        <div key={idx} className="mb-1">
-                                          {days && <span className="font-medium">{days}</span>}
-                                          {time.availableStartTime && time.availableEndTime && (
-                                            <span className="ml-2 text-gray-600">
-                                              {time.availableStartTime} - {time.availableEndTime}
-                                            </span>
-                                          )}
-                                          {time.allDay && <span className="ml-2 text-blue-600">(All Day)</span>}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Comment */}
-                              {schedule.comment && (
-                                <div className="bg-white rounded-md p-3 md:col-span-2 lg:col-span-3">
-                                  <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Comment</div>
-                                  <div className="text-base text-text-primary">{schedule.comment}</div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-gray-500">Specialty:</span>
+                                  <span className="text-text-primary">
+                                    {schedule.specialty.map((spec, idx) => spec.coding?.[0]?.display).filter(Boolean).join(', ') || 'N/A'}
+                                  </span>
                                 </div>
                               )}
                             </div>
                           </div>
+
+                          {/* Available Time - Separate section */}
+                          {schedule.availableTime && schedule.availableTime.length > 0 && (
+                            <div className="mb-2 md:mb-3 text-xs md:text-sm">
+                              <span className="font-semibold text-gray-500">Available:</span>
+                              <span className="ml-2 text-text-primary">
+                                {schedule.availableTime.map((time, idx) => {
+                                  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                                  const days = time.daysOfWeek?.map(day => dayNames[parseInt(day)]).join(', ');
+                                  const timeRange = time.availableStartTime && time.availableEndTime
+                                    ? `${time.availableStartTime}-${time.availableEndTime}`
+                                    : time.allDay ? 'All Day' : '';
+                                  return days && timeRange ? `${days} ${timeRange}` : null;
+                                }).filter(Boolean).join(' | ')}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Comment */}
+                          {schedule.comment && (
+                            <div className="text-xs md:text-sm text-gray-600 mb-2">
+                              {schedule.comment}
+                            </div>
+                          )}
 
                           {/* Expandable Slots Section */}
                           {expandedScheduleId === schedule.id && (
@@ -823,78 +1051,648 @@ export default function PractitionerDetailClient({
                         </div>
                       </Card>
                     ))
-                )}
-              </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
-        );
+        </div>
+      );
   };
 
   const renderSlotsContent = () => {
-        // Filter slots based on selected schedule
-        const filteredSlots = selectedScheduleFilter === 'all'
-          ? slots
-          : slots.filter(slot => slot.schedule?.reference === `Schedule/${selectedScheduleFilter}`);
+    // Check if any filters are active
+    const hasActiveFilters =
+      selectedSchedules.length > 0 ||
+      selectedCategories.length > 0 ||
+      selectedServiceTypes.length > 0 ||
+      selectedSpecialties.length > 0;
+
+    // If no filters are active, show all slots
+    let filteredSlots = slots;
+
+    if (hasActiveFilters) {
+      // Filter schedules based on selected characteristics
+      const filteredScheduleIds = schedules
+        .filter(schedule => {
+          // Filter by selected schedules (if any selected)
+          if (selectedSchedules.length > 0 && !selectedSchedules.includes(schedule.id!)) {
+            return false;
+          }
+
+          // Filter by category
+          if (selectedCategories.length > 0) {
+            const scheduleCategories = schedule.serviceCategory?.flatMap(cat =>
+              cat.coding?.map(code => code.display).filter(Boolean) || []
+            ) || [];
+            if (!selectedCategories.some(cat => scheduleCategories.includes(cat))) {
+              return false;
+            }
+          }
+
+          // Filter by service type
+          if (selectedServiceTypes.length > 0) {
+            const scheduleTypes = schedule.serviceType?.flatMap(type =>
+              type.coding?.map(code => code.display).filter(Boolean) || []
+            ) || [];
+            if (!selectedServiceTypes.some(type => scheduleTypes.includes(type))) {
+              return false;
+            }
+          }
+
+          // Filter by specialty
+          if (selectedSpecialties.length > 0) {
+            const scheduleSpecialties = schedule.specialty?.flatMap(spec =>
+              spec.coding?.map(code => code.display).filter(Boolean) || []
+            ) || [];
+            if (!selectedSpecialties.some(spec => scheduleSpecialties.includes(spec))) {
+              return false;
+            }
+          }
+
+          return true;
+        })
+        .map(s => s.id!);
+
+      // Filter slots to only include those from filtered schedules
+      filteredSlots = slots.filter(slot => {
+        const scheduleId = slot.schedule?.reference?.replace('Schedule/', '');
+        return filteredScheduleIds.includes(scheduleId!);
+      });
+    }
+
+    return (
+      <div className="flex gap-4">
+        {/* Left Sidebar - Filters (hidden on mobile, shown on md+) */}
+        <div className="hidden md:block w-64 flex-shrink-0">
+          <SlotFilters
+            slots={slots}
+            schedules={schedules}
+            selectedSchedules={selectedSchedules}
+            selectedCategories={selectedCategories}
+            selectedServiceTypes={selectedServiceTypes}
+            selectedSpecialties={selectedSpecialties}
+            onSchedulesChange={setSelectedSchedules}
+            onCategoriesChange={setSelectedCategories}
+            onServiceTypesChange={setSelectedServiceTypes}
+            onSpecialtiesChange={setSelectedSpecialties}
+          />
+        </div>
+
+        {/* Main Content - Calendar */}
+        <div className="flex-1 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+            <h2 className="text-lg md:text-xl font-semibold">
+              Slot Calendar
+              {filteredSlots.length < slots.length && (
+                <span className="text-sm text-gray-500 ml-2">
+                  ({filteredSlots.length} of {slots.length} slots)
+                </span>
+              )}
+            </h2>
+            <Button
+              onClick={() => setShowGenerateSlots(true)}
+              variant="primary"
+              size="sm"
+            >
+              Generate Slots
+            </Button>
+          </div>
+
+          {loadingSlots ? (
+            <SlotCalendarSkeleton />
+          ) : slotsError ? (
+            <Card>
+              <div className="p-6 text-center">
+                <div className="text-red-600 mb-2">Failed to load slots</div>
+                <div className="text-sm text-gray-500">{slotsError}</div>
+              </div>
+            </Card>
+          ) : (
+            <>
+              {filteredSlots.length === 0 && hasActiveFilters && (
+                <Card className="mb-4">
+                  <div className="p-4 text-center text-yellow-700 bg-yellow-50 rounded-lg">
+                    <p className="font-medium">No slots match the selected filters</p>
+                    <p className="text-sm mt-1">Try adjusting your filter criteria or clear all filters to see all slots.</p>
+                  </div>
+                </Card>
+              )}
+              <SlotCalendar
+                slots={filteredSlots}
+                onSlotUpdate={() => {
+                  // Refresh slots when a slot is updated/deleted
+                  setSlotsLoaded(false);
+                  if (activeTab === 'slots') {
+                    // Will trigger re-fetch via useEffect
+                    setSlotsLoaded(false);
+                  }
+                }}
+              />
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Handler for approving an appointment
+  const handleApproveAppointment = async (appointmentId: string) => {
+    setProcessingAppointments(prev => new Set(prev).add(appointmentId));
+    try {
+      const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json-patch+json' },
+        body: JSON.stringify([
+          { op: 'replace', path: '/status', value: 'booked' }
+        ]),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to approve appointment: ${response.status}`);
+      }
+
+      // Update local state
+      setAppointments(prev => prev.map(apt =>
+        apt.id === appointmentId ? { ...apt, status: 'booked' } : apt
+      ));
+
+      console.log(`✅ Approved appointment ${appointmentId}`);
+    } catch (error) {
+      console.error('Error approving appointment:', error);
+      alert(`Failed to approve appointment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setProcessingAppointments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(appointmentId);
+        return newSet;
+      });
+    }
+  };
+
+  // Handler for rejecting an appointment
+  const handleRejectAppointment = async (appointmentId: string) => {
+    setProcessingAppointments(prev => new Set(prev).add(appointmentId));
+    try {
+      const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json-patch+json' },
+        body: JSON.stringify([
+          { op: 'replace', path: '/status', value: 'cancelled' }
+        ]),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to reject appointment: ${response.status}`);
+      }
+
+      // Update local state
+      setAppointments(prev => prev.map(apt =>
+        apt.id === appointmentId ? { ...apt, status: 'cancelled' } : apt
+      ));
+
+      console.log(`✅ Rejected appointment ${appointmentId}`);
+    } catch (error) {
+      console.error('Error rejecting appointment:', error);
+      alert(`Failed to reject appointment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setProcessingAppointments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(appointmentId);
+        return newSet;
+      });
+    }
+  };
+
+  // Handler for starting an encounter
+  const handleStartEncounter = async (appointmentId: string) => {
+    setProcessingAppointments(prev => new Set(prev).add(appointmentId));
+    try {
+      // First, try to find existing encounter for this appointment
+      const searchResponse = await fetch(
+        `/api/fhir/encounters?appointment=Appointment/${appointmentId}&_count=1`,
+        {
+          method: 'GET',
+          credentials: 'include',
+        }
+      );
+
+      if (!searchResponse.ok) {
+        throw new Error(`Failed to search for encounter: ${searchResponse.status}`);
+      }
+
+      const searchData = await searchResponse.json();
+      const existingEncounter = searchData.encounters?.[0];
+
+      if (existingEncounter) {
+        // Update encounter status to 'in-progress'
+        const patchResponse = await fetch(`/api/fhir/encounters/${existingEncounter.id}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json-patch+json' },
+          body: JSON.stringify([
+            { op: 'replace', path: '/status', value: 'in-progress' }
+          ]),
+        });
+
+        if (!patchResponse.ok) {
+          throw new Error(`Failed to start encounter: ${patchResponse.status}`);
+        }
+
+        const updatedEncounter = await patchResponse.json();
+        setEncounters(prev => ({
+          ...prev,
+          [appointmentId]: updatedEncounter
+        }));
+
+        console.log(`✅ Started encounter ${existingEncounter.id} for appointment ${appointmentId}`);
+      } else {
+        console.warn(`No encounter found for appointment ${appointmentId}`);
+        alert('No encounter found for this appointment. It may not have been created yet.');
+      }
+    } catch (error) {
+      console.error('Error starting encounter:', error);
+      alert(`Failed to start encounter: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setProcessingAppointments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(appointmentId);
+        return newSet;
+      });
+    }
+  };
+
+  // Handler for marking patient as arrived
+  const handleMarkArrived = async (appointmentId: string) => {
+    setProcessingAppointments(prev => new Set(prev).add(appointmentId));
+    try {
+      // Update appointment status to 'arrived'
+      const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json-patch+json' },
+        body: JSON.stringify([
+          { op: 'replace', path: '/status', value: 'arrived' }
+        ]),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to mark as arrived: ${response.status}`);
+      }
+
+      // Update local state
+      setAppointments(prev => prev.map(apt =>
+        apt.id === appointmentId ? { ...apt, status: 'arrived' } : apt
+      ));
+
+      console.log(`✅ Marked appointment ${appointmentId} as arrived`);
+    } catch (error) {
+      console.error('Error marking as arrived:', error);
+      alert(`Failed to mark as arrived: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setProcessingAppointments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(appointmentId);
+        return newSet;
+      });
+    }
+  };
+
+  // Handler for completing an encounter
+  const handleCompleteEncounter = async (appointmentId: string) => {
+    setProcessingAppointments(prev => new Set(prev).add(appointmentId));
+    try {
+      // First, find the encounter for this appointment
+      const searchResponse = await fetch(
+        `/api/fhir/encounters?appointment=Appointment/${appointmentId}&_count=1`,
+        {
+          method: 'GET',
+          credentials: 'include',
+        }
+      );
+
+      if (!searchResponse.ok) {
+        throw new Error(`Failed to search for encounter: ${searchResponse.status}`);
+      }
+
+      const searchData = await searchResponse.json();
+      const existingEncounter = searchData.encounters?.[0];
+
+      if (existingEncounter) {
+        // Update encounter status to 'finished'
+        const encounterPatchResponse = await fetch(`/api/fhir/encounters/${existingEncounter.id}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json-patch+json' },
+          body: JSON.stringify([
+            { op: 'replace', path: '/status', value: 'finished' }
+          ]),
+        });
+
+        if (!encounterPatchResponse.ok) {
+          throw new Error(`Failed to complete encounter: ${encounterPatchResponse.status}`);
+        }
+
+        const updatedEncounter = await encounterPatchResponse.json();
+
+        // Update appointment status to 'fulfilled'
+        const appointmentPatchResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json-patch+json' },
+          body: JSON.stringify([
+            { op: 'replace', path: '/status', value: 'fulfilled' }
+          ]),
+        });
+
+        if (!appointmentPatchResponse.ok) {
+          throw new Error(`Failed to mark appointment as fulfilled: ${appointmentPatchResponse.status}`);
+        }
+
+        // Update local state
+        setEncounters(prev => ({
+          ...prev,
+          [appointmentId]: updatedEncounter
+        }));
+
+        setAppointments(prev => prev.map(apt =>
+          apt.id === appointmentId ? { ...apt, status: 'fulfilled' } : apt
+        ));
+
+        console.log(`✅ Completed encounter ${existingEncounter.id} and marked appointment ${appointmentId} as fulfilled`);
+      } else {
+        console.warn(`No encounter found for appointment ${appointmentId}`);
+        alert('No encounter found for this appointment.');
+      }
+    } catch (error) {
+      console.error('Error completing encounter:', error);
+      alert(`Failed to complete encounter: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setProcessingAppointments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(appointmentId);
+        return newSet;
+      });
+    }
+  };
+
+  // Render appointments content - shows appointments for this practitioner only
+  const renderAppointmentsContent = () => {
+    const formatDateTime = (isoString: string) => {
+      return new Date(isoString).toLocaleString(navigator.language, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    };
+
+    const formatDuration = (start: string, end: string) => {
+      const startTime = new Date(start);
+      const endTime = new Date(end);
+      const diffMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
+      return `${diffMinutes}min`;
+    };
+
+    const getStatusVariant = (status: string) => {
+      switch (status) {
+        case 'booked':
+        case 'fulfilled':
+          return 'success';
+        case 'pending':
+        case 'proposed':
+          return 'warning';
+        case 'cancelled':
+        case 'noshow':
+        case 'entered-in-error':
+          return 'danger';
+        case 'arrived':
+        case 'checked-in':
+          return 'info';
+        default:
+          return 'info';
+      }
+    };
+
+    const getStatusLabel = (status: string) => {
+      switch (status) {
+        case 'booked': return 'Confirmed';
+        case 'pending': return 'Pending';
+        case 'proposed': return 'Proposed';
+        case 'fulfilled': return 'Completed';
+        case 'cancelled': return 'Cancelled';
+        case 'noshow': return 'No Show';
+        case 'arrived': return 'Arrived';
+        case 'checked-in': return 'Checked In';
+        case 'waitlist': return 'Waitlist';
+        case 'entered-in-error': return 'Error';
+        default: return status;
+      }
+    };
+
+    const getPatientName = (appointment: Appointment) => {
+      const patientParticipant = appointment.participant?.find(p =>
+        p.actor?.reference?.startsWith('Patient/')
+      );
+      return patientParticipant?.actor?.display || 'Unknown Patient';
+    };
 
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <h2 className="text-lg font-semibold">Slot Calendar</h2>
-            {schedules.length > 0 && (
-              <div className="flex items-center space-x-2">
-                <Label className="text-sm font-medium">Filter by Schedule:</Label>
-                <Select
-                  value={selectedScheduleFilter}
-                  onValueChange={(value) => setSelectedScheduleFilter(value)}
-                >
-                  <SelectTrigger className="w-[300px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Schedules ({slots.length} slots)</SelectItem>
-                    {schedules.map((schedule) => {
-                      const scheduleSlots = slots.filter(slot => slot.schedule?.reference === `Schedule/${schedule.id}`);
-                      return (
-                        <SelectItem key={schedule.id} value={schedule.id || ''}>
-                          Schedule {schedule.id} ({scheduleSlots.length} slots)
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-          <Button
-            onClick={() => setShowGenerateSlots(true)}
-            variant="primary"
-          >
-            Generate Slots
-          </Button>
+          <h2 className="text-lg md:text-xl font-semibold">
+            Appointments for this Practitioner
+          </h2>
         </div>
 
-        {loadingSlots ? (
-          <SlotCalendarSkeleton />
-        ) : slotsError ? (
+        {loadingAppointments ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <Card key={i} className="animate-pulse">
+                <div className="p-4 space-y-3">
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-4 w-64" />
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : appointmentsError ? (
           <Card>
             <div className="p-6 text-center">
-              <div className="text-red-600 mb-2">Failed to load slots</div>
-              <div className="text-sm text-gray-500">{slotsError}</div>
+              <div className="text-red-600 mb-2">Failed to load appointments</div>
+              <div className="text-sm text-gray-500">{appointmentsError}</div>
+            </div>
+          </Card>
+        ) : appointments.length === 0 ? (
+          <Card>
+            <div className="p-8 text-center text-gray-500">
+              No appointments found for this practitioner.
             </div>
           </Card>
         ) : (
-          <SlotCalendar
-            slots={filteredSlots}
-            onSlotUpdate={() => {
-              // Refresh slots when a slot is updated/deleted
-              setSlotsLoaded(false);
-              if (activeTab === 'slots') {
-                // Will trigger re-fetch via useEffect
-                setSlotsLoaded(false);
-              }
-            }}
-          />
+          <div className="space-y-3">
+            {appointments.map((appointment) => (
+              <Card key={appointment.id} className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => {
+                  // TODO: Navigate to appointment detail page
+                  console.log('Navigate to appointment:', appointment.id);
+                }}
+              >
+                <div className="p-4">
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <Badge variant={getStatusVariant(appointment.status)}>
+                          {getStatusLabel(appointment.status)}
+                        </Badge>
+                        {appointment.id && encounters[appointment.id] && (
+                          <Badge
+                            variant={
+                              encounters[appointment.id].status === 'in-progress' ? 'info' :
+                              encounters[appointment.id].status === 'finished' ? 'success' :
+                              'warning'
+                            }
+                          >
+                            Encounter: {encounters[appointment.id].status}
+                          </Badge>
+                        )}
+                        <span className="text-xs text-gray-500">
+                          ID: {appointment.id}
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="font-medium text-base">
+                          {getPatientName(appointment)}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {appointment.start && formatDateTime(appointment.start)}
+                          {appointment.start && appointment.end && (
+                            <span className="ml-2">
+                              ({formatDuration(appointment.start, appointment.end)})
+                            </span>
+                          )}
+                        </div>
+                        {appointment.description && (
+                          <div className="text-sm text-gray-500 mt-1">
+                            {appointment.description}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {/* Pending appointments: Approve or Reject */}
+                      {appointment.status === 'pending' && (
+                        <>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (appointment.id) {
+                                handleApproveAppointment(appointment.id);
+                              }
+                            }}
+                            disabled={processingAppointments.has(appointment.id || '')}
+                          >
+                            {processingAppointments.has(appointment.id || '') ? (
+                              <LoadingSpinner size="sm" />
+                            ) : (
+                              'Approve'
+                            )}
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (appointment.id) {
+                                handleRejectAppointment(appointment.id);
+                              }
+                            }}
+                            disabled={processingAppointments.has(appointment.id || '')}
+                          >
+                            {processingAppointments.has(appointment.id || '') ? (
+                              <LoadingSpinner size="sm" />
+                            ) : (
+                              'Reject'
+                            )}
+                          </Button>
+                        </>
+                      )}
+
+                      {/* Booked appointments: Mark patient as arrived */}
+                      {appointment.status === 'booked' && !encounters[appointment.id || ''] && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (appointment.id) {
+                              handleMarkArrived(appointment.id);
+                            }
+                          }}
+                          disabled={processingAppointments.has(appointment.id || '')}
+                        >
+                          {processingAppointments.has(appointment.id || '') ? (
+                            <LoadingSpinner size="sm" />
+                          ) : (
+                            'Patient Arrived'
+                          )}
+                        </Button>
+                      )}
+
+                      {/* Arrived appointments: Start encounter */}
+                      {(appointment.status === 'arrived' || (appointment.status === 'booked' && encounters[appointment.id || '']?.status === 'planned')) && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (appointment.id) {
+                              handleStartEncounter(appointment.id);
+                            }
+                          }}
+                          disabled={processingAppointments.has(appointment.id || '')}
+                        >
+                          {processingAppointments.has(appointment.id || '') ? (
+                            <LoadingSpinner size="sm" />
+                          ) : (
+                            'Start Encounter'
+                          )}
+                        </Button>
+                      )}
+
+                      {/* Encounter in-progress: Complete encounter */}
+                      {appointment.id && encounters[appointment.id]?.status === 'in-progress' && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (appointment.id) {
+                              handleCompleteEncounter(appointment.id);
+                            }
+                          }}
+                          disabled={processingAppointments.has(appointment.id || '')}
+                        >
+                          {processingAppointments.has(appointment.id || '') ? (
+                            <LoadingSpinner size="sm" />
+                          ) : (
+                            'Complete Encounter'
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
         )}
       </div>
     );
@@ -904,9 +1702,10 @@ export default function PractitionerDetailClient({
     <>
       {/* Tab Content */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+        <TabsList className="grid w-full grid-cols-3 max-w-[600px]">
           <TabsTrigger value="schedules">Schedules</TabsTrigger>
           <TabsTrigger value="slots">Slots</TabsTrigger>
+          <TabsTrigger value="appointments">Appointments</TabsTrigger>
         </TabsList>
 
         <TabsContent value="schedules">
@@ -915,6 +1714,10 @@ export default function PractitionerDetailClient({
 
         <TabsContent value="slots">
           {renderSlotsContent()}
+        </TabsContent>
+
+        <TabsContent value="appointments">
+          {renderAppointmentsContent()}
         </TabsContent>
       </Tabs>
 

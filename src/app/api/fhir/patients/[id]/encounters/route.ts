@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromCookies, prepareToken } from '../../../utils/auth';
-import { getPatientEncounters } from '../../operations';
+import { getSessionFromCookies, prepareToken } from '@/app/api/fhir/utils/auth';
+import { getPatientEncounters } from '@/app/api/fhir/patients/operations';
 
 /**
  * GET /api/fhir/patients/[id]/encounters - Get patient encounters with related resources

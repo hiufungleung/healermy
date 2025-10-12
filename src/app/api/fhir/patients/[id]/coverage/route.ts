@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromCookies } from '../../../utils/auth';
-import { FHIRClient } from '../../../client';
-import { getPatientCoverage } from '../../../patients/operations';
+import { getSessionFromCookies } from '@/app/api/fhir/utils/auth';
+import { FHIRClient } from '@/app/api/fhir/client';
+import { getPatientCoverage } from '@/app/api/fhir/patients/operations';
 // Inline Coverage type to avoid import issues
 interface Coverage {
   resourceType: 'Coverage';

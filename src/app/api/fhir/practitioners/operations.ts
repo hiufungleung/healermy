@@ -1,5 +1,5 @@
-import { FHIRClient } from '../client';
-import type { Practitioner, Bundle } from '../../../../types/fhir';
+import { FHIRClient } from '@/app/api/fhir/client';
+import type { Practitioner, Bundle } from '@/types/fhir';
 
 /**
  * Search practitioners by various parameters

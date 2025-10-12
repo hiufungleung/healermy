@@ -296,7 +296,7 @@ export default function DashboardClient({
     waitTime: null
   };
 
-  // Calculate queue position for next appointment on the same day with same doctor
+  // Calculate queue position based on encounters for next appointment
   useEffect(() => {
     const calculateQueuePosition = async () => {
       if (!nextTodayAppointment || !nextTodayAppointment.start) {
@@ -321,37 +321,33 @@ export default function DashboardClient({
 
         // Get the date of MY appointment
         const appointmentDate = new Date(nextTodayAppointment.start);
-        const appointmentDateStr = appointmentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        const startOfDay = new Date(appointmentDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(appointmentDate);
+        endOfDay.setHours(23, 59, 59, 999);
 
-        // Fetch all appointments for this practitioner on the SAME date as my appointment
+        // Fetch all encounters for this practitioner on the same day
         const response = await fetch(
-          `/api/fhir/appointments?practitioner=${practitionerId}&date=${appointmentDateStr}&status=booked,pending,arrived,checked-in`,
+          `/api/fhir/encounters?practitioner=${practitionerId}&date=ge${startOfDay.toISOString()}&date=le${endOfDay.toISOString()}&_count=100`,
           {
             credentials: 'include'
           }
         );
 
         if (!response.ok) {
-          console.error('Failed to fetch practitioner appointments for queue calculation');
+          console.error('Failed to fetch encounters for queue calculation');
           setQueuePosition(null);
           return;
         }
 
         const data = await response.json();
-        const practitionerAppointments = data.appointments || [];
+        const encounters = data.encounters || [];
 
-        // Sort all appointments on that day by start time
-        const sortedAppointments = practitionerAppointments
-          .filter((apt: any) => apt.start)
-          .sort((a: any, b: any) => new Date(a.start).getTime() - new Date(b.start).getTime());
+        // Use the reusable queue calculation utility
+        const { calculateQueuePosition: calcQueue } = await import('@/lib/queueCalculation');
+        const queueData = calcQueue(nextTodayAppointment.start, encounters);
 
-        // Count how many appointments are BEFORE mine (same day, same doctor, earlier time)
-        const myAppointmentTime = new Date(nextTodayAppointment.start).getTime();
-        const appointmentsBeforeMe = sortedAppointments.filter(
-          (apt: any) => new Date(apt.start).getTime() < myAppointmentTime
-        );
-
-        setQueuePosition(appointmentsBeforeMe.length);
+        setQueuePosition(queueData.position);
       } catch (error) {
         console.error('Error calculating queue position:', error);
         setQueuePosition(null);

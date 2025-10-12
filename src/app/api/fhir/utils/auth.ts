@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
-import type { AuthSession, TokenData, SessionData } from '../../../../types/auth';
-import { decrypt } from '../../../../library/auth/encryption';
-import { SESSION_COOKIE_NAME, TOKEN_COOKIE_NAME } from '../../../../library/auth/config';
+import type { AuthSession, TokenData, SessionData } from '@/types/auth';
+import { decrypt } from '@/library/auth/encryption';
+import { SESSION_COOKIE_NAME, TOKEN_COOKIE_NAME } from '@/library/auth/config';
 
 /**
  * Extract and decrypt session from HTTP-only cookies

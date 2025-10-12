@@ -5,6 +5,7 @@ export interface SlotInterval {
   start: Date;
   end: Date;
   scheduleId: string;
+  practitionerId?: string; // Added to support cross-schedule overlap detection
 }
 
 export interface SlotCreationRequest {
@@ -58,11 +59,10 @@ function extractScheduleId(reference: string): string {
 
 /**
  * Check if two time intervals overlap
+ * NOTE: Changed to check practitioner-level overlaps (not schedule-level)
+ * A practitioner cannot have overlapping slots across ANY of their schedules
  */
 export function detectOverlap(newSlot: SlotInterval, existingSlot: SlotInterval): boolean {
-  // Same schedule and time overlap
-  if (newSlot.scheduleId !== existingSlot.scheduleId) return false;
-  
   // Check if intervals overlap: (start1 < end2) && (start2 < end1)
   return (newSlot.start < existingSlot.end) && (existingSlot.start < newSlot.end);
 }
@@ -75,9 +75,80 @@ export function hasAnyOverlap(newSlot: SlotInterval, existingSlots: SlotInterval
 }
 
 /**
+ * Fetch all schedules for a practitioner
+ */
+async function fetchPractitionerSchedules(
+  token: string,
+  fhirBaseUrl: string,
+  practitionerId: string
+): Promise<string[]> {
+  const params = new URLSearchParams();
+  params.append('actor', `Practitioner/${practitionerId}`);
+  params.append('_count', '100');
+
+  const response = await FHIRClient.fetchWithAuth(
+    `${fhirBaseUrl}/Schedule?${params.toString()}`,
+    token
+  );
+
+  const bundle = await response.json();
+  const schedules = bundle.entry?.map((entry: any) => entry.resource) || [];
+
+  return schedules.map((schedule: any) => schedule.id);
+}
+
+/**
+ * Extract practitioner ID from a schedule resource
+ */
+async function getPractitionerFromSchedule(
+  token: string,
+  fhirBaseUrl: string,
+  scheduleId: string
+): Promise<string | null> {
+  const response = await FHIRClient.fetchWithAuth(
+    `${fhirBaseUrl}/Schedule/${scheduleId}`,
+    token
+  );
+
+  const schedule = await response.json();
+  const practitionerActor = schedule.actor?.find((actor: any) =>
+    actor.reference?.startsWith('Practitioner/')
+  );
+
+  return practitionerActor ? practitionerActor.reference.replace('Practitioner/', '') : null;
+}
+
+/**
+ * Fetch all slots in a time range for ALL schedules of a practitioner
+ * This ensures overlaps are detected across all schedules, not just within one schedule
+ */
+export async function fetchSlotsInRangeForPractitioner(
+  token: string,
+  fhirBaseUrl: string,
+  startTime: Date,
+  endTime: Date,
+  scheduleId: string
+): Promise<SlotInterval[]> {
+  // Step 1: Get practitioner ID from the schedule
+  const practitionerId = await getPractitionerFromSchedule(token, fhirBaseUrl, scheduleId);
+
+  if (!practitionerId) {
+    console.warn(`No practitioner found for schedule ${scheduleId}, falling back to schedule-only check`);
+    return fetchSlotsForSchedules(token, fhirBaseUrl, startTime, endTime, [scheduleId]);
+  }
+
+  // Step 2: Get ALL schedules for this practitioner
+  const allScheduleIds = await fetchPractitionerSchedules(token, fhirBaseUrl, practitionerId);
+  console.log(`Found ${allScheduleIds.length} schedules for practitioner ${practitionerId}`);
+
+  // Step 3: Fetch all slots for ALL practitioner's schedules
+  return fetchSlotsForSchedules(token, fhirBaseUrl, startTime, endTime, allScheduleIds);
+}
+
+/**
  * Fetch all slots in a time range for specific schedules
  */
-export async function fetchSlotsInRange(
+async function fetchSlotsForSchedules(
   token: string,
   fhirBaseUrl: string,
   startTime: Date,
@@ -85,26 +156,26 @@ export async function fetchSlotsInRange(
   scheduleIds: string[]
 ): Promise<SlotInterval[]> {
   const params = new URLSearchParams();
-  
+
   // Add time range filters using FHIR date search parameters
   params.append('start', `ge${startTime.toISOString()}`);
   params.append('start', `lt${endTime.toISOString()}`);
-  
+
   // Add schedule filters - FHIR allows multiple values for the same parameter
   scheduleIds.forEach(id => {
     params.append('schedule', `Schedule/${id}`);
   });
-  
+
   params.append('_count', '1000'); // Large count to get all relevant slots
-  
+
   const response = await FHIRClient.fetchWithAuth(
-    `${fhirBaseUrl}/Slot?${params.toString()}`, 
+    `${fhirBaseUrl}/Slot?${params.toString()}`,
     token
   );
-  
+
   const bundle = await response.json();
   const slots = bundle.entry?.map((entry: any) => entry.resource) || [];
-  
+
   return slots.map((slot: any) => ({
     start: new Date(slot.start),
     end: new Date(slot.end),
@@ -125,6 +196,7 @@ function toSlotInterval(slot: SlotCreationRequest): SlotInterval {
 
 /**
  * Create multiple slots with overlap validation
+ * Checks for overlaps across ALL practitioner's schedules (not just within one schedule)
  */
 export async function createSlotsWithOverlapValidation(
   slotsToCreate: SlotCreationRequest[],
@@ -135,26 +207,26 @@ export async function createSlotsWithOverlapValidation(
     return { created: [], rejected: [] };
   }
 
-  // Step 1: Convert to intervals and determine time range and schedules
+  // Step 1: Convert to intervals and determine time range and first schedule
   const intervals = slotsToCreate.map(toSlotInterval);
-  
+
   const minStart = new Date(Math.min(...intervals.map(i => i.start.getTime())));
   const maxEnd = new Date(Math.max(...intervals.map(i => i.end.getTime())));
-  const scheduleIds = [...new Set(intervals.map(i => i.scheduleId))];
-  
-  console.log(`Checking ${slotsToCreate.length} slots for overlaps in range ${minStart.toISOString()} to ${maxEnd.toISOString()}`);
-  console.log(`Schedules involved: ${scheduleIds.join(', ')}`);
+  const firstScheduleId = intervals[0].scheduleId; // Use first schedule to get practitioner
 
-  // Step 2: Batch fetch existing slots in time range
-  const existingSlots = await fetchSlotsInRange(
-    token, 
-    fhirBaseUrl, 
-    minStart, 
-    maxEnd, 
-    scheduleIds
+  console.log(`Checking ${slotsToCreate.length} slots for overlaps in range ${minStart.toISOString()} to ${maxEnd.toISOString()}`);
+  console.log(`Using schedule ${firstScheduleId} to determine practitioner`);
+
+  // Step 2: Fetch existing slots for ALL practitioner's schedules in time range
+  const existingSlots = await fetchSlotsInRangeForPractitioner(
+    token,
+    fhirBaseUrl,
+    minStart,
+    maxEnd,
+    firstScheduleId
   );
-  
-  console.log(`Found ${existingSlots.length} existing slots in range`);
+
+  console.log(`Found ${existingSlots.length} existing slots across all practitioner schedules`);
 
   // Step 3: Validate each slot for overlaps
   const validSlots: SlotCreationRequest[] = [];
@@ -164,21 +236,22 @@ export async function createSlotsWithOverlapValidation(
     const slot = slotsToCreate[i];
     const interval = intervals[i];
     
-    // Check against existing slots
+    // Check against existing slots (across ALL practitioner schedules)
     if (hasAnyOverlap(interval, existingSlots)) {
       const overlappingSlot = existingSlots.find(existing => detectOverlap(interval, existing));
-      rejectedSlots.push({ 
-        slot, 
-        reason: `Overlaps with existing slot (${overlappingSlot?.start.toISOString()} - ${overlappingSlot?.end.toISOString()}) in schedule ${interval.scheduleId}` 
+      const sameSchedule = overlappingSlot?.scheduleId === interval.scheduleId;
+      rejectedSlots.push({
+        slot,
+        reason: `Practitioner has overlapping slot (${overlappingSlot?.start.toISOString()} - ${overlappingSlot?.end.toISOString()}) ${sameSchedule ? 'in same schedule' : `in schedule ${overlappingSlot?.scheduleId}`}`
       });
       continue;
     }
-    
+
     // Check against other slots being created (avoid creating overlapping slots in same batch)
     const otherNewSlots = intervals.slice(0, i); // Only check against previously validated slots
     if (hasAnyOverlap(interval, otherNewSlots)) {
       const overlappingSlot = otherNewSlots.find(existing => detectOverlap(interval, existing));
-      rejectedSlots.push({ 
+      rejectedSlots.push({
         slot, 
         reason: `Overlaps with another slot being created (${overlappingSlot?.start.toISOString()} - ${overlappingSlot?.end.toISOString()})` 
       });

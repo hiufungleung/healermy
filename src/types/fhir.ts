@@ -756,3 +756,214 @@ export interface ExplanationOfBenefit {
     };
   };
 }
+
+export interface Encounter {
+  resourceType: 'Encounter';
+  id?: string;
+  status: 'planned' | 'arrived' | 'triaged' | 'in-progress' | 'onleave' | 'finished' | 'cancelled' | 'entered-in-error' | 'unknown';
+  class: {
+    system?: string;
+    code?: string;
+    display?: string;
+  };
+  type?: Array<{
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  }>;
+  serviceType?: {
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  };
+  priority?: {
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  };
+  subject?: {
+    reference: string;
+    display?: string;
+  };
+  participant?: Array<{
+    type?: Array<{
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    }>;
+    period?: {
+      start?: string;
+      end?: string;
+    };
+    individual?: {
+      reference: string;
+      display?: string;
+    };
+  }>;
+  appointment?: Array<{
+    reference: string;
+    display?: string;
+  }>;
+  period?: {
+    start?: string;
+    end?: string;
+  };
+  length?: {
+    value?: number;
+    unit?: string;
+    system?: string;
+    code?: string;
+  };
+  reasonCode?: Array<{
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    text?: string;
+  }>;
+  diagnosis?: Array<{
+    condition?: {
+      reference: string;
+      display?: string;
+    };
+    use?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    };
+    rank?: number;
+  }>;
+  account?: Array<{
+    reference: string;
+    display?: string;
+  }>;
+  hospitalization?: {
+    preAdmissionIdentifier?: {
+      use?: string;
+      system?: string;
+      value?: string;
+    };
+    origin?: {
+      reference: string;
+      display?: string;
+    };
+    admitSource?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    };
+    reAdmission?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    };
+    dietPreference?: Array<{
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    }>;
+    specialCourtesy?: Array<{
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    }>;
+    specialArrangement?: Array<{
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    }>;
+    destination?: {
+      reference: string;
+      display?: string;
+    };
+    dischargeDisposition?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    };
+  };
+  location?: Array<{
+    location: {
+      reference: string;
+      display?: string;
+    };
+    status?: 'planned' | 'active' | 'reserved' | 'completed';
+    physicalType?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    };
+    period?: {
+      start?: string;
+      end?: string;
+    };
+  }>;
+  serviceProvider?: {
+    reference: string;
+    display?: string;
+  };
+  partOf?: {
+    reference: string;
+    display?: string;
+  };
+}
+
+// Placeholder types for missing FHIR resources
+export interface Organization {
+  resourceType: "Organization";
+  id?: string;
+  name?: string;
+  [key: string]: any;
+}
+
+export interface DiagnosticReport {
+  resourceType: "DiagnosticReport";
+  id?: string;
+  status: string;
+  [key: string]: any;
+}
+
+export interface ServiceRequest {
+  resourceType: "ServiceRequest";
+  id?: string;
+  status: string;
+  intent: string;
+  [key: string]: any;
+}

@@ -1,5 +1,5 @@
-import { FHIRClient } from '../client';
-import type { Patient, Condition, MedicationRequest, MedicationDispense, Observation, AllergyIntolerance, Procedure, FamilyMemberHistory, DiagnosticReport, ServiceRequest, Bundle, Encounter, ExplanationOfBenefit } from '../../../../types/fhir';
+import { FHIRClient } from '@/app/api/fhir/client';
+import type { Patient, Condition, MedicationRequest, MedicationDispense, Observation, AllergyIntolerance, Procedure, FamilyMemberHistory, DiagnosticReport, ServiceRequest, Bundle, Encounter, ExplanationOfBenefit } from '@/types/fhir';
 
 // Inline Coverage type to avoid import issues
 interface Coverage {

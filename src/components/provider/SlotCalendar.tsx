@@ -19,42 +19,58 @@ interface SlotCalendarProps {
 export function SlotCalendar({ slots, onSlotUpdate }: SlotCalendarProps) {
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [showSlotDetail, setShowSlotDetail] = useState(false);
-  // Convert FHIR slots to FullCalendar events
+
+  // Generate a color palette for schedules
+  const scheduleColors = useMemo(() => {
+    const scheduleIds = Array.from(new Set(slots.map(s => s.schedule?.reference).filter(Boolean)));
+    const colors: Record<string, { light: string; heavy: string }> = {};
+
+    // Predefined color palette with light/heavy variants
+    const palette = [
+      { light: '#86EFAC', heavy: '#16A34A' }, // Green
+      { light: '#93C5FD', heavy: '#2563EB' }, // Blue
+      { light: '#FCA5A5', heavy: '#DC2626' }, // Red
+      { light: '#FCD34D', heavy: '#CA8A04' }, // Yellow
+      { light: '#C4B5FD', heavy: '#7C3AED' }, // Purple
+      { light: '#FDA4AF', heavy: '#E11D48' }, // Pink
+      { light: '#67E8F9', heavy: '#0891B2' }, // Cyan
+      { light: '#FBB6CE', heavy: '#DB2777' }, // Rose
+      { light: '#A7F3D0', heavy: '#059669' }, // Emerald
+      { light: '#BFD3FA', heavy: '#1D4ED8' }, // Indigo
+    ];
+
+    scheduleIds.forEach((scheduleId, index) => {
+      colors[scheduleId as string] = palette[index % palette.length];
+    });
+
+    return colors;
+  }, [slots]);
+
+  // Convert FHIR slots to FullCalendar events with schedule-based colors
   const events: EventInput[] = useMemo(() => {
     return slots.map((slot) => {
-      // Map slot status to colors
-      const getColorByStatus = (status: string) => {
-        switch (status) {
-          case 'free':
-            return '#22C55E'; // Green
-          case 'busy':
-            return '#EF4444'; // Red
-          case 'busy-unavailable':
-            return '#6B7280'; // Gray
-          case 'busy-tentative':
-            return '#FFC107'; // Yellow
-          case 'entered-in-error':
-            return '#DC2626'; // Dark red
-          default:
-            return '#3B82F6'; // Blue
-        }
-      };
+      const scheduleRef = slot.schedule?.reference || '';
+      const colors = scheduleColors[scheduleRef] || { light: '#D1D5DB', heavy: '#6B7280' };
+
+      // Use light color for free slots, heavy color for busy slots
+      const isBusy = slot.status === 'busy' || slot.status?.startsWith('busy-');
+      const color = isBusy ? colors.heavy : colors.light;
 
       return {
         id: slot.id,
         title: slot.status === 'free' ? 'Available' : 'Booked',
         start: slot.start,
         end: slot.end,
-        backgroundColor: getColorByStatus(slot.status || 'free'),
-        borderColor: getColorByStatus(slot.status || 'free'),
+        backgroundColor: color,
+        borderColor: color,
         extendedProps: {
           status: slot.status,
           slotId: slot.id,
-          schedule: slot.schedule?.reference,
+          schedule: scheduleRef,
         },
       };
     });
-  }, [slots]);
+  }, [slots, scheduleColors]);
 
   // Event content customization
   const renderEventContent = (eventInfo: any) => {
@@ -71,49 +87,55 @@ export function SlotCalendar({ slots, onSlotUpdate }: SlotCalendarProps) {
     );
   };
 
+  // Get unique schedules for legend
+  const uniqueSchedules = useMemo(() => {
+    const scheduleIds = Array.from(new Set(slots.map(s => s.schedule?.reference).filter(Boolean)));
+    return scheduleIds.map(id => ({
+      id: id as string,
+      colors: scheduleColors[id as string] || { light: '#D1D5DB', heavy: '#6B7280' }
+    }));
+  }, [slots, scheduleColors]);
+
   return (
-    <Card className="p-4">
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 mb-4 pb-4 border-b">
-        <div className="flex items-center space-x-2">
-          <div className="w-4 h-4 rounded bg-green-500"></div>
-          <span className="text-sm">Available</span>
+    <Card className="p-3 md:p-4">
+      {/* Legend - Schedule Colors */}
+      <div className="mb-3 md:mb-4 pb-3 md:pb-4 border-b">
+        <div className="text-xs md:text-sm font-semibold mb-2">Schedule Colors:</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {uniqueSchedules.map(schedule => (
+            <div key={schedule.id} className="flex items-center space-x-2 text-xs">
+              <div className="flex space-x-1">
+                <div className="w-3 h-3 md:w-4 md:h-4 rounded" style={{ backgroundColor: schedule.colors.light }}></div>
+                <div className="w-3 h-3 md:w-4 md:h-4 rounded" style={{ backgroundColor: schedule.colors.heavy }}></div>
+              </div>
+              <span className="truncate" title={schedule.id}>{schedule.id.replace('Schedule/', '')}</span>
+            </div>
+          ))}
         </div>
-        <div className="flex items-center space-x-2">
-          <div className="w-4 h-4 rounded bg-red-500"></div>
-          <span className="text-sm">Booked</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <div className="w-4 h-4 rounded bg-yellow-500"></div>
-          <span className="text-sm">Tentative</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <div className="w-4 h-4 rounded bg-gray-500"></div>
-          <span className="text-sm">Unavailable</span>
-        </div>
+        <div className="text-xs text-gray-500 mt-2">Light = Available, Dark = Booked</div>
       </div>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <div className="text-sm text-gray-600">Total Slots</div>
-          <div className="text-2xl font-bold">{slots.length}</div>
+      {/* Summary Stats - Responsive sizing */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-3 md:mb-4">
+        <div className="bg-gray-50 p-2 md:p-3 rounded-lg">
+          <div className="text-xs md:text-sm text-gray-600">Total Slots</div>
+          <div className="text-lg md:text-2xl font-bold">{slots.length}</div>
         </div>
-        <div className="bg-green-50 p-3 rounded-lg">
-          <div className="text-sm text-green-600">Available</div>
-          <div className="text-2xl font-bold text-green-600">
+        <div className="bg-green-50 p-2 md:p-3 rounded-lg">
+          <div className="text-xs md:text-sm text-green-600">Available</div>
+          <div className="text-lg md:text-2xl font-bold text-green-600">
             {slots.filter((s) => s.status === 'free').length}
           </div>
         </div>
-        <div className="bg-red-50 p-3 rounded-lg">
-          <div className="text-sm text-red-600">Booked</div>
-          <div className="text-2xl font-bold text-red-600">
+        <div className="bg-red-50 p-2 md:p-3 rounded-lg">
+          <div className="text-xs md:text-sm text-red-600">Booked</div>
+          <div className="text-lg md:text-2xl font-bold text-red-600">
             {slots.filter((s) => s.status === 'busy').length}
           </div>
         </div>
-        <div className="bg-yellow-50 p-3 rounded-lg">
-          <div className="text-sm text-yellow-600">Tentative</div>
-          <div className="text-2xl font-bold text-yellow-600">
+        <div className="bg-yellow-50 p-2 md:p-3 rounded-lg">
+          <div className="text-xs md:text-sm text-yellow-600">Tentative</div>
+          <div className="text-lg md:text-2xl font-bold text-yellow-600">
             {slots.filter((s) => s.status === 'busy-tentative').length}
           </div>
         </div>

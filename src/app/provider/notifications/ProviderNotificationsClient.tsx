@@ -920,33 +920,33 @@ export default function ProviderNotificationsClient() {
         )}
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+      {/* Summary Cards - 2x2 grid on mobile, 4 columns on desktop */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-6">
         <Card padding="sm">
-          <div className="text-center py-2">
-            <div className="text-xl sm:text-2xl font-bold text-primary">{unreadCount}</div>
-            <div className="text-xs sm:text-sm text-text-secondary">Unread</div>
+          <div className="text-center py-1 md:py-2">
+            <div className="text-lg md:text-xl font-bold text-primary">{unreadCount}</div>
+            <div className="text-xs text-text-secondary">Unread</div>
           </div>
         </Card>
 
         <Card padding="sm">
-          <div className="text-center py-2">
-            <div className="text-xl sm:text-2xl font-bold text-red-500">{urgentCount}</div>
-            <div className="text-xs sm:text-sm text-text-secondary">Urgent</div>
+          <div className="text-center py-1 md:py-2">
+            <div className="text-lg md:text-xl font-bold text-red-500">{urgentCount}</div>
+            <div className="text-xs text-text-secondary">Urgent</div>
           </div>
         </Card>
 
         <Card padding="sm">
-          <div className="text-center py-2">
-            <div className="text-xl sm:text-2xl font-bold text-orange-500">{actionRequiredCount}</div>
-            <div className="text-xs sm:text-sm text-text-secondary">Action Required</div>
+          <div className="text-center py-1 md:py-2">
+            <div className="text-lg md:text-xl font-bold text-orange-500">{actionRequiredCount}</div>
+            <div className="text-xs text-text-secondary">Action Required</div>
           </div>
         </Card>
 
         <Card padding="sm">
-          <div className="text-center py-2">
-            <div className="text-xl sm:text-2xl font-bold text-text-primary">{totalCount}</div>
-            <div className="text-xs sm:text-sm text-text-secondary">Total</div>
+          <div className="text-center py-1 md:py-2">
+            <div className="text-lg md:text-xl font-bold text-text-primary">{totalCount}</div>
+            <div className="text-xs text-text-secondary">Total</div>
           </div>
         </Card>
       </div>

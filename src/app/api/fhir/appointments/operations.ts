@@ -1,6 +1,6 @@
-import { FHIRClient } from '../client';
-import { manageSlotStatusForAppointment } from '../slots/operations';
-import type { Appointment, Bundle } from '../../../../types/fhir';
+import { FHIRClient } from '@/app/api/fhir/client';
+import { manageSlotStatusForAppointment } from '@/app/api/fhir/slots/operations';
+import type { Appointment, Bundle } from '@/types/fhir';
 
 /**
  * Search appointments by various parameters

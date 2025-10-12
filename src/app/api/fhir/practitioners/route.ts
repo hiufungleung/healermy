@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromCookies, validateRole, prepareToken } from '../utils/auth';
-import { validatePractitionerData } from '../utils/validation';
-import { searchPractitioners, createPractitioner } from './operations';
+import { getSessionFromCookies, validateRole, prepareToken } from '@/app/api/fhir/utils/auth';
+import { validatePractitionerData } from '@/app/api/fhir/utils/validation';
+import { searchPractitioners, createPractitioner } from '@/app/api/fhir/practitioners/operations';
 
 /**
  * GET /api/fhir/practitioners - Search practitioners

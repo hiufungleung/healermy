@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromCookies, prepareToken } from '../utils/auth';
+import { getSessionFromCookies, prepareToken } from '@/app/api/fhir/utils/auth';
 import {
   searchCommunications,
   createCommunication,
   createManualMessage,
   getUnreadCommunicationsCount,
   isCommunicationRead
-} from './operations';
-import type { Communication } from '../../../../types/fhir';
+} from '@/app/api/fhir/communications/operations';
+import type { Communication } from '@/types/fhir';
 
 /**
  * GET /api/fhir/communications - Search communications

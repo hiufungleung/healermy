@@ -6,8 +6,10 @@ import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { AppointmentSkeleton } from '@/components/common/LoadingSpinner';
 import { formatDateForDisplay } from '@/library/timezone';
+import { calculateQueuePosition, formatWaitTime, getQueueStatusMessage } from '@/lib/queueCalculation';
 import type { AuthSession } from '@/types/auth';
 import type { AppointmentWithPractitionerDetails } from '@/library/appointmentDetailInfo';
+import type { Encounter } from '@/types/fhir';
 
 interface AppointmentsClientProps {
   session: AuthSession;
@@ -15,16 +17,24 @@ interface AppointmentsClientProps {
 
 type FilterStatus = 'all' | 'pending' | 'booked' | 'completed' | 'cancelled';
 
+interface QueueInfo {
+  position: number;
+  encountersAhead: number;
+  estimatedWaitMinutes: number;
+}
+
 export default function AppointmentsClient({ session }: AppointmentsClientProps) {
   const router = useRouter();
   const [appointments, setAppointments] = useState<AppointmentWithPractitionerDetails[]>([]);
+  const [encounters, setEncounters] = useState<Record<string, Encounter[]>>({});
+  const [queueInfo, setQueueInfo] = useState<Record<string, QueueInfo>>({});
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [cancellingAppointments, setCancellingAppointments] = useState<Set<string>>(new Set());
   const [reschedulingAppointments, setReschedulingAppointments] = useState<Set<string>>(new Set());
 
-  // Fetch appointments
+  // Fetch appointments and encounters
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
@@ -39,6 +49,15 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
           const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');
           const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
           setAppointments(enhancedAppointments);
+
+          // Fetch encounters for queue calculation (only for booked/arrived appointments)
+          const bookedAppointments = enhancedAppointments.filter(apt =>
+            apt.status === 'booked' || apt.status === 'arrived'
+          );
+
+          if (bookedAppointments.length > 0) {
+            await fetchEncountersAndCalculateQueue(bookedAppointments);
+          }
         } else {
           console.error('Failed to fetch appointments:', response.status, response.statusText);
           setAppointments([]);
@@ -53,6 +72,54 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
 
     fetchAppointments();
   }, [session.patient]);
+
+  // Fetch encounters and calculate queue position
+  const fetchEncountersAndCalculateQueue = async (bookedAppointments: AppointmentWithPractitionerDetails[]) => {
+    const encountersMap: Record<string, Encounter[]> = {};
+    const queueMap: Record<string, QueueInfo> = {};
+
+    for (const appointment of bookedAppointments) {
+      if (!appointment.id || !appointment.start) continue;
+
+      try {
+        // Extract practitioner ID from appointment
+        const practitionerRef = appointment.participant?.find(p =>
+          p.actor?.reference?.startsWith('Practitioner/')
+        )?.actor?.reference;
+
+        if (!practitionerRef) continue;
+
+        const practitionerId = practitionerRef.replace('Practitioner/', '');
+
+        // Fetch all encounters for this practitioner on the same day
+        const appointmentDate = new Date(appointment.start);
+        const startOfDay = new Date(appointmentDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(appointmentDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const encountersResponse = await fetch(
+          `/api/fhir/encounters?practitioner=${practitionerId}&date=ge${startOfDay.toISOString()}&date=le${endOfDay.toISOString()}&_count=100`,
+          { credentials: 'include' }
+        );
+
+        if (encountersResponse.ok) {
+          const encountersData = await encountersResponse.json();
+          const practitionerEncounters = encountersData.encounters || [];
+          encountersMap[appointment.id] = practitionerEncounters;
+
+          // Calculate queue position
+          const queueData = calculateQueuePosition(appointment.start, practitionerEncounters);
+          queueMap[appointment.id] = queueData;
+        }
+      } catch (error) {
+        console.error(`Error fetching encounters for appointment ${appointment.id}:`, error);
+      }
+    }
+
+    setEncounters(encountersMap);
+    setQueueInfo(queueMap);
+  };
 
   // Filter and search appointments
   const filteredAppointments = (Array.isArray(appointments) ? appointments : []).filter((appointment) => {
@@ -355,6 +422,37 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
                         </svg>
                         <span className="text-sm text-gray-600 leading-tight">{location}</span>
                       </div>
+
+                      {/* Queue Information for booked/arrived appointments */}
+                      {appointment.id && queueInfo[appointment.id] && (appointmentStatus === 'booked' || appointmentStatus === 'arrived') && (
+                        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-start space-x-2">
+                            <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-blue-900 mb-1">
+                                {getQueueStatusMessage(queueInfo[appointment.id].position)}
+                              </p>
+                              {queueInfo[appointment.id].encountersAhead > 0 && (
+                                <>
+                                  <p className="text-xs text-blue-700">
+                                    {queueInfo[appointment.id].encountersAhead} {queueInfo[appointment.id].encountersAhead === 1 ? 'patient' : 'patients'} ahead of you
+                                  </p>
+                                  <p className="text-xs text-blue-700 mt-1">
+                                    Estimated wait: <span className="font-medium">{formatWaitTime(queueInfo[appointment.id].estimatedWaitMinutes)}</span>
+                                  </p>
+                                </>
+                              )}
+                              {queueInfo[appointment.id].encountersAhead === 0 && (
+                                <p className="text-xs text-blue-700">
+                                  Please proceed to check-in
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Actions */}

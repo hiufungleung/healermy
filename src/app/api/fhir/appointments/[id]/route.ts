@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromCookies, validateRole, prepareToken } from '../../utils/auth';
-import { updateAppointment } from '../operations';
-import { createStatusUpdateMessage } from '../../communications/operations';
-import { FHIRClient } from '../../client';
-import { manageSlotStatusForAppointment } from '../../slots/operations';
-import type { Appointment } from '../../../../../types/fhir';
+import { getSessionFromCookies, validateRole, prepareToken } from '@/app/api/fhir/utils/auth';
+import { updateAppointment } from '@/app/api/fhir/appointments/operations';
+import { createStatusUpdateMessage } from '@/app/api/fhir/communications/operations';
+import { FHIRClient } from '@/app/api/fhir/client';
+import { manageSlotStatusForAppointment } from '@/app/api/fhir/slots/operations';
+import type { Appointment } from '@/types/fhir';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -267,7 +267,102 @@ export async function PATCH(
         // Don't fail the appointment update if messaging fails
       }
     }
-    
+
+    // Auto-create encounter when appointment is confirmed (status changed to 'booked')
+    if (currentAppointment) {
+      try {
+        const statusPatch = patchOperations.find((op) => op.path === '/status');
+
+        if (statusPatch && statusPatch.value === 'booked' && oldStatus !== 'booked') {
+          // Check if encounter already exists for this appointment
+          const encounterSearchResponse = await FHIRClient.fetchWithAuth(
+            `${session.fhirBaseUrl}/Encounter?appointment=Appointment/${id}&_count=1`,
+            token
+          );
+
+          let encounterExists = false;
+          if (encounterSearchResponse.ok) {
+            const encounterBundle = await encounterSearchResponse.json();
+            encounterExists = (encounterBundle.entry?.length || 0) > 0;
+          }
+
+          if (!encounterExists) {
+            console.log(`Auto-creating encounter for appointment ${id} (status: ${oldStatus} → booked)`);
+
+            const patientParticipant = currentAppointment.participant?.find((p) =>
+              p.actor?.reference?.startsWith('Patient/')
+            );
+            const practitionerParticipant = currentAppointment.participant?.find((p) =>
+              p.actor?.reference?.startsWith('Practitioner/')
+            );
+
+            if (patientParticipant && practitionerParticipant) {
+              const encounterData = {
+                resourceType: 'Encounter',
+                status: 'planned',
+                class: {
+                  system: 'http://terminology.hl7.org/CodeSystem/v3-ActCode',
+                  code: 'AMB',
+                  display: 'ambulatory'
+                },
+                subject: {
+                  reference: patientParticipant.actor?.reference,
+                  display: patientParticipant.actor?.display
+                },
+                participant: [
+                  {
+                    type: [{
+                      coding: [{
+                        system: 'http://terminology.hl7.org/CodeSystem/v3-ParticipationType',
+                        code: 'PPRF',
+                        display: 'primary performer'
+                      }]
+                    }],
+                    individual: {
+                      reference: practitionerParticipant.actor?.reference,
+                      display: practitionerParticipant.actor?.display
+                    }
+                  }
+                ],
+                appointment: [{
+                  reference: `Appointment/${id}`,
+                  display: `Appointment ${id}`
+                }],
+                period: {
+                  start: currentAppointment.start,
+                  end: currentAppointment.end
+                },
+                reasonCode: currentAppointment.reasonCode
+              };
+
+              const encounterResponse = await FHIRClient.fetchWithAuth(
+                `${session.fhirBaseUrl}/Encounter`,
+                token,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/fhir+json' },
+                  body: JSON.stringify(encounterData)
+                }
+              );
+
+              if (encounterResponse.ok) {
+                const createdEncounter = await encounterResponse.json();
+                console.log(`✅ Auto-created encounter ${createdEncounter.id} for appointment ${id}`);
+              } else {
+                const errorText = await encounterResponse.text();
+                console.warn('Failed to auto-create encounter:', errorText);
+              }
+            }
+          } else {
+            console.log(`Encounter already exists for appointment ${id}, skipping auto-creation`);
+          }
+        }
+      } catch (encounterError) {
+        console.warn('Failed to auto-create encounter:', encounterError);
+        // Don't fail the appointment update if encounter creation fails
+      }
+    }
+
     return NextResponse.json(result);
   } catch (error) {
     console.error(`Error in PATCH /api/fhir/appointments/${id}:`, error);

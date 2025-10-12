@@ -1,5 +1,5 @@
-import { FHIRClient } from '../client';
-import type { Communication, Bundle } from '../../../../types/fhir';
+import { FHIRClient } from '@/app/api/fhir/client';
+import type { Communication, Bundle } from '@/types/fhir';
 
 /**
  * Search communications by various parameters
