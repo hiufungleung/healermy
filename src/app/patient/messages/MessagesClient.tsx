@@ -25,7 +25,7 @@ interface Communication {
 }
 
 interface MessagesClientProps {
-  session: { patient: string; accessToken: string; fhirBaseUrl: string; [key: string]: any };
+  session: { patient?: string; accessToken: string; fhirBaseUrl: string; [key: string]: any };
 }
 
 export default function MessagesClient({
@@ -42,6 +42,12 @@ export default function MessagesClient({
   // Fetch patient data and communications on client-side
   useEffect(() => {
     async function fetchData() {
+      if (!session.patient) {
+        console.error('No patient ID in session');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
 

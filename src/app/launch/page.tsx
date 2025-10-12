@@ -52,21 +52,26 @@ function LaunchContent() {
       // Role can come from: URL param (old bookmarks), sessionStorage (after OAuth redirect)
       const storedRole = sessionStorage.getItem('auth_role') as 'patient' | 'provider' | null;
 
+      let currentRole: 'patient' | 'provider';
       if (!selectedRole) {
         // Check if role was already selected (stored from previous selection)
         if (storedRole) {
           console.log('🔐 Using stored role from sessionStorage:', storedRole);
           setSelectedRole(storedRole);
+          currentRole = storedRole;
         } else if (requestedRole) {
           // Support old URL format with role parameter
           console.log('🔐 Using role from URL parameter:', requestedRole);
           setSelectedRole(requestedRole);
+          currentRole = requestedRole;
         } else {
           // No role selected - show selection screen
           console.log('🔐 No role selected, showing role selection screen');
           setShowRoleSelection(true);
           return;
         }
+      } else {
+        currentRole = selectedRole;
       }
 
       // Discover SMART endpoints from the provided ISS
@@ -92,7 +97,7 @@ function LaunchContent() {
       }
       
       // Get auth config from server-side API using selected role
-      const configResponse = await fetch(`/api/auth/config?iss=${encodeURIComponent(iss)}&role=${selectedRole}`);
+      const configResponse = await fetch(`/api/auth/config?iss=${encodeURIComponent(iss)}&role=${currentRole}`);
       if (!configResponse.ok) {
         const errorData = await configResponse.json().catch(() => ({ error: 'Unknown error' }));
         setError(`Failed to get auth configuration: ${errorData.error || 'Unknown error'}`);
@@ -100,7 +105,7 @@ function LaunchContent() {
       }
 
       const config = await configResponse.json();
-      console.log(`Smart config for role ${selectedRole}:`, config);
+      console.log(`Smart config for role ${currentRole}:`, config);
       if (!config) {
         setError('Invalid auth configuration received.');
         return;
@@ -126,8 +131,10 @@ function LaunchContent() {
         
         // Store launch context for callback including selected role
         sessionStorage.setItem('auth_iss', iss);
-        sessionStorage.setItem('auth_launch', launchToken);
-        sessionStorage.setItem('auth_role', selectedRole);
+        if (launchToken) {
+          sessionStorage.setItem('auth_launch', launchToken);
+        }
+        sessionStorage.setItem('auth_role', currentRole);
         
         console.log('🚀 Starting SMART authorization with:', {
           clientId: config.clientId,

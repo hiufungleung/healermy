@@ -3,6 +3,11 @@ import { getSessionFromCookies } from '@/app/api/fhir/utils/auth';
 import { FHIRClient } from '@/app/api/fhir/client';
 import { getPatientCoverage } from '@/app/api/fhir/patients/operations';
 // Inline Coverage type to avoid import issues
+
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
 interface Coverage {
   resourceType: 'Coverage';
   id: string;
@@ -18,12 +23,6 @@ interface Coverage {
   }>;
   // Add other properties as needed
   [key: string]: any;
-}
-
-interface RouteContext {
-  params: {
-    id: string;
-  };
 }
 
 export async function GET(

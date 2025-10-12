@@ -2,6 +2,18 @@ export interface Patient {
   resourceType: 'Patient';
   id: string;
   active?: boolean;
+  identifier?: Array<{
+    system?: string;
+    value?: string;
+    type?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    };
+  }>;
   name?: Array<{
     given?: string[];
     family?: string;
@@ -27,6 +39,10 @@ export interface Practitioner {
   id: string;
   active?: boolean;
   gender?: string;
+  meta?: {
+    lastUpdated?: string;
+    versionId?: string;
+  };
   identifier?: Array<{
     use?: string;
     type?: {
@@ -97,6 +113,14 @@ export interface Slot {
   status: 'busy' | 'free' | 'busy-unavailable' | 'busy-tentative' | 'entered-in-error';
   start: string;
   end: string;
+  serviceType?: Array<{
+    text?: string;
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+  }>;
 }
 
 export interface Appointment {

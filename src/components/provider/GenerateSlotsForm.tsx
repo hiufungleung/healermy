@@ -167,7 +167,7 @@ export function GenerateSlotsForm({
 
     // Allow today if the schedule is still active (end date is today or later)
     // Users can select today and the slot generation will handle filtering past times
-    const minDate = scheduleConstraints.minDate <= today ? today : scheduleConstraints.minDate;
+    const minDate = scheduleConstraints.minDate && scheduleConstraints.minDate <= today ? today : (scheduleConstraints.minDate || today);
 
     return {
       minDate,
@@ -261,7 +261,7 @@ export function GenerateSlotsForm({
     if (!formData.scheduleId) return;
 
     const selectedSchedule = schedules.find(s => s.id === formData.scheduleId);
-    if (!selectedSchedule?.planningHorizon) return;
+    if (!selectedSchedule?.planningHorizon?.start || !selectedSchedule.planningHorizon.end) return;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -609,8 +609,8 @@ export function GenerateSlotsForm({
                     startDate: date ? format(date, 'yyyy-MM-dd') : ''
                   }));
                 }}
-                minDate={getEffectiveDateConstraints().minDate ? new Date(getEffectiveDateConstraints().minDate) : undefined}
-                maxDate={getEffectiveDateConstraints().maxDate ? new Date(getEffectiveDateConstraints().maxDate) : undefined}
+                minDate={(() => { const c = getEffectiveDateConstraints(); return c.minDate ? new Date(c.minDate) : undefined; })()}
+                maxDate={(() => { const c = getEffectiveDateConstraints(); return c.maxDate ? new Date(c.maxDate) : undefined; })()}
                 disabled={!formData.scheduleId}
                 className={formData.scheduleId ? 'border-primary bg-primary/5' : ''}
               />
@@ -636,8 +636,8 @@ export function GenerateSlotsForm({
                     endDate: date ? format(date, 'yyyy-MM-dd') : ''
                   }));
                 }}
-                minDate={formData.startDate ? new Date(formData.startDate) : (getEffectiveDateConstraints().minDate ? new Date(getEffectiveDateConstraints().minDate) : undefined)}
-                maxDate={getEffectiveDateConstraints().maxDate ? new Date(getEffectiveDateConstraints().maxDate) : undefined}
+                minDate={formData.startDate ? new Date(formData.startDate) : (() => { const c = getEffectiveDateConstraints(); return c.minDate ? new Date(c.minDate) : undefined; })()}
+                maxDate={(() => { const c = getEffectiveDateConstraints(); return c.maxDate ? new Date(c.maxDate) : undefined; })()}
                 disabled={!formData.scheduleId}
                 className={formData.scheduleId ? 'border-primary bg-primary/5' : ''}
               />
@@ -722,7 +722,7 @@ export function GenerateSlotsForm({
             <div className="grid grid-cols-4 md:grid-cols-7 gap-4">
               {DAYS_OF_WEEK.map((day) => {
                 const isAllowed = isDayAllowedForSchedule(day.value);
-                const isDisabled = formData.scheduleId && !isAllowed;
+                const isDisabled = !!(formData.scheduleId && !isAllowed);
 
                 return (
                   <div key={day.value} className="flex items-center space-x-2">

@@ -7,9 +7,9 @@ import {
   deleteCommunication
 } from '../operations';
 
-interface RouteContext {
+type RouteContext = {
   params: Promise<{ id: string }>;
-}
+};
 
 /**
  * GET /api/fhir/communications/[id] - Get communication by ID

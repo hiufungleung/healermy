@@ -67,7 +67,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
     const details: CoverageDetails = {
       id: cov.id,
       status: cov.status,
-      kind: cov.kind,
+      kind: cov.kind || 'insurance',
       subscriberId: cov.subscriberId,
       network: cov.network,
       effectivePeriod: cov.period,
@@ -86,7 +86,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
     // Extract plan information from class
     if (cov.class) {
       for (const classItem of cov.class) {
-        const classType = classItem.type?.coding?.[0]?.code || classItem.type?.text;
+        const classType = classItem.type?.coding?.[0]?.code || (classItem.type as any)?.text;
 
         switch (classType?.toLowerCase()) {
           case 'group':
@@ -105,11 +105,12 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
     // Extract cost information
     if (cov.costToBeneficiary) {
       for (const cost of cov.costToBeneficiary) {
-        const costType = cost.type?.coding?.[0]?.code || cost.type?.text;
+        const costType = cost.type?.coding?.[0]?.code || (cost.type as any)?.text;
+        const costAny = cost as any;
         const amount = cost.valueMoney ?
           `$${cost.valueMoney.value} ${cost.valueMoney.currency || 'USD'}` :
-          cost.valueQuantity ?
-          `${cost.valueQuantity.value} ${cost.valueQuantity.unit || ''}` :
+          costAny.valueQuantity ?
+          `${costAny.valueQuantity.value} ${costAny.valueQuantity.unit || ''}` :
           undefined;
 
         switch (costType?.toLowerCase()) {
@@ -242,7 +243,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
     }
   };
 
-  const getKindIcon = (kind: string) => {
+  const getKindIcon = (kind?: string) => {
     switch (kind) {
       case 'insurance':
         return (

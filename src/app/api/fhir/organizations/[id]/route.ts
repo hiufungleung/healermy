@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromCookies, prepareToken } from '../../utils/auth';
 import { getOrganization } from '../operations';
 
-interface RouteContext {
+type RouteContext = {
   params: Promise<{ id: string }>;
-}
+};
 
 /**
  * GET /api/fhir/organizations/[id] - Get organization by ID

@@ -6,22 +6,24 @@ import { getSchedule, updateSchedule, deleteSchedule } from '../operations';
  * GET /api/fhir/schedules/[id] - Get schedule by ID
  */
 export async function GET(
-  request: NextRequest, 
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
+
   try {
     // Extract session from middleware headers
     const session = await getSessionFromCookies();
-    
+
     // Validate that user has provider role
     validateRole(session, 'provider');
-    
+
     const token = prepareToken(session.accessToken);
-    const result = await getSchedule(token, session.fhirBaseUrl, params.id);
+    const result = await getSchedule(token, session.fhirBaseUrl, id);
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error(`Error in GET /api/fhir/schedules/${params?.id}:`, error);
+    console.error(`Error in GET /api/fhir/schedules/${id}:`, error);
     
     if (error instanceof Error && error.message.includes('session')) {
       return NextResponse.json({ error: error.message }, { status: 401 });
@@ -45,18 +47,20 @@ export async function GET(
  * PUT /api/fhir/schedules/[id] - Update schedule by ID
  */
 export async function PUT(
-  request: NextRequest, 
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
+
   try {
     // Extract session from middleware headers
     const session = await getSessionFromCookies();
-    
+
     // Validate that user has provider role
     validateRole(session, 'provider');
-    
+
     const scheduleData = await request.json();
-    
+
     // Basic validation
     if (!scheduleData.resourceType || scheduleData.resourceType !== 'Schedule') {
       return NextResponse.json(
@@ -64,16 +68,16 @@ export async function PUT(
         { status: 400 }
       );
     }
-    
+
     // Ensure the ID in the data matches the URL parameter
-    scheduleData.id = params.id;
-    
+    scheduleData.id = id;
+
     const token = prepareToken(session.accessToken);
-    const result = await updateSchedule(token, session.fhirBaseUrl, params.id, scheduleData);
+    const result = await updateSchedule(token, session.fhirBaseUrl, id, scheduleData);
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error(`Error in PUT /api/fhir/schedules/${params?.id}:`, error);
+    console.error(`Error in PUT /api/fhir/schedules/${id}:`, error);
     
     if (error instanceof Error && error.message.includes('session')) {
       return NextResponse.json({ error: error.message }, { status: 401 });
@@ -97,22 +101,24 @@ export async function PUT(
  * DELETE /api/fhir/schedules/[id] - Delete schedule by ID
  */
 export async function DELETE(
-  request: NextRequest, 
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
+
   try {
     // Extract session from middleware headers
     const session = await getSessionFromCookies();
-    
+
     // Validate that user has provider role
     validateRole(session, 'provider');
-    
+
     const token = prepareToken(session.accessToken);
-    const result = await deleteSchedule(token, session.fhirBaseUrl, params.id);
+    const result = await deleteSchedule(token, session.fhirBaseUrl, id);
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error(`Error in DELETE /api/fhir/schedules/${params?.id}:`, error);
+    console.error(`Error in DELETE /api/fhir/schedules/${id}:`, error);
     
     if (error instanceof Error && error.message.includes('session')) {
       return NextResponse.json({ error: error.message }, { status: 401 });

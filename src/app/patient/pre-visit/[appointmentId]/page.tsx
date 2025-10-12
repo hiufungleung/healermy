@@ -33,17 +33,17 @@ export default function PreVisitSummary() {
     
     setLoading(true);
     try {
-      const [patientData, conditionsData, medicationsData, observationsData] = await Promise.all([
+      const [patientData, conditionsBundle, medicationsBundle, observationsBundle] = await Promise.all([
         getPatient(session.accessToken, session.fhirBaseUrl, session.patient),
         getPatientConditions(session.accessToken, session.fhirBaseUrl, session.patient),
         getPatientMedications(session.accessToken, session.fhirBaseUrl, session.patient),
         getPatientObservations(session.accessToken, session.fhirBaseUrl, session.patient)
       ]);
-      
+
       setPatient(patientData);
-      setConditions(conditionsData);
-      setMedications(medicationsData);
-      setObservations(observationsData);
+      setConditions(conditionsBundle.entry?.map(e => e.resource).filter((r): r is Condition => !!r) || []);
+      setMedications(medicationsBundle.entry?.map(e => e.resource).filter((r): r is MedicationRequest => !!r) || []);
+      setObservations(observationsBundle.entry?.map(e => e.resource).filter((r): r is Observation => !!r) || []);
     } catch (error) {
       console.error('Error fetching patient data:', error);
       // Use mock data for demo
@@ -105,6 +105,7 @@ export default function PreVisitSummary() {
       resourceType: 'MedicationRequest',
       id: '1',
       status: 'active',
+      intent: 'order',
       medicationCodeableConcept: { text: 'Levothyroxine 50mcg' },
       dosageInstruction: [{ text: 'Once daily in the morning' }],
       authoredOn: '2023-01-15'
@@ -113,6 +114,7 @@ export default function PreVisitSummary() {
       resourceType: 'MedicationRequest',
       id: '2',
       status: 'active',
+      intent: 'order',
       medicationCodeableConcept: { text: 'Vitamin D3 1000IU' },
       dosageInstruction: [{ text: 'Once daily with food' }],
       authoredOn: '2024-02-10'
@@ -121,6 +123,7 @@ export default function PreVisitSummary() {
       resourceType: 'MedicationRequest',
       id: '3',
       status: 'active',
+      intent: 'order',
       medicationCodeableConcept: { text: 'Iron supplement' },
       dosageInstruction: [{ text: 'Twice daily with meals' }],
       authoredOn: '2024-06-20'

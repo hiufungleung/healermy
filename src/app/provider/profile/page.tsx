@@ -60,11 +60,11 @@ export default function ClinicProfile() {
   };
 
   const getEmail = () => {
-    return organization?.telecom?.find(t => t.system === 'email')?.value || 'Not provided';
+    return organization?.telecom?.find((t: any) => t.system === 'email')?.value || 'Not provided';
   };
 
   const getPhone = () => {
-    return organization?.telecom?.find(t => t.system === 'phone')?.value || 'Not provided';
+    return organization?.telecom?.find((t: any) => t.system === 'phone')?.value || 'Not provided';
   };
 
   const getAddress = () => {
@@ -178,7 +178,7 @@ export default function ClinicProfile() {
                         Organization Type
                       </label>
                       <div className="flex flex-wrap gap-2">
-                        {organization.type.map((type, idx) => (
+                        {organization.type.map((type: any, idx: number) => (
                           <Badge key={idx} variant="info" size="sm">
                             {type.text || type.coding?.[0]?.display || 'Healthcare Provider'}
                           </Badge>
@@ -226,12 +226,12 @@ export default function ClinicProfile() {
                       <label className="block text-sm font-medium text-text-secondary mb-1">
                         Address
                       </label>
-                      {organization.address.map((addr, idx) => (
+                      {organization.address.map((addr: any, idx: number) => (
                         <div key={idx} className="bg-gray-50 p-4 rounded-lg mb-2">
                           {addr.text && <p className="text-text-primary">{addr.text}</p>}
                           {!addr.text && (
                             <>
-                              {addr.line && addr.line.map((line, lineIdx) => (
+                              {addr.line && addr.line.map((line: string, lineIdx: number) => (
                                 <p key={lineIdx} className="text-text-primary">{line}</p>
                               ))}
                               <p className="text-text-primary">
@@ -252,7 +252,7 @@ export default function ClinicProfile() {
                         Contact Persons
                       </label>
                       <div className="space-y-2">
-                        {organization.contact.map((contact, idx) => (
+                        {organization.contact.map((contact: any, idx: number) => (
                           <div key={idx} className="bg-gray-50 p-3 rounded-lg">
                             {contact.name?.text && (
                               <p className="font-medium text-text-primary">{contact.name.text}</p>
@@ -264,7 +264,7 @@ export default function ClinicProfile() {
                             )}
                             {contact.telecom && contact.telecom.length > 0 && (
                               <p className="text-sm text-text-primary mt-1">
-                                {contact.telecom.map(t => t.value).filter(Boolean).join(', ')}
+                                {contact.telecom.map((t: any) => t.value).filter(Boolean).join(', ')}
                               </p>
                             )}
                           </div>

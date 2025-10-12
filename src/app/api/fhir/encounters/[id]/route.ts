@@ -10,7 +10,7 @@ type RouteContext = {
  * GET /api/fhir/encounters/[id]
  * Get a specific encounter by ID
  */
-export async function GET(request: NextRequest, context: RouteContext) async {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
 
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest, context: RouteContext) async {
  * Body: Array of JSON Patch operations
  * Example: [{ "op": "replace", "path": "/status", "value": "in-progress" }]
  */
-export async function PATCH(request: NextRequest, context: RouteContext) async {
+export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
 

@@ -1,4 +1,4 @@
-import type { Appointment } from '@/types/fhir';
+import type { Appointment, Patient, Practitioner } from '@/types/fhir';
 
 /**
  * Extract unique patient and practitioner IDs from appointments
@@ -93,7 +93,7 @@ export async function fetchPractitionerData(practitionerIds: Set<string>) {
 /**
  * Extract full name from FHIR name object
  */
-export function extractFullName(nameObj: { name?: Array<{ given?: string[]; family?: string }> }): string | null {
+export function extractFullName(nameObj?: { name?: Array<{ given?: string[]; family?: string }> }): string | null {
   if (!nameObj?.name?.[0]) return null;
 
   const name = nameObj.name[0];

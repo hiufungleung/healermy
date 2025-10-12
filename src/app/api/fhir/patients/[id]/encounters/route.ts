@@ -31,11 +31,11 @@ export async function GET(
     bundle.entry?.forEach(entry => {
       if (entry.resource.resourceType === 'Encounter') {
         encounters.push(entry.resource);
-      } else if (entry.resource.resourceType === 'Practitioner') {
+      } else if (entry.resource.resourceType === 'Practitioner' && entry.resource.id) {
         practitioners[entry.resource.id] = entry.resource;
-      } else if (entry.resource.resourceType === 'Condition') {
+      } else if (entry.resource.resourceType === 'Condition' && entry.resource.id) {
         conditions[entry.resource.id] = entry.resource;
-      } else if (entry.resource.resourceType === 'Account') {
+      } else if (entry.resource.resourceType === 'Account' && entry.resource.id) {
         accounts[entry.resource.id] = entry.resource;
       }
     });

@@ -6,9 +6,9 @@ import { FHIRClient } from '@/app/api/fhir/client';
 import { manageSlotStatusForAppointment } from '@/app/api/fhir/slots/operations';
 import type { Appointment } from '@/types/fhir';
 
-interface RouteContext {
+type RouteContext = {
   params: Promise<{ id: string }>;
-}
+};
 
 /**
  * GET /api/fhir/appointments/[id] - Get appointment by ID
