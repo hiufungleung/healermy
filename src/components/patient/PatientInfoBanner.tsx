@@ -8,7 +8,9 @@ interface PatientInfoBannerProps {
   patientId: string;
   gender?: string;
   birthDate?: string;
+  bloodType?: string;
   active?: boolean;
+  registeredDate?: string;
 }
 
 export const PatientInfoBanner: React.FC<PatientInfoBannerProps> = ({
@@ -16,7 +18,9 @@ export const PatientInfoBanner: React.FC<PatientInfoBannerProps> = ({
   patientId,
   gender,
   birthDate,
-  active = true
+  bloodType,
+  active = true,
+  registeredDate
 }) => {
   // Calculate age from birth date
   const calculateAge = (dateString: string): number => {
@@ -30,43 +34,75 @@ export const PatientInfoBanner: React.FC<PatientInfoBannerProps> = ({
     return age;
   };
 
+  // Format date to readable format
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
   const age = birthDate ? calculateAge(birthDate) : null;
 
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b-2 border-blue-200 px-6 py-4 mb-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {/* Avatar */}
-          <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xl">
-            {name.charAt(0).toUpperCase()}
-          </div>
-
-          {/* Patient Info */}
-          <div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-xl font-bold text-gray-900">{name}</h2>
-              {gender && (
-                <>
-                  <span className="text-gray-400">•</span>
-                  <span className="text-sm text-gray-600 capitalize">{gender}</span>
-                </>
-              )}
-              {age !== null && (
-                <>
-                  <span className="text-gray-400">•</span>
-                  <span className="text-sm text-gray-600">Age {age}</span>
-                </>
-              )}
-            </div>
-            <p className="text-sm text-gray-500 mt-0.5">Patient ID: {patientId}</p>
-          </div>
+    <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-6 py-5 mb-6">
+      <div className="flex items-start justify-between mb-4">
+        {/* Patient Name and ID */}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{name}</h1>
+          <p className="text-sm text-gray-500 mt-1">Patient ID: <span className="font-mono text-gray-700">{patientId}</span></p>
         </div>
 
         {/* Status Badge */}
-        {active && (
-          <Badge variant="success" size="sm">
-            Active
-          </Badge>
+        <Badge variant={active ? "success" : "info"} size="sm">
+          {active ? 'Active' : 'Inactive'}
+        </Badge>
+      </div>
+
+      {/* Clinical Information Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        {/* Sex */}
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Sex</p>
+          <p className="mt-1 text-sm font-semibold text-gray-900 capitalize">
+            {gender || 'Not specified'}
+          </p>
+        </div>
+
+        {/* Age */}
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Age</p>
+          <p className="mt-1 text-sm font-semibold text-gray-900">
+            {age !== null ? `${age} years` : 'Unknown'}
+          </p>
+        </div>
+
+        {/* Date of Birth */}
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Date of Birth</p>
+          <p className="mt-1 text-sm font-semibold text-gray-900">
+            {birthDate ? formatDate(birthDate) : 'Unknown'}
+          </p>
+        </div>
+
+        {/* Blood Type */}
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Blood Type</p>
+          <p className="mt-1 text-sm font-semibold text-gray-900">
+            {bloodType || 'Unknown'}
+          </p>
+        </div>
+
+        {/* Registered Date */}
+        {registeredDate && (
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Registered</p>
+            <p className="mt-1 text-sm font-semibold text-gray-900">
+              {formatDate(registeredDate)}
+            </p>
+          </div>
         )}
       </div>
     </div>

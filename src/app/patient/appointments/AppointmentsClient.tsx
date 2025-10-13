@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { AppointmentSkeleton } from '@/components/common/LoadingSpinner';
+import { AppointmentDetailModal } from '@/components/patient/AppointmentDetailModal';
 import { formatDateForDisplay } from '@/library/timezone';
 import { calculateQueuePosition, formatWaitTime, getQueueStatusMessage } from '@/lib/queueCalculation';
 import type { AuthSession } from '@/types/auth';
@@ -31,8 +32,8 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [cancellingAppointments, setCancellingAppointments] = useState<Set<string>>(new Set());
-  const [reschedulingAppointments, setReschedulingAppointments] = useState<Set<string>>(new Set());
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Fetch appointments and encounters
   useEffect(() => {
@@ -146,14 +147,23 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
     return true;
   });
 
+  // Open modal
+  const handleOpenModal = (appointmentId: string) => {
+    setSelectedAppointmentId(appointmentId);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedAppointmentId(null);
+  };
+
   // Cancel appointment
   const handleCancelAppointment = async (appointmentId: string) => {
     if (!appointmentId) return;
 
     const confirmCancel = window.confirm('Are you sure you want to cancel this appointment?');
     if (!confirmCancel) return;
-
-    setCancellingAppointments(prev => new Set([...prev, appointmentId]));
 
     try {
       const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
@@ -199,12 +209,6 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
     } catch (error) {
       console.error('Error cancelling appointment:', error);
       alert('Failed to cancel appointment. Please try again.');
-    } finally {
-      setCancellingAppointments(prev => {
-        const updated = new Set(prev);
-        updated.delete(appointmentId);
-        return updated;
-      });
     }
   };
 
@@ -214,8 +218,6 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
 
     const confirmReschedule = window.confirm('Do you want to request a reschedule for this appointment?');
     if (!confirmReschedule) return;
-
-    setReschedulingAppointments(prev => new Set([...prev, appointmentId]));
 
     try {
       const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
@@ -261,12 +263,6 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
     } catch (error) {
       console.error('Error requesting reschedule:', error);
       alert('Failed to request reschedule. Please try again.');
-    } finally {
-      setReschedulingAppointments(prev => {
-        const updated = new Set(prev);
-        updated.delete(appointmentId);
-        return updated;
-      });
     }
   };
 
@@ -372,11 +368,12 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
                 const location = appointment.practitionerDetails?.address || 'TBD';
                 const phoneNumber = appointment.practitionerDetails?.phone || 'N/A';
 
-                const canCancel = appointmentStatus !== 'cancelled' && appointmentStatus !== 'fulfilled';
-                const canReschedule = appointmentStatus !== 'cancelled' && appointmentStatus !== 'fulfilled';
-
                 return (
-                  <div key={appointment.id} className="bg-white border rounded-lg p-4 sm:p-6 hover:shadow-md transition-all">
+                  <div
+                    key={appointment.id}
+                    className="bg-white border rounded-lg p-4 sm:p-6 hover:shadow-md transition-all cursor-pointer"
+                    onDoubleClick={() => appointment.id && handleOpenModal(appointment.id)}
+                  >
                     {/* Header */}
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
                       <div className="flex-1">
@@ -455,49 +452,33 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
                       )}
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      {appointment.id && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => router.push(`/patient/appointments/${appointment.id}`)}
-                          className="w-full sm:w-auto"
-                        >
-                          View Details
-                        </Button>
-                      )}
-
-                      {canReschedule && appointment.id && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRescheduleAppointment(appointment.id)}
-                          disabled={reschedulingAppointments.has(appointment.id)}
-                          className="w-full sm:w-auto"
-                        >
-                          {reschedulingAppointments.has(appointment.id) ? 'Requesting...' : 'Reschedule'}
-                        </Button>
-                      )}
-
-                      {canCancel && appointment.id && (
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleCancelAppointment(appointment.id)}
-                          disabled={cancellingAppointments.has(appointment.id)}
-                          className="w-full sm:w-auto"
-                        >
-                          {cancellingAppointments.has(appointment.id) ? 'Cancelling...' : 'Cancel'}
-                        </Button>
-                      )}
+                    {/* Action hint */}
+                    <div className="border-t pt-3 text-center">
+                      <p className="text-xs text-gray-500 flex items-center justify-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                        </svg>
+                        Double-click for details, reschedule, or cancel
+                      </p>
                     </div>
+
                   </div>
                 );
               })}
             </div>
           )}
         </div>
+      )}
+
+      {/* Appointment Detail Modal */}
+      {selectedAppointmentId && (
+        <AppointmentDetailModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          appointmentId={selectedAppointmentId}
+          onCancel={handleCancelAppointment}
+          onReschedule={handleRescheduleAppointment}
+        />
       )}
     </>
   );

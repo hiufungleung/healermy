@@ -6,6 +6,7 @@ import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { AppointmentSkeleton } from '@/components/common/LoadingSpinner';
+import { ProviderAppointmentDetailModal } from '@/components/provider/ProviderAppointmentDetailModal';
 import type { Appointment } from '@/types/fhir';
 
 interface AppointmentStats {
@@ -35,6 +36,18 @@ export default function ProviderAppointmentsClient({
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
   const [loadingAppointment, setLoadingAppointment] = useState<string | null>(null);
   const [loadingNames, setLoadingNames] = useState(true);
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleOpenModal = (appointmentId: string) => {
+    setSelectedAppointmentId(appointmentId);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedAppointmentId(null);
+  };
 
   // Enhance appointments with real names on mount
   React.useEffect(() => {
@@ -530,7 +543,8 @@ export default function ProviderAppointmentsClient({
             {displayAppointments.map((appointment) => (
               <div
                 key={appointment.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                onClick={() => handleOpenModal(appointment.id!)}
               >
                 <div className="flex items-center space-x-4">
                   <div className="text-center min-w-[100px]">
@@ -565,64 +579,6 @@ export default function ProviderAppointmentsClient({
                   >
                     {getStatusLabel(appointment.status)}
                   </Badge>
-
-                  <div className="flex space-x-2">
-                    {appointment.status === 'pending' && (
-                      <>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => handleApprove(appointment.id!)}
-                          disabled={loadingAppointment === appointment.id}
-                        >
-                          {loadingAppointment === appointment.id ? 'Approving...' : 'Approve'}
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleReject(appointment.id!)}
-                          disabled={loadingAppointment === appointment.id}
-                        >
-                          {loadingAppointment === appointment.id ? 'Rejecting...' : 'Reject'}
-                        </Button>
-                      </>
-                    )}
-
-                    {appointment.status === 'booked' && (
-                      <>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => handleComplete(appointment.id!)}
-                          disabled={loadingAppointment === appointment.id}
-                        >
-                          {loadingAppointment === appointment.id ? 'Completing...' : 'Complete'}
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleCancel(appointment.id!)}
-                          disabled={loadingAppointment === appointment.id}
-                        >
-                          {loadingAppointment === appointment.id ? 'Cancelling...' : 'Cancel'}
-                        </Button>
-                      </>
-                    )}
-
-                    {appointment.status === 'checked-in' && (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => handleQuickAction(appointment.id!, 'complete')}
-                      >
-                        Complete
-                      </Button>
-                    )}
-
-                    <Button variant="outline" size="sm">
-                      Details
-                    </Button>
-                  </div>
                 </div>
               </div>
             ))}
@@ -630,6 +586,30 @@ export default function ProviderAppointmentsClient({
           )}
         </Card>
       )}
+
+      {/* Appointment Detail Modal */}
+      <ProviderAppointmentDetailModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        appointmentId={selectedAppointmentId}
+        appointment={appointments.find(apt => apt.id === selectedAppointmentId)}
+        onApprove={async (id) => {
+          await handleApprove(id);
+          handleCloseModal();
+        }}
+        onReject={async (id) => {
+          await handleReject(id);
+          handleCloseModal();
+        }}
+        onComplete={async (id) => {
+          await handleComplete(id);
+          handleCloseModal();
+        }}
+        onCancel={async (id) => {
+          await handleCancel(id);
+          handleCloseModal();
+        }}
+      />
     </div>
   );
 }
