@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { useToast } from '@/hooks/use-toast';
 import { Layout } from '@/components/common/Layout';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
@@ -74,6 +76,8 @@ const SERVICE_TYPES: Record<string, string[]> = {
 
 export default function NewBookingFlow() {
   const router = useRouter();
+  const { session } = useAuth();
+  const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
 
   // Step 1: Service Details
@@ -303,112 +307,6 @@ export default function NewBookingFlow() {
     }
   };
 
-  const fetchPractitionersWithSchedules = async () => {
-    setLoading(true);
-    setCurrentPage(1); // Reset to first page when filtering
-    try {
-      // Fetch first 30 practitioners
-      const response = await fetch('/api/fhir/practitioners?count=30', {
-        credentials: 'include'
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch practitioners');
-
-      const result = await response.json();
-      const allPractitioners = result.practitioners || [];
-
-      // For each practitioner, check if they have schedules matching the service criteria
-      const practitionersWithSchedules = await Promise.all(
-        allPractitioners.map(async (practitioner: Practitioner) => {
-          const schedulesResponse = await fetch(
-            `/api/fhir/schedules?actor=Practitioner/${practitioner.id}`,
-            { credentials: 'include' }
-          );
-
-          if (!schedulesResponse.ok) return null;
-
-          const schedulesData = await schedulesResponse.json();
-          const schedules = schedulesData.entry?.map((e: any) => e.resource) || [];
-
-          // DEBUG: Log schedules for specific doctor
-          if (practitioner.id === '1528002870e5236c6b93d34e79feeaa9') {
-            console.log(`🔍 DEBUG: Doctor ${practitioner.id} (${practitioner.name?.[0]?.text || practitioner.name?.[0]?.family}):`);
-            console.log('Total schedules:', schedules.length);
-            schedules.forEach((schedule: Schedule, idx: number) => {
-              console.log(`  Schedule ${idx + 1}:`, {
-                id: schedule.id,
-                specialty: schedule.specialty?.[0]?.coding?.[0]?.display || 'N/A',
-                serviceCategory: schedule.serviceCategory?.[0]?.coding?.[0]?.display || 'N/A',
-                serviceType: schedule.serviceType?.[0]?.coding?.[0]?.display || 'N/A'
-              });
-            });
-            console.log('Selected filters:', {
-              specialty: selectedSpecialty,
-              serviceCategoryId: selectedServiceCategory,
-              serviceCategoryName: SERVICE_CATEGORIES.find(c => c.id === selectedServiceCategory)?.name,
-              serviceType: selectedServiceType
-            });
-          }
-
-          // Filter schedules by service criteria
-          const matchingSchedules = schedules.filter((schedule: Schedule) => {
-            const scheduleSpecialty = schedule.specialty?.[0]?.coding?.[0]?.display || '';
-            const scheduleServiceCategory = schedule.serviceCategory?.[0]?.coding?.[0]?.display || '';
-            const scheduleServiceType = schedule.serviceType?.[0]?.coding?.[0]?.display || '';
-
-            // More flexible matching - check both ways (schedule contains filter OR filter contains schedule)
-            const categoryName = SERVICE_CATEGORIES.find(c => c.id === selectedServiceCategory)?.name || '';
-            const categoryLower = categoryName.toLowerCase();
-            const scheduleCategoryLower = scheduleServiceCategory.toLowerCase();
-
-            const specialtyMatch = scheduleSpecialty.toLowerCase().includes(selectedSpecialty.toLowerCase());
-            // Match if either contains the other (e.g., "Outpatient" matches "In-clinic visit (Outpatient)")
-            const categoryMatch = scheduleCategoryLower.includes(categoryLower) ||
-                                 categoryLower.includes(scheduleCategoryLower) ||
-                                 // Also check just the ID part (e.g., "outpatient")
-                                 scheduleCategoryLower.includes(selectedServiceCategory.toLowerCase());
-            const typeMatch = scheduleServiceType.toLowerCase().includes(selectedServiceType.toLowerCase());
-
-            // DEBUG: Log matching logic for specific doctor
-            if (practitioner.id === '1528002870e5236c6b93d34e79feeaa9') {
-              console.log(`  Matching schedule ${schedule.id}:`, {
-                scheduleSpecialty,
-                specialtyMatch,
-                scheduleServiceCategory,
-                categoryMatch,
-                categoryName,
-                scheduleServiceType,
-                typeMatch,
-                allMatch: specialtyMatch && categoryMatch && typeMatch
-              });
-            }
-
-            return specialtyMatch && categoryMatch && typeMatch;
-          });
-
-          if (matchingSchedules.length > 0) {
-            return {
-              ...practitioner,
-              matchingSchedules
-            };
-          }
-
-          return null;
-        })
-      );
-
-      const validPractitioners = practitionersWithSchedules.filter(Boolean);
-      setPractitioners(validPractitioners);
-      setFilteredPractitioners(validPractitioners);
-    } catch (error) {
-      console.error('Error fetching practitioners:', error);
-      setPractitioners([]);
-      setFilteredPractitioners([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const fetchAvailableSlots = async () => {
     if (!selectedPractitioner) return;
 
@@ -565,24 +463,107 @@ export default function NewBookingFlow() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      // Navigate to confirmation page with all booking data
-      const params = new URLSearchParams({
-        practitionerId: selectedPractitioner?.id || '',
-        date: selectedDate,
-        time: selectedTime,
-        slotId: selectedSlotId,
-        specialty: selectedSpecialty,
-        serviceCategory: selectedServiceCategory,
-        serviceType: selectedServiceType,
-        reasonForVisit,
-        symptoms: symptoms || '',
-        requestLonger: requestLonger.toString()
+      // Parse and create appointment start/end times
+      let appointmentStartTime: string;
+      let appointmentEndTime: string;
+
+      try {
+        // Try direct date parsing first
+        const startDate = new Date(`${selectedDate} ${selectedTime}`);
+        if (isNaN(startDate.getTime())) {
+          throw new Error('Invalid date format');
+        }
+        appointmentStartTime = startDate.toISOString();
+        appointmentEndTime = new Date(startDate.getTime() + (30 * 60 * 1000)).toISOString();
+      } catch (dateError) {
+        console.warn('Date parsing failed, using fallback method. Selected time:', selectedTime);
+
+        // Parse the selected time - supports multiple formats
+        const time12HourMatch = selectedTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
+        const time24HourMatch = selectedTime.match(/^(\d+):(\d+)$/);
+
+        let hours: number;
+        let minutes: number;
+
+        if (time12HourMatch) {
+          hours = parseInt(time12HourMatch[1]);
+          minutes = parseInt(time12HourMatch[2]);
+          const isPM = time12HourMatch[3].toUpperCase() === 'PM';
+          if (isPM && hours !== 12) hours += 12;
+          else if (!isPM && hours === 12) hours = 0;
+        } else if (time24HourMatch) {
+          hours = parseInt(time24HourMatch[1]);
+          minutes = parseInt(time24HourMatch[2]);
+        } else {
+          throw new Error(`Invalid time format: ${selectedTime}`);
+        }
+
+        const fallbackDate = new Date(selectedDate);
+        fallbackDate.setHours(hours, minutes, 0, 0);
+        appointmentStartTime = fallbackDate.toISOString();
+        appointmentEndTime = new Date(fallbackDate.getTime() + (30 * 60 * 1000)).toISOString();
+      }
+
+      // Get patient ID from session
+      const patientId = session?.patient || 'demo-patient';
+
+      // Create appointment via FHIR API
+      const appointmentRequestData = {
+        resourceType: 'Appointment',
+        status: 'pending',
+        slot: [{ reference: `Slot/${selectedSlotId}` }],
+        participant: [
+          {
+            actor: { reference: `Patient/${patientId}` },
+            status: 'accepted'
+          },
+          {
+            actor: { reference: `Practitioner/${selectedPractitioner?.id}` },
+            status: 'needs-action'
+          }
+        ],
+        start: appointmentStartTime,
+        end: appointmentEndTime,
+        reasonCode: [{ text: reasonForVisit }],
+        description: symptoms || reasonForVisit
+      };
+
+      console.log('[BOOKING] Creating appointment with data:', appointmentRequestData);
+
+      const response = await fetch('/api/fhir/appointments', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(appointmentRequestData),
       });
 
-      router.push(`/patient/book-appointment/confirm?${params.toString()}`);
+      console.log('[BOOKING] Response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('[BOOKING] Error response:', errorData);
+        throw new Error(errorData.error || errorData.details || `Failed to create appointment: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Appointment created successfully:', result);
+
+      // Show success toast
+      toast({
+        title: "✅ Appointment Booked Successfully!",
+        description: `Your appointment with ${selectedPractitioner?.name?.[0]?.text || selectedPractitioner?.name?.[0]?.family} on ${formatDateForDisplay(selectedDate)} at ${selectedTime} has been submitted for review. You will receive a notification once it's confirmed.`,
+        duration: 5000,
+      });
+
+      // Navigate to dashboard after a short delay to show the toast
+      setTimeout(() => {
+        router.push('/patient/dashboard');
+      }, 1500);
     } catch (error) {
       console.error('Error submitting booking:', error);
-      alert('Failed to submit booking. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to submit booking. Please try again.');
     } finally {
       setSubmitting(false);
     }

@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { User, LogOut, Home, Calendar, Users } from 'lucide-react';
+import { Toaster } from '@/components/ui/toaster';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -327,6 +328,9 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
         onCancel={handleLogoutCancel}
         isLoading={isLoggingOut}
       />
+
+      {/* Toast Notifications */}
+      <Toaster />
     </div>
   );
 }
