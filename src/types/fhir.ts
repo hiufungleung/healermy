@@ -551,6 +551,11 @@ export interface FamilyMemberHistory {
         code?: string;
         display?: string;
       }>;
+      text?: string;
+    };
+    onsetAge?: {
+      value?: number;
+      unit?: string;
     };
     name?: {
       text?: string;

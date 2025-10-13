@@ -243,8 +243,8 @@ export const ClinicalTimeline: React.FC<ClinicalTimelineProps> = ({
               return (
                 <div key={event.id} className="relative pl-12">
                   {/* Timeline dot */}
-                  <div className={`absolute left-0 flex h-8 w-8 items-center justify-center rounded-full border ${colors.borderClass} bg-white shadow`}>
-                    <span className={`flex h-6 w-6 items-center justify-center rounded-full ${colors.dotClass}`}>
+                  <div className={`absolute left-0 flex h-8 w-8 items-center justify-center rounded-full border ${colors.border} bg-white shadow`}>
+                    <span className={`flex h-6 w-6 items-center justify-center rounded-full ${colors.bg} ${colors.text}`}>
                       {getEventIcon(event.type)}
                     </span>
                   </div>

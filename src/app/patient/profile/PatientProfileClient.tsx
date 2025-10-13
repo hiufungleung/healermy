@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import type { Patient, Bundle, Condition, MedicationRequest, MedicationDispense, Observation, AllergyIntolerance, Procedure, FamilyMemberHistory, DiagnosticReport, ServiceRequest, Coverage, ExplanationOfBenefit, Organization, Account, Organization, Account } from '@/types/fhir';
+import type { Patient, Bundle, Condition, MedicationRequest, MedicationDispense, Observation, AllergyIntolerance, Procedure, FamilyMemberHistory, DiagnosticReport, ServiceRequest, Coverage, ExplanationOfBenefit, Organization, Account } from '@/types/fhir';
 import { ModernPatientProfile } from './PatientProfileModern';
 
 // Extract contact information according to FHIR standard
