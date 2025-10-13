@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
       date?: string;
       specialty?: string;
       serviceCategory?: string;
+      serviceType?: string;
       _count?: number;
     } = {};
 
@@ -36,6 +37,9 @@ export async function GET(request: NextRequest) {
     }
     if (searchParams.get('serviceCategory')) {
       searchOptions.serviceCategory = searchParams.get('serviceCategory')!;
+    }
+    if (searchParams.get('service-type')) {
+      searchOptions.serviceType = searchParams.get('service-type')!;
     }
     if (searchParams.get('_count')) {
       searchOptions._count = parseInt(searchParams.get('_count')!);

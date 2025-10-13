@@ -11,16 +11,22 @@ export async function searchSchedules(
     date?: string;    // Date range with ge/le comparators
     specialty?: string;
     serviceCategory?: string;
+    serviceType?: string;
     _count?: number;
   }
 ): Promise<any> {
   const queryParams = new URLSearchParams();
 
   // Add search parameters directly as provided
+  // Map to FHIR standard parameter names
   if (searchOptions) {
     Object.entries(searchOptions).forEach(([key, value]) => {
       if (value !== undefined) {
-        queryParams.append(key, value.toString());
+        // Map serviceType to service-type (FHIR standard)
+        const paramName = key === 'serviceType' ? 'service-type' : key;
+        // Map serviceCategory to service-category (FHIR standard)
+        const finalParamName = paramName === 'serviceCategory' ? 'service-category' : paramName;
+        queryParams.append(finalParamName, value.toString());
       }
     });
   }

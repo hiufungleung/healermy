@@ -160,15 +160,71 @@ export default function NewBookingFlow() {
     setCurrentPage(1); // Reset to first page when filtering
 
     try {
-      console.log('🔍 [FILTER] Starting service filter with:', {
+      console.log('🔍 [FILTER] Starting server-side filter with:', {
         specialty: selectedSpecialty,
         serviceCategory: selectedServiceCategory,
         serviceType: selectedServiceType
       });
 
-      // Fetch all schedules first (FHIR doesn't support specialty/serviceCategory filters well)
-      const scheduleUrl = `/api/fhir/schedules?_count=500`;
-      console.log('🔍 [FILTER] Fetching all schedules from:', scheduleUrl);
+      // Map UI values to FHIR codes (matching CreateScheduleForm format)
+      const specialtyCodeMap: Record<string, string> = {
+        'General Practice': 'general-practice',
+        'Internal Medicine': 'internal-medicine',
+        'Family Medicine': 'family-medicine',
+        'Pediatrics': 'pediatrics',
+        'Cardiology': 'cardiology',
+        'Dermatology': 'dermatology',
+        'Orthopedics': 'orthopedics',
+        'Psychiatry': 'psychiatry',
+        'Neurology': 'neurology',
+        'Oncology': 'oncology'
+      };
+
+      const serviceTypeCodeMap: Record<string, string> = {
+        'Consultation': 'consultation',
+        'Follow-up': 'follow-up',
+        'Screening': 'screening',
+        'Vaccination': 'vaccination',
+        'Minor Procedure': 'minor-procedure',
+        'Home Consultation': 'consultation',
+        'Home Follow-up': 'follow-up',
+        'Home Vaccination': 'vaccination',
+        'Wound Care': 'wound-care',
+        'Virtual Consultation': 'consultation',
+        'Virtual Follow-up': 'follow-up',
+        'Mental Health Consultation': 'mental-health',
+        'Preventive Screening': 'screening',
+        'Wellness Consultation': 'consultation',
+        'Preventive Vaccination': 'vaccination'
+      };
+
+      // Build query parameters for server-side filtering
+      const params = new URLSearchParams();
+      params.append('_count', '200');
+
+      // Add specialty filter (using FHIR code)
+      if (selectedSpecialty) {
+        const specialtyCode = specialtyCodeMap[selectedSpecialty];
+        if (specialtyCode) {
+          params.append('specialty', specialtyCode);
+        }
+      }
+
+      // Add service category filter (using category ID directly)
+      if (selectedServiceCategory) {
+        params.append('serviceCategory', selectedServiceCategory);
+      }
+
+      // Add service type filter (using FHIR code)
+      if (selectedServiceType) {
+        const serviceTypeCode = serviceTypeCodeMap[selectedServiceType];
+        if (serviceTypeCode) {
+          params.append('service-type', serviceTypeCode);
+        }
+      }
+
+      const scheduleUrl = `/api/fhir/schedules?${params.toString()}`;
+      console.log('🔍 [FILTER] Server-side query URL:', scheduleUrl);
 
       const schedulesResponse = await fetch(scheduleUrl, { credentials: 'include' });
 
@@ -179,36 +235,9 @@ export default function NewBookingFlow() {
       }
 
       const schedulesData = await schedulesResponse.json();
-      const allSchedules = schedulesData.schedules || [];
+      const matchingSchedules = schedulesData.schedules || [];
 
-      console.log('🔍 [FILTER] Fetched', allSchedules.length, 'total schedules');
-
-      // Client-side filtering by selected criteria
-      const matchingSchedules = allSchedules.filter((schedule: Schedule) => {
-        const scheduleSpecialty = schedule.specialty?.[0]?.coding?.[0]?.display || '';
-        const scheduleServiceCategory = schedule.serviceCategory?.[0]?.coding?.[0]?.display || '';
-        const scheduleServiceType = schedule.serviceType?.[0]?.coding?.[0]?.display || '';
-
-        // Get category name for comparison
-        const categoryName = SERVICE_CATEGORIES.find(c => c.id === selectedServiceCategory)?.name || '';
-
-        // Only check filters that are actually selected
-        const specialtyMatch = !selectedSpecialty ||
-          scheduleSpecialty.toLowerCase().includes(selectedSpecialty.toLowerCase()) ||
-          selectedSpecialty.toLowerCase().includes(scheduleSpecialty.toLowerCase());
-
-        const categoryMatch = !selectedServiceCategory ||
-          scheduleServiceCategory.toLowerCase().includes(categoryName.toLowerCase()) ||
-          categoryName.toLowerCase().includes(scheduleServiceCategory.toLowerCase());
-
-        const typeMatch = !selectedServiceType ||
-          scheduleServiceType.toLowerCase().includes(selectedServiceType.toLowerCase()) ||
-          selectedServiceType.toLowerCase().includes(scheduleServiceType.toLowerCase());
-
-        return specialtyMatch && categoryMatch && typeMatch;
-      });
-
-      console.log('🔍 [FILTER] Found', matchingSchedules.length, 'matching schedules after filtering');
+      console.log('🔍 [FILTER] Server returned', matchingSchedules.length, 'matching schedules');
 
       if (matchingSchedules.length === 0) {
         console.log('🔍 [FILTER] No schedules match the selected filters');
@@ -240,7 +269,7 @@ export default function NewBookingFlow() {
 
       console.log('🔍 [FILTER] Found', practitionerIds.size, 'unique practitioners');
 
-      // Fetch practitioner details for each ID
+      // Fetch practitioner details for each ID (in parallel for better performance)
       const practitionerPromises = Array.from(practitionerIds).map(async (id) => {
         try {
           const response = await fetch(`/api/fhir/practitioners/${id}`, { credentials: 'include' });
@@ -250,7 +279,6 @@ export default function NewBookingFlow() {
           }
 
           const practitioner = await response.json();
-          console.log(`🔍 [FILTER] Fetched practitioner ${id}:`, practitioner.name?.[0]);
 
           return {
             ...practitioner,
