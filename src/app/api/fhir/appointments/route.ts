@@ -6,6 +6,9 @@ import type { Appointment } from '@/types/fhir';
 
 /**
  * GET /api/fhir/appointments - Search appointments
+ * Supports batch fetching via _id parameter:
+ * - Single ID: ?_id=131249
+ * - Multiple IDs: ?_id=131249,131305,131261
  */
 export async function GET(request: NextRequest) {
   try {
@@ -20,6 +23,7 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get('date-from');
     const dateTo = searchParams.get('date-to');
     const date = searchParams.get('date'); // For single date queries like ?date=2025-01-15
+    const ids = searchParams.get('_id'); // Batch fetch by IDs: ?_id=123,456,789
 
     // Auto-filter by patient based on session role (like Communications API)
     // This prevents fetching all appointments without filter
@@ -32,14 +36,16 @@ export async function GET(request: NextRequest) {
     // Call FHIR operations
     const token = prepareToken(session.accessToken);
     const _count = searchParams.get('_count');
-    
+
     // Build options object
     const options: {
       status?: string;
       _count?: number;
+      _id?: string;
     } = {};
     if (status) options.status = status;
     if (_count) options._count = parseInt(_count);
+    if (ids) options._id = ids; // Pass comma-separated IDs for batch fetch
     
     // Handle single date vs date range
     let finalDateFrom = dateFrom;

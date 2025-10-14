@@ -4,7 +4,11 @@ import type { Appointment, Bundle } from '@/types/fhir';
 
 /**
  * Search appointments by various parameters
- * FHIR requires date parameters for appointment searches
+ * FHIR requires date parameters for appointment searches (except when using _id)
+ *
+ * _id parameter supports:
+ * - Single ID: "131249"
+ * - Multiple IDs (comma-separated): "131249,131305,131261"
  */
 export async function searchAppointments(
   token: string,
@@ -16,12 +20,19 @@ export async function searchAppointments(
     _count?: number;
     'date-from'?: string;
     'date-to'?: string;
+    _id?: string; // Comma-separated list of IDs for batch fetch
   },
   dateFrom?: string,
   dateTo?: string
 ): Promise<Bundle<Appointment>> {
   const queryParams = new URLSearchParams();
-  
+
+  // Check if this is a batch fetch by IDs
+  let batchIds: string | undefined;
+  if (typeof options === 'object' && options._id) {
+    batchIds = options._id;
+  }
+
   if (patientId) queryParams.append('patient', patientId);
   if (practitionerId) queryParams.append('practitioner', practitionerId);
   
@@ -45,32 +56,38 @@ export async function searchAppointments(
   if (status) queryParams.append('status', status);
   if (count) queryParams.append('_count', count.toString());
 
-  // Use date parameters from options object first, then fall back to function parameters
-  const finalDateFrom = optionsDateFrom || dateFrom;
-  const finalDateTo = optionsDateTo || dateTo;
-
-  // FHIR requires date parameters with time component and timezone (per swagger.json)
-  if (finalDateFrom) {
-    // If dateFrom provided, ensure it has time component
-    const fromDate = finalDateFrom.includes('T') ? finalDateFrom : `${finalDateFrom}T00:00:00.000Z`;
-    queryParams.append('date', `ge${fromDate}`);
-
-    if (finalDateTo) {
-      // If dateTo also provided, add upper bound
-      const toDate = finalDateTo.includes('T') ? finalDateTo : `${finalDateTo}T23:59:59.999Z`;
-      queryParams.append('date', `le${toDate}`);
-    }
+  // If batch fetching by IDs, add _id parameter (FHIR supports comma-separated IDs)
+  if (batchIds) {
+    queryParams.append('_id', batchIds);
+    // Note: When using _id, date parameters are not required by FHIR
   } else {
-    // Default to appointments from 30 days ago at start of day to 90 days in future
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    thirtyDaysAgo.setHours(0, 0, 0, 0);
-    queryParams.append('date', `ge${thirtyDaysAgo.toISOString()}`);
-    
-    const ninetyDaysFromNow = new Date();
-    ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
-    ninetyDaysFromNow.setHours(23, 59, 59, 999);
-    queryParams.append('date', `le${ninetyDaysFromNow.toISOString()}`);
+    // Use date parameters from options object first, then fall back to function parameters
+    const finalDateFrom = optionsDateFrom || dateFrom;
+    const finalDateTo = optionsDateTo || dateTo;
+
+    // FHIR requires date parameters with time component and timezone (per swagger.json)
+    if (finalDateFrom) {
+      // If dateFrom provided, ensure it has time component
+      const fromDate = finalDateFrom.includes('T') ? finalDateFrom : `${finalDateFrom}T00:00:00.000Z`;
+      queryParams.append('date', `ge${fromDate}`);
+
+      if (finalDateTo) {
+        // If dateTo also provided, add upper bound
+        const toDate = finalDateTo.includes('T') ? finalDateTo : `${finalDateTo}T23:59:59.999Z`;
+        queryParams.append('date', `le${toDate}`);
+      }
+    } else {
+      // Default to appointments from 30 days ago at start of day to 90 days in future
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      thirtyDaysAgo.setHours(0, 0, 0, 0);
+      queryParams.append('date', `ge${thirtyDaysAgo.toISOString()}`);
+
+      const ninetyDaysFromNow = new Date();
+      ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+      ninetyDaysFromNow.setHours(23, 59, 59, 999);
+      queryParams.append('date', `le${ninetyDaysFromNow.toISOString()}`);
+    }
   }
   
   const url = `${fhirBaseUrl}/Appointment?${queryParams.toString()}`;

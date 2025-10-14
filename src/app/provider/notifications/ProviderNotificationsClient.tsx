@@ -197,42 +197,46 @@ export default function ProviderNotificationsClient() {
           batches.push(appointmentIdsArray.slice(i, i + batchSize));
         }
 
-        // Process batches sequentially to avoid overwhelming the server
+        // Process batches using FHIR _id parameter (much more efficient!)
         for (const batch of batches) {
-          const statusPromises = batch.map(async appointmentId => {
-            try {
-              const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
-                credentials: 'include'
-              });
-              if (response.ok) {
-                const appointment = await response.json();
-                return { id: appointmentId, status: appointment.status };
-              } else if (response.status === 410) {
-                // Appointment was deleted, cache it and mark as cancelled
-                console.log(`Appointment ${appointmentId} was deleted, caching to prevent future 410 errors`);
-                newDeletedAppointments.add(appointmentId);
-                return { id: appointmentId, status: 'cancelled' };
-              }
-            } catch (error) {
-              // Silently handle errors to prevent performance issues
-              const errorMessage = error instanceof Error ? error.message : String(error);
-              console.warn(`Failed to fetch status for appointment ${appointmentId}:`, errorMessage);
-            }
-            return null;
-          });
-
-          const results = await Promise.all(statusPromises);
-
-          // Update statuses incrementally for better UX
-          setAppointmentStatuses(prev => {
-            const newStatuses = { ...prev };
-            results.forEach(result => {
-              if (result) {
-                newStatuses[result.id] = result.status;
-              }
+          try {
+            // Use batch fetch endpoint with comma-separated IDs
+            const idsParam = batch.join(',');
+            const response = await fetch(`/api/fhir/appointments?_id=${idsParam}`, {
+              credentials: 'include'
             });
-            return newStatuses;
-          });
+
+            if (response.ok) {
+              const data = await response.json();
+              const appointments = data.appointments || [];
+
+              // Update statuses from batch response
+              setAppointmentStatuses(prev => {
+                const newStatuses = { ...prev };
+                appointments.forEach((appointment: any) => {
+                  if (appointment.id) {
+                    newStatuses[appointment.id] = appointment.status;
+                  }
+                });
+                return newStatuses;
+              });
+
+              // Check for any IDs that weren't returned (deleted/not found)
+              const returnedIds = new Set(appointments.map((apt: any) => apt.id));
+              batch.forEach(id => {
+                if (!returnedIds.has(id)) {
+                  console.log(`Appointment ${id} was not found, marking as cancelled`);
+                  newDeletedAppointments.add(id);
+                  setAppointmentStatuses(prev => ({ ...prev, [id]: 'cancelled' }));
+                }
+              });
+            } else {
+              console.warn(`Failed to fetch batch of appointments (${batch.length} IDs):`, response.status);
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.warn(`Error fetching appointment batch:`, errorMessage);
+          }
         }
 
         // Update deleted appointments cache if any were found

@@ -5,6 +5,9 @@ import { searchPractitioners, createPractitioner } from '@/app/api/fhir/practiti
 
 /**
  * GET /api/fhir/practitioners - Search practitioners
+ * Supports batch fetching via _id parameter:
+ * - Single ID: ?_id=12345
+ * - Multiple IDs: ?_id=12345,67890,11111
  */
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +23,8 @@ export async function GET(request: NextRequest) {
     const addressState = searchParams.get('addressState');
     const addressPostalCode = searchParams.get('addressPostalCode');
     const addressCountry = searchParams.get('addressCountry');
-    const practitionerId = searchParams.get('practitionerId');
+    const ids = searchParams.get('_id'); // FHIR standard: supports comma-separated IDs
+    const practitionerId = searchParams.get('practitionerId'); // Legacy parameter (kept for backward compatibility)
     const page = searchParams.get('page');
     const count = searchParams.get('count');
 
@@ -33,7 +37,9 @@ export async function GET(request: NextRequest) {
     if (addressState) searchOptions['address-state'] = addressState;
     if (addressPostalCode) searchOptions['address-postalcode'] = addressPostalCode;
     if (addressCountry) searchOptions['address-country'] = addressCountry;
-    if (practitionerId) searchOptions._id = practitionerId;
+    // Prefer _id (FHIR standard), fallback to practitionerId (legacy)
+    if (ids) searchOptions._id = ids;
+    else if (practitionerId) searchOptions._id = practitionerId;
     if (count) searchOptions._count = parseInt(count);
 
     // Use proper FHIR pagination with offset

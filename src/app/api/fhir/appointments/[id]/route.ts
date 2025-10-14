@@ -17,39 +17,53 @@ export async function GET(
   request: NextRequest,
   context: RouteContext
 ) {
-  const { id } = await context.params;
-  
   try {
+    const params = await context.params;
+    const { id } = params;
+
     // Extract session from middleware headers
     const session = await getSessionFromCookies();
     const token = prepareToken(session.accessToken);
-    
+
     // Get appointment from FHIR
     const response = await FHIRClient.fetchWithAuth(
       `${session.fhirBaseUrl}/Appointment/${id}`,
       token
     );
-    
+
     if (!response.ok) {
       return NextResponse.json(
         { error: 'Appointment not found' },
         { status: 404 }
       );
     }
-    
+
     const appointment: Appointment = await response.json();
     return NextResponse.json(appointment);
   } catch (error) {
-    console.error(`Error in GET /api/fhir/appointments/${id}:`, error);
-    
+    let appointmentId = 'unknown';
+    try {
+      const params = await context.params;
+      appointmentId = params.id;
+    } catch {
+      // Ignore params error in catch block
+    }
+
+    console.error(`❌ Error in GET /api/fhir/appointments/${appointmentId}:`, error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : 'No stack trace'
+    });
+
     if (error instanceof Error && error.message.includes('session')) {
       return NextResponse.json({ error: error.message }, { status: 401 });
     }
-    
+
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to get appointment',
-        details: error instanceof Error ? error.message : String(error)
+        details: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     );

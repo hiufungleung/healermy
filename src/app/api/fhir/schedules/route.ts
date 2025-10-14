@@ -4,20 +4,24 @@ import { searchSchedules, createSchedule } from './operations';
 
 /**
  * GET /api/fhir/schedules - Search schedules
+ * Supports batch fetching via _id parameter:
+ * - Single ID: ?_id=12345
+ * - Multiple IDs: ?_id=12345,67890,11111
  */
 export async function GET(request: NextRequest) {
   try {
     // Extract session from middleware headers
     const session = await getSessionFromCookies();
-    
+
     // Both providers and patients can search schedules
-    // Providers: to manage their schedules  
+    // Providers: to manage their schedules
     // Patients: to find available slots for booking
-    
+
     const { searchParams } = request.nextUrl;
-    
+
     // Build search options from query parameters - Direct FHIR mapping
     const searchOptions: {
+      _id?: string;
       actor?: string;
       date?: string;
       specialty?: string;
@@ -26,6 +30,9 @@ export async function GET(request: NextRequest) {
       _count?: number;
     } = {};
 
+    if (searchParams.get('_id')) {
+      searchOptions._id = searchParams.get('_id')!;
+    }
     if (searchParams.get('actor')) {
       searchOptions.actor = searchParams.get('actor')!;
     }

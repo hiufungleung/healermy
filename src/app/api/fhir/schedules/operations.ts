@@ -2,11 +2,13 @@ import { FHIRClient } from '../client';
 
 /**
  * Search schedules by practitioner ID - Direct FHIR query approach
+ * Supports batch fetching via _id: "12345,67890,11111"
  */
 export async function searchSchedules(
   token: string,
   fhirBaseUrl: string,
   searchOptions?: {
+    _id?: string;     // Single ID or comma-separated IDs for batch fetch
     actor?: string;   // Practitioner/{id}
     date?: string;    // Date range with ge/le comparators
     specialty?: string;

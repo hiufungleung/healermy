@@ -5,20 +5,15 @@ import { FHIRClient } from '../client';
 
 /**
  * GET /api/fhir/slots - Search slots
+ * Supports batch fetching via _id parameter:
+ * - Single ID: ?_id=12345
+ * - Multiple IDs: ?_id=12345,67890,11111
+ * Also supports all standard FHIR Slot search parameters
  */
 export async function GET(request: NextRequest) {
   try {
-    console.log('=== SLOTS API ROUTE - START ===');
-    console.log('Request URL:', request.url);
-    console.log('Request headers:', Object.fromEntries(request.headers.entries()));
-
     // Extract session from middleware headers
     const session = await getSessionFromCookies();
-
-    console.log('Slots API - Session role:', session.role);
-    console.log('Slots API - Session scopes:', session.scope);
-    console.log('Slots API - FHIR Base URL:', session.fhirBaseUrl);
-    console.log('Slots API - Access Token (first 20 chars):', session.accessToken.substring(0, 20) + '...');
 
     // Both providers and patients can search for slots
     // Providers: to manage their slots
@@ -27,28 +22,13 @@ export async function GET(request: NextRequest) {
     // Use the user's own access token for slot queries
     const token = prepareToken(session.accessToken);
 
-    console.log('Slots API - Using session access token for role:', session.role);
-
-    // Build the FHIR URL with all query parameters (including ge/lt prefixes)
+    // Build the FHIR URL with all query parameters (including ge/lt prefixes and _id)
     const fhirUrl = `${session.fhirBaseUrl}/Slot?${request.nextUrl.searchParams.toString()}`;
 
-    console.log('Slots API - FHIR URL:', fhirUrl);
-    console.log('Slots API - Query params:', Object.fromEntries(request.nextUrl.searchParams.entries()));
-
     // Use centralized FHIRClient for consistent error handling and logging
-    console.log('=== MAKING FHIR REQUEST ===');
     const response = await FHIRClient.fetchWithAuth(fhirUrl, token);
 
-    console.log('Slots API - FHIR response status:', response.status);
-    console.log('Slots API - FHIR response headers:', Object.fromEntries(response.headers.entries()));
-
     const fhirBundle = await response.json();
-    console.log('Slots API - FHIR response total:', fhirBundle.total);
-    console.log('Slots API - FHIR response entry count:', fhirBundle.entry?.length || 0);
-    if (fhirBundle.entry && fhirBundle.entry.length > 0) {
-      console.log('Slots API - First 3 slot IDs:', fhirBundle.entry.slice(0, 3).map((e: any) => e.resource?.id));
-    }
-    console.log('Slots API - FHIR response bundle:', JSON.stringify(fhirBundle, null, 2));
     
     // Transform FHIR Bundle to expected format
     const slots = fhirBundle.entry?.map((entry: any) => entry.resource) || [];
