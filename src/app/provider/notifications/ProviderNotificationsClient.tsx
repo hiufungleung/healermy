@@ -319,7 +319,7 @@ export default function ProviderNotificationsClient() {
     return () => clearInterval(interval);
   }, [localCommunications.length]); // Only depend on communications length to prevent infinite loops
 
-  // Fetch patient names when communications change
+  // Fetch patient names when communications change (using batch fetching for better performance)
   useEffect(() => {
     const fetchPatientNames = async () => {
       const patientIds = new Set<string>();
@@ -337,23 +337,35 @@ export default function ProviderNotificationsClient() {
       const namesToFetch = Array.from(patientIds).filter(id => !patientNames[id]);
 
       if (namesToFetch.length > 0) {
-        const namePromises = namesToFetch.slice(0, 10).map(async (patientId) => {
-          try {
-            const name = await fetchPatientName(patientId);
-            return { id: patientId, name };
-          } catch (error) {
-            console.error(`Failed to fetch patient ${patientId}:`, error);
-            return { id: patientId, name: `Patient ${patientId}` };
+        try {
+          // Use batch fetch with comma-separated IDs (much more efficient!)
+          const idsParam = namesToFetch.slice(0, 20).join(','); // Batch up to 20 patients at once
+          const response = await fetch(`/api/fhir/patients?_id=${idsParam}`, {
+            credentials: 'include'
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const patients = data.patients || [];
+
+            const newNames: Record<string, string> = {};
+            patients.forEach((patient: any) => {
+              if (patient.id) {
+                const name = patient.name?.[0];
+                const displayName = name?.text ||
+                  `${name?.given?.join(' ') || ''} ${name?.family || ''}`.trim() ||
+                  `Patient ${patient.id}`;
+                newNames[patient.id] = displayName;
+              }
+            });
+
+            setPatientNames(prev => ({ ...prev, ...newNames }));
+          } else {
+            console.error('Failed to batch fetch patient names:', response.status);
           }
-        });
-
-        const results = await Promise.all(namePromises);
-        const newNames: Record<string, string> = {};
-        results.forEach(result => {
-          newNames[result.id] = result.name;
-        });
-
-        setPatientNames(prev => ({ ...prev, ...newNames }));
+        } catch (error) {
+          console.error('Error batch fetching patient names:', error);
+        }
       }
     };
 

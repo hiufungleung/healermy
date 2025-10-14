@@ -273,32 +273,34 @@ export default function NewBookingFlow() {
 
       console.log('🔍 [FILTER] Found', practitionerIds.size, 'unique practitioners');
 
-      // Fetch practitioner details for each ID (in parallel for better performance)
-      const practitionerPromises = Array.from(practitionerIds).map(async (id) => {
-        try {
-          const response = await fetch(`/api/fhir/practitioners/${id}`, { credentials: 'include' });
-          if (!response.ok) {
-            console.error(`🔍 [FILTER] Failed to fetch practitioner ${id}: ${response.status}`);
-            return null;
-          }
+      // Fetch practitioner details using batch request (much more efficient!)
+      try {
+        const idsParam = Array.from(practitionerIds).join(',');
+        const response = await fetch(`/api/fhir/practitioners?_id=${idsParam}`, {
+          credentials: 'include'
+        });
 
-          const practitioner = await response.json();
-
-          return {
-            ...practitioner,
-            matchingSchedules: schedulesByPractitioner.get(id) || []
-          };
-        } catch (error) {
-          console.error(`🔍 [FILTER] Failed to fetch practitioner ${id}:`, error);
-          return null;
+        if (!response.ok) {
+          console.error(`🔍 [FILTER] Failed to batch fetch practitioners: ${response.status}`);
+          setFilteredPractitioners([]);
+          return;
         }
-      });
 
-      const practitionersWithSchedules = await Promise.all(practitionerPromises);
-      const validPractitioners = practitionersWithSchedules.filter(Boolean);
+        const data = await response.json();
+        const practitioners = data.practitioners || [];
 
-      console.log('🔍 [FILTER] Returning', validPractitioners.length, 'practitioners with matching schedules');
-      setFilteredPractitioners(validPractitioners);
+        // Add matching schedules to each practitioner
+        const practitionersWithSchedules = practitioners.map((practitioner: any) => ({
+          ...practitioner,
+          matchingSchedules: schedulesByPractitioner.get(practitioner.id) || []
+        }));
+
+        console.log('🔍 [FILTER] Returning', practitionersWithSchedules.length, 'practitioners with matching schedules');
+        setFilteredPractitioners(practitionersWithSchedules);
+      } catch (error) {
+        console.error('🔍 [FILTER] Error batch fetching practitioners:', error);
+        setFilteredPractitioners([]);
+      }
     } catch (error) {
       console.error('Error applying filters:', error);
       setFilteredPractitioners([]);
