@@ -85,6 +85,7 @@ const config: Config = {
   		animation: {
   			shimmer: 'shimmer 2s infinite linear',
   			'spin-once': 'spin-once 0.5s ease-in-out',
+  			'spin-reverse': 'spin 1s linear infinite reverse',
   			'color-pulse': 'color-pulse 1s infinite alternate',
   			'gentle-bounce': 'gentle-bounce 0.8s infinite ease-in-out',
   			'gentle-shake': 'gentle-shake 0.6s infinite ease-in-out',

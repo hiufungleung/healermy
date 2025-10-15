@@ -17,11 +17,44 @@ export async function middleware(request: NextRequest) {
       '/api/debug-log',
       '/_next',
       '/favicon.ico',
-    ].some(path => request.nextUrl.pathname.startsWith(path)) ||
-    request.nextUrl.pathname === '/'; 
+    ].some(path => request.nextUrl.pathname.startsWith(path));
 
   if (isPublicRoute) {
     console.log(`✅ [MIDDLEWARE] Public route, skipping: ${pathname}`);
+    return NextResponse.next();
+  }
+
+  // Special handling for index page "/" - check if user is already authenticated
+  if (pathname === '/') {
+    const tokenCookie = request.cookies.get(TOKEN_COOKIE_NAME);
+    const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME);
+    
+    // If user has valid session cookies, redirect to appropriate dashboard
+    if (tokenCookie && sessionCookie) {
+      try {
+        const decryptedSessionString = await decrypt(sessionCookie.value);
+        const sessionMetadata: SessionData = JSON.parse(decryptedSessionString);
+        
+        const baseUrl = getPublicBaseUrl(request);
+        if (sessionMetadata.role === 'provider') {
+          console.log(`🔀 [MIDDLEWARE] Authenticated provider accessing /, redirecting to provider dashboard`);
+          return NextResponse.redirect(new URL('/provider/dashboard', baseUrl));
+        } else if (sessionMetadata.role === 'patient') {
+          console.log(`🔀 [MIDDLEWARE] Authenticated patient accessing /, redirecting to patient dashboard`);
+          return NextResponse.redirect(new URL('/patient/dashboard', baseUrl));
+        }
+      } catch (error) {
+        console.error('❌ [MIDDLEWARE] Failed to decrypt session for index page:', error);
+        // If decryption fails, clear cookies and let user see index page
+        const response = NextResponse.next();
+        response.cookies.delete(TOKEN_COOKIE_NAME);
+        response.cookies.delete(SESSION_COOKIE_NAME);
+        return response;
+      }
+    }
+    
+    // No valid session, show index page
+    console.log(`✅ [MIDDLEWARE] Anonymous user on index page, allowing access`);
     return NextResponse.next();
   }
 

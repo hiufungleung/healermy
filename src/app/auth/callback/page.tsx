@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserRole } from '@/types/auth';
+import { FancyLoader } from '@/components/common/FancyLoader';
 
 export default function CallbackPage() {
   const router = useRouter();
@@ -236,14 +237,9 @@ export default function CallbackPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="card max-w-md w-full text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-        <h1 className="text-2xl font-bold mb-2">Completing Authentication...</h1>
-        <p className="text-text-secondary">
-          Processing your SMART on FHIR authentication. Please wait...
-        </p>
-      </div>
-    </div>
+    <FancyLoader 
+      message="Completing Authentication"
+      submessage="Processing your SMART on FHIR authentication. Please wait..."
+    />
   );
 }

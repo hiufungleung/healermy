@@ -8,28 +8,8 @@ import { Card } from '@/components/common/Card';
 
 export default function Home() {
   const router = useRouter();
-  const { session, isLoading } = useAuth();
-
-  useEffect(() => {
-    // If user is authenticated, redirect to appropriate dashboard
-    if (!isLoading && session?.role) {
-      console.log('✅ User authenticated, redirecting to dashboard');
-      if (session.role === 'provider') {
-        router.push('/provider/dashboard');
-      } else {
-        router.push('/patient/dashboard');
-      }
-    }
-  }, [session, isLoading, router]);
-
-  // Show loading state while checking authentication
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  // Note: Authentication check is now handled in middleware.ts
+  // Logged-in users are redirected server-side before this component renders
 
   return (
     <div className="min-h-screen bg-background">

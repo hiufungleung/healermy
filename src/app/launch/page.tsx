@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { FancyLoader } from '@/components/common/FancyLoader';
 
 function LaunchContent() {
   const searchParams = useSearchParams();
@@ -371,30 +372,20 @@ function LaunchContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="card max-w-md w-full text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-        <h1 className="text-2xl font-bold mb-2">Authorizing...</h1>
-        <p className="text-text-secondary">
-          Connecting to your healthcare provider. Please wait...
-        </p>
-      </div>
-    </div>
+    <FancyLoader 
+      message="Authorizing"
+      submessage="Connecting to your healthcare provider. Please wait..."
+    />
   );
 }
 
 export default function LaunchPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="card max-w-md w-full text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <h1 className="text-2xl font-bold mb-2">Loading...</h1>
-          <p className="text-text-secondary">
-            Please wait...
-          </p>
-        </div>
-      </div>
+      <FancyLoader 
+        message="Loading"
+        submessage="Please wait..."
+      />
     }>
       <LaunchContent />
     </Suspense>
