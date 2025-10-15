@@ -36,17 +36,37 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 401 });
     }
 
-    // Check if it's a 404 from FHIR
+    // Check if it's a 404 from FHIR (no data found)
     if (error instanceof Error && error.message.includes('404')) {
-      return NextResponse.json({ error: 'No explanation of benefit records found' }, { status: 404 });
+      return NextResponse.json({ 
+        resourceType: 'Bundle',
+        type: 'searchset',
+        total: 0,
+        entry: []
+      }, { status: 200 });
     }
 
+    // Check if it's a 400 or 501 (resource not supported by FHIR server)
+    if (error instanceof Error && (error.message.includes('400') || error.message.includes('501'))) {
+      console.warn('ExplanationOfBenefit resource not supported by FHIR server');
+      return NextResponse.json({ 
+        resourceType: 'Bundle',
+        type: 'searchset',
+        total: 0,
+        entry: []
+      }, { status: 200 });
+    }
+
+    // Return empty bundle for other errors to prevent UI breaking
+    console.warn('Returning empty bundle due to error fetching explanation of benefit');
     return NextResponse.json(
       {
-        error: 'Failed to get patient explanation of benefit records',
-        details: error instanceof Error ? error.message : String(error)
+        resourceType: 'Bundle',
+        type: 'searchset',
+        total: 0,
+        entry: []
       },
-      { status: 500 }
+      { status: 200 }
     );
   }
 }

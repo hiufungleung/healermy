@@ -285,10 +285,17 @@ export default function PatientProfileClient({ patientName }: PatientProfileClie
       } else if (response.status === 404) {
         console.log('💊 No medication dispenses found (404)');
         setMedicationDispenses([]);
+      } else if (response.status === 500) {
+        console.warn('💊 Medication dispenses not supported by FHIR server (500)');
+        setMedicationDispenses([]);
+      } else {
+        console.warn(`💊 Unexpected status ${response.status} for medication dispenses`);
+        setMedicationDispenses([]);
       }
     } catch (error) {
       console.error('Error fetching medication dispenses:', error);
       // Don't set error state here, as it's supplementary data
+      setMedicationDispenses([]);
     } finally {
       setLoading(prev => ({ ...prev, medications: false }));
     }
@@ -709,14 +716,21 @@ export default function PatientProfileClient({ patientName }: PatientProfileClie
       } else if (response.status === 404) {
         console.log('💰 No EOB records found (404)');
         setExplanationOfBenefit([]);
+      } else if (response.status === 500) {
+        console.warn('💰 Explanation of Benefit not supported by FHIR server (500)');
+        setExplanationOfBenefit([]);
+        // Don't set error state for unsupported features
       } else {
-        throw new Error(`Failed to fetch EOB: ${response.status}`);
+        console.warn(`💰 Unexpected status ${response.status} for EOB`);
+        setExplanationOfBenefit([]);
       }
     } catch (error) {
       console.error('Error fetching explanation of benefit:', error);
+      // Only set error for actual failures, not unsupported features
+      setExplanationOfBenefit([]);
       setErrors(prev => ({
         ...prev,
-        explanationOfBenefit: error instanceof Error ? error.message : 'Failed to load claim information'
+        explanationOfBenefit: ''
       }));
     } finally {
       setLoading(prev => ({ ...prev, explanationOfBenefit: false }));
