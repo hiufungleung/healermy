@@ -1,8 +1,6 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 
@@ -47,7 +45,12 @@ export default function Home() {
               size="lg"
               onClick={() => {
                 // Standalone launch - role selection on launch page
-                const fhirServerUrl = process.env.NEXT_PUBLIC_FHIR_SERVER_URL || 'https://gw.interop.community/healerMy/data';
+                const fhirServerUrl = process.env.NEXT_PUBLIC_FHIR_SERVER_URL;
+                if (!fhirServerUrl) {
+                  console.error('FHIR server URL not configured');
+                  alert('FHIR server URL is not configured. Please contact your administrator.');
+                  return;
+                }
                 router.push(`/launch?iss=${encodeURIComponent(fhirServerUrl)}`);
               }}
               className="text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4"
@@ -126,7 +129,7 @@ export default function Home() {
       <footer className="bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center text-text-secondary">
-            <p>&copy; 2024 HealerMy. All rights reserved.</p>
+            <p>&copy; 2025 healerMy. All rights reserved.</p>
             <p className="mt-2">A SMART on FHIR Healthcare Platform</p>
           </div>
         </div>

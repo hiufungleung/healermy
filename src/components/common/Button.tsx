@@ -3,11 +3,12 @@ import { Button as ShadcnButton, ButtonProps as ShadcnButtonProps } from '@/comp
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 
-interface ButtonProps extends Omit<ShadcnButtonProps, 'variant' | 'size'> {
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'danger' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   fullWidth?: boolean;
+  children?: React.ReactNode;
 }
 
 export function Button({

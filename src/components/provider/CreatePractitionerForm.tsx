@@ -192,8 +192,8 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
                 }
               ]
             },
-            system: process.env.NEXT_PUBLIC_PRACTITIONER_IDENTIFIER_SYSTEM!,
-            value: `PROV-${Date.now()}`
+            system: 'urn:ietf:rfc:3986',
+            value: `urn:uuid:${crypto.randomUUID()}`
           }
         ],
       };

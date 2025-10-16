@@ -43,8 +43,12 @@ export async function GET(
     console.log('🔍 [COVERAGE] Patient ID:', patientId);
 
     const token = `Bearer ${session.accessToken}`;
-    const fhirBaseUrl = session.fhirBaseUrl || 'https://gw.interop.community/healerMy/data';
-    console.log('🔍 [COVERAGE] FHIR Base URL:', fhirBaseUrl, '(from session:', !!session.fhirBaseUrl, ')');
+    const fhirBaseUrl = session.fhirBaseUrl;
+    if (!fhirBaseUrl) {
+      console.error('🔍 [COVERAGE] FHIR Base URL not found in session');
+      return NextResponse.json({ error: 'FHIR server URL not configured' }, { status: 500 });
+    }
+    console.log('🔍 [COVERAGE] FHIR Base URL:', fhirBaseUrl);
 
     // Use the operations function which handles the FHIR call
     console.log('🔍 [COVERAGE] Calling getPatientCoverage operation');
@@ -102,7 +106,11 @@ export async function POST(
     const { id: patientId } = await context.params;
     const coverageData = await request.json();
     const token = `Bearer ${session.accessToken}`;
-    const fhirBaseUrl = session.fhirBaseUrl || 'https://gw.interop.community/healerMy/data';
+    const fhirBaseUrl = session.fhirBaseUrl;
+    if (!fhirBaseUrl) {
+      console.error('🔍 [COVERAGE POST] FHIR Base URL not found in session');
+      return NextResponse.json({ error: 'FHIR server URL not configured' }, { status: 500 });
+    }
 
     // Ensure beneficiary references the correct patient
     const coverage: Coverage = {

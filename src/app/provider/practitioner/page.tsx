@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Layout } from '@/components/common/Layout';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
-import { Badge } from '@/components/common/Badge';
 import { SkeletonCard, Skeleton } from '@/components/common/LoadingSpinner';
 import { PractitionerSearch } from '@/components/common/PractitionerSearch';
 import { CreatePractitionerForm } from '@/components/provider/CreatePractitionerForm';
@@ -291,15 +290,9 @@ export default function PractitionerManagement() {
                 id.type?.coding?.[0]?.code === 'NPI'
               )?.value;
               
-              const providerNumber = practitioner.identifier?.find(id => 
+              const providerNumber = practitioner.identifier?.find(id =>
                 id.type?.coding?.[0]?.code === 'PRN'
               )?.value;
-
-              // Check if this is an app-created practitioner (has our custom identifier system)
-              const isAppCreated = practitioner.identifier?.some(id => 
-                id.system === process.env.NEXT_PUBLIC_PRACTITIONER_IDENTIFIER_SYSTEM || 
-                id.system?.includes('healermy.com')
-              );
 
               return (
                 <Card key={practitioner.id} className="hover:shadow-md transition-shadow">
@@ -312,17 +305,10 @@ export default function PractitionerManagement() {
                       </div>
                       
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h3 className="text-xl font-semibold text-text-primary">{displayName}</h3>
-                            {qualifications.length > 0 && (
-                              <p className="text-sm text-primary font-medium">{qualifications.join(', ')}</p>
-                            )}
-                          </div>
-                          {isAppCreated && (
-                            <div className="ml-4">
-                              <Badge variant="info" size="sm">App Created</Badge>
-                            </div>
+                        <div className="mb-2">
+                          <h3 className="text-xl font-semibold text-text-primary">{displayName}</h3>
+                          {qualifications.length > 0 && (
+                            <p className="text-sm text-primary font-medium">{qualifications.join(', ')}</p>
                           )}
                         </div>
                         

@@ -90,18 +90,16 @@ export function validatePractitionerData(data: any): string[] {
     }
   }
 
-  // Identifier validation (ensure our system)
+  // Identifier validation
   if (!data.identifier || !Array.isArray(data.identifier) || data.identifier.length === 0) {
     errors.push('Practitioner identifier is required');
   } else {
-    const hasValidIdentifier = data.identifier.some((id: any) => 
-      id.system && (
-        id.system.includes('healermy.com') || 
-        id.system === process.env.NEXT_PUBLIC_PRACTITIONER_IDENTIFIER_SYSTEM
-      )
-    );
-    if (!hasValidIdentifier) {
-      errors.push('Valid practitioner identifier system is required');
+    // Validate that each identifier has both system and value
+    for (const id of data.identifier) {
+      if (!id.system || !id.value) {
+        errors.push('Each identifier must have both system and value');
+        break;
+      }
     }
   }
 

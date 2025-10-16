@@ -54,15 +54,9 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
     id.type?.coding?.[0]?.code === 'NPI'
   )?.value;
 
-  const providerNumber = practitioner.identifier?.find(id => 
+  const providerNumber = practitioner.identifier?.find(id =>
     id.type?.coding?.[0]?.code === 'PRN'
   )?.value;
-
-  // Check if this is an app-created practitioner (has our custom identifier system)
-  const isAppCreated = practitioner.identifier?.some(id => 
-    id.system === process.env.NEXT_PUBLIC_PRACTITIONER_IDENTIFIER_SYSTEM || 
-    id.system?.includes('healermy.com')
-  );
 
   // Get meta information
   const lastUpdated = practitioner.meta?.lastUpdated;
@@ -101,9 +95,6 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
                       <Badge variant="success">Active</Badge>
                     ) : (
                       <Badge variant="danger">Inactive</Badge>
-                    )}
-                    {isAppCreated && (
-                      <Badge variant="info">App Created</Badge>
                     )}
                   </div>
                 </div>
@@ -283,13 +274,6 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
                 </div>
               </div>
 
-              <div>
-                <h4 className="font-medium text-text-secondary mb-2">Source Information</h4>
-                <div className="space-y-1 text-sm">
-                  <p><strong>Created by:</strong> {isAppCreated ? 'HealerMy Application' : 'External System'}</p>
-                  <p><strong>Editable:</strong> {isAppCreated ? 'Yes' : 'No'}</p>
-                </div>
-              </div>
             </div>
           </Card>
 
@@ -314,11 +298,6 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
-          {isAppCreated && onEdit && (
-            <Button variant="primary" onClick={onEdit}>
-              Edit Practitioner
-            </Button>
-          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

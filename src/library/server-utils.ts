@@ -13,7 +13,7 @@ import { NextRequest } from 'next/server';
  * 4. Request URL (fallback for local development)
  *
  * @param request - Next.js request object
- * @returns The public base URL (e.g., https://healermy.hughishere.com)
+ * @returns The public base URL
  *
  * @example
  * ```typescript

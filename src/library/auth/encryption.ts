@@ -1,5 +1,14 @@
 // Web Crypto API compatible encryption for Edge Runtime
-const ENCRYPTION_KEY = process.env.SESSION_SECRET || 'fallback-key-for-development';
+const ENCRYPTION_KEY = process.env.SESSION_SECRET;
+const ENCRYPTION_SALT = process.env.SESSION_SALT;
+
+if (!ENCRYPTION_KEY) {
+  throw new Error('SESSION_SECRET environment variable is required');
+}
+
+if (!ENCRYPTION_SALT) {
+  throw new Error('SESSION_SALT environment variable is required');
+}
 
 // Derive a proper key using Web Crypto API
 async function getKey(): Promise<CryptoKey> {
@@ -10,11 +19,11 @@ async function getKey(): Promise<CryptoKey> {
     false,
     ['deriveBits', 'deriveKey']
   );
-  
+
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: new TextEncoder().encode('healermy-salt'),
+      salt: new TextEncoder().encode(ENCRYPTION_SALT),
       iterations: 100000,
       hash: 'SHA-256',
     },

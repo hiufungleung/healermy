@@ -221,7 +221,7 @@ export default function ProviderDashboardClient({
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-lg md:text-2xl font-bold truncate">HealerMy Clinic</h2>
-            <p className="text-blue-100 text-sm md:text-base truncate">info@healermy.com.au</p>
+            <p className="text-blue-100 text-sm md:text-base truncate">info@healermy.com.au (demo)</p>
           </div>
         </div>
       </Card>
