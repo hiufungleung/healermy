@@ -211,21 +211,6 @@ export default function ProviderDashboardClient({
 
   return (
     <>
-      {/* Welcome Section - Clinic Profile Style */}
-      <Card className="mb-6 md:mb-8 bg-gradient-to-r from-primary to-blue-600 text-white">
-        <div className="flex items-center space-x-3 md:space-x-4">
-          <div className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-full flex items-center justify-center text-primary text-2xl md:text-3xl font-bold flex-shrink-0">
-            <svg className="w-10 h-10 md:w-12 md:h-12" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg md:text-2xl font-bold truncate">HealerMy Clinic</h2>
-            <p className="text-blue-100 text-sm md:text-base truncate">info@healermy.com.au (demo)</p>
-          </div>
-        </div>
-      </Card>
-
       {/* Stats Cards - 2x2 grid on mobile */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
         <Card className="text-center p-3 md:p-4">
@@ -416,8 +401,8 @@ export default function ProviderDashboardClient({
             </div>
           </Card>
 
-          {/* Quick Actions */}
-          <Card>
+          {/* Quick Actions - Hidden on mobile */}
+          <Card className="hidden sm:block">
             <h3 className="font-semibold mb-4">Quick Actions</h3>
             <div className="space-y-2">
               <Button

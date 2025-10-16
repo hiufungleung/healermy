@@ -108,6 +108,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               }
             }
           }
+        } else if (session.role === 'practitioner') {
+          // For practitioner, use practitionerName from session (stored from ID token)
+          // This is more efficient than fetching from FHIR API
+          if (session.practitionerName) {
+            setUserName(session.practitionerName);
+            console.log('✅ Practitioner name loaded from session:', session.practitionerName);
+          }
         }
       } catch (error) {
         console.error('Error fetching user name:', error);
@@ -227,6 +234,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('🔔 [AuthProvider] Provider unread count (communications only):', count);
 
         setUnreadCount(count);
+      } else if (session.role === 'practitioner') {
+        // Practitioner: For now, no separate notification system
+        // Could be extended in the future to show urgent patient updates
+        setUnreadCount(0);
       }
     } catch (error) {
       // Silently fail - don't show errors for background polling
@@ -256,7 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Re-check session when navigating to protected pages
   useEffect(() => {
-    if (pathname.startsWith('/patient/') || pathname.startsWith('/provider/')) {
+    if (pathname.startsWith('/patient/') || pathname.startsWith('/provider/') || pathname.startsWith('/practitioner/')) {
       if (!session && !isLoading) {
         console.log('🔄 Protected route accessed, re-checking session...');
         checkSession();

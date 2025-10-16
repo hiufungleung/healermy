@@ -1381,13 +1381,13 @@ export default function PractitionerDetailClient({
       const existingEncounter = searchData.encounters?.[0];
 
       if (existingEncounter) {
-        // Update encounter status to 'finished'
+        // Update encounter status to 'completed'
         const encounterPatchResponse = await fetch(`/api/fhir/encounters/${existingEncounter.id}`, {
           method: 'PATCH',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json-patch+json' },
           body: JSON.stringify([
-            { op: 'replace', path: '/status', value: 'finished' }
+            { op: 'replace', path: '/status', value: 'completed' }
           ]),
         });
 
@@ -1554,7 +1554,7 @@ export default function PractitionerDetailClient({
                           <Badge
                             variant={
                               encounters[appointment.id].status === 'in-progress' ? 'info' :
-                              encounters[appointment.id].status === 'finished' ? 'success' :
+                              encounters[appointment.id].status === 'completed' ? 'success' :
                               'warning'
                             }
                           >

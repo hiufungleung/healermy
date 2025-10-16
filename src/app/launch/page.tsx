@@ -12,21 +12,21 @@ function LaunchContent() {
   const [error, setError] = useState<string | null>(null);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [showRoleSelection, setShowRoleSelection] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<'patient' | 'provider' | null>(null);
+  const [selectedRole, setSelectedRole] = useState<'patient' | 'provider' | 'practitioner' | null>(null);
 
   useEffect(() => {
     const launch = async () => {
       if (isAuthorizing) return;
-      
+
       const iss = searchParams.get('iss');
       const launchToken = searchParams.get('launch');
-      const requestedRole = searchParams.get('role') as 'patient' | 'provider' | null;
+      const requestedRole = searchParams.get('role') as 'patient' | 'provider' | 'practitioner' | null;
 
       // Detect standalone vs EHR launch
       const isStandaloneLaunch = !launchToken;
 
       // Log launch parameters for debugging
-      const logData = {
+      console.log('🔍 Launch parameters:', {
         iss,
         launchToken,
         requestedRole,
@@ -34,15 +34,7 @@ function LaunchContent() {
         currentUrl: window.location.href,
         referrer: document.referrer,
         allSearchParams: Object.fromEntries(searchParams.entries())
-      };
-      console.log('🔍 Launch parameters:', logData);
-
-      // Send log to server for visibility
-      fetch('/api/debug-log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'launch-params', data: logData })
-      }).catch(e => console.warn('Failed to send debug log:', e));
+      });
 
       if (!iss) {
         setError('Missing ISS parameter (FHIR server URL). Please provide the FHIR server URL.');
@@ -51,9 +43,9 @@ function LaunchContent() {
 
       // Always show role selection if no role selected yet
       // Role can come from: URL param (old bookmarks), sessionStorage (after OAuth redirect)
-      const storedRole = sessionStorage.getItem('auth_role') as 'patient' | 'provider' | null;
+      const storedRole = sessionStorage.getItem('auth_role') as 'patient' | 'provider' | 'practitioner' | null;
 
-      let currentRole: 'patient' | 'provider';
+      let currentRole: 'patient' | 'provider' | 'practitioner';
       if (!selectedRole) {
         // Check if role was already selected (stored from previous selection)
         if (storedRole) {
@@ -88,7 +80,7 @@ function LaunchContent() {
       
       const smartConfig = await response.json();
       console.log('✅ SMART configuration discovered:', smartConfig);
-      
+      debugger;
       const authorizeUrl = smartConfig.authorization_endpoint;
       const tokenUrl = smartConfig.token_endpoint;
       const revokeUrl = smartConfig.revocation_endpoint; // Store revoke endpoint
@@ -249,7 +241,7 @@ function LaunchContent() {
     launch();
   }, [searchParams, isAuthorizing, selectedRole]);
 
-  const handleRoleSelection = (role: 'patient' | 'provider') => {
+  const handleRoleSelection = (role: 'patient' | 'provider' | 'practitioner') => {
     setSelectedRole(role);
     setShowRoleSelection(false);
   };
@@ -317,6 +309,11 @@ function LaunchContent() {
                 <div className="flex-1">
                   <div className="font-bold text-xl text-primary mb-1">Patient</div>
                   <div className="text-sm text-text-secondary">
+                    {!isEhrLaunch ? (
+                      <>
+                        <strong>You can select any practitioner in the context picker. You will be loggin in as the patient you select.<br/></strong>
+                      </>
+                    ) : (<></>)}
                     Access your personal health records, view appointments, and book new appointments
                   </div>
                 </div>
@@ -328,11 +325,36 @@ function LaunchContent() {
               className="w-full p-5 text-left border-2 border-gray-200 rounded-lg hover:border-green-600 hover:bg-green-50 transition-all hover:shadow-md group"
             >
               <div className="flex items-start">
+                <div className="text-4xl mr-4">🏥</div>
+                <div className="flex-1">
+                  <div className="font-bold text-xl text-green-600 mb-1">Healthcare Provider (Admin)</div>
+                  <div className="text-sm text-text-secondary">
+                    {!isEhrLaunch ? (
+                      <>
+                        <strong>You can select any practitioner and patient in the context picker.<br/></strong>
+                      </>
+                    ) : (<></>)}
+                    Manage clinic operations, practitioners, appointments, and access all patient records.
+                  </div>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleRoleSelection('practitioner')}
+              className="w-full p-5 text-left border-2 border-gray-200 rounded-lg hover:border-purple-600 hover:bg-purple-50 transition-all hover:shadow-md group"
+            >
+              <div className="flex items-start">
                 <div className="text-4xl mr-4">👨‍⚕️</div>
                 <div className="flex-1">
-                  <div className="font-bold text-xl text-green-600 mb-1">Healthcare Provider</div>
+                  <div className="font-bold text-xl text-purple-600 mb-1">Practitioner</div>
                   <div className="text-sm text-text-secondary">
-                    Manage patient appointments, review requests, and access patient medical records
+                    {!isEhrLaunch ? (
+                      <>
+                        <strong>You will select your practitioner profile in the context picker.<br/></strong>
+                      </>
+                    ) : (<></>)}
+                    Manage your appointments, encounters, patient queue, and clinical workflow.
                   </div>
                 </div>
               </div>
@@ -348,12 +370,11 @@ function LaunchContent() {
                 {isEhrLaunch ? (
                   <>
                     <strong>EHR Launch:</strong> Your healthcare system has provided context.
-                    Select your role to continue.
+                    Select your role to continue. You might be required to select both the practitioner and patient, but the role depends only on your selection here.
                   </>
                 ) : (
                   <>
-                    <strong>Standalone Launch:</strong> After selecting your role, you'll choose
-                    which patient or practitioner to access.
+                    <strong>Standalone Launch:</strong> You might be required to select both the practitioner and patient, but the role depends only on your selection here.
                   </>
                 )}
               </div>
@@ -373,7 +394,7 @@ function LaunchContent() {
 
   return (
     <FancyLoader 
-      message="Authorizing"
+      message="Authorising"
       submessage="Connecting to your healthcare provider. Please wait..."
     />
   );

@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
       role: fullSessionData.role,
       patient: fullSessionData.patient,
       user: fullSessionData.user,
+      practitioner: fullSessionData.practitioner, // Store practitioner ID
+      practitionerName: fullSessionData.practitionerName, // Store practitioner name
       username: fullSessionData.username,
       encounter: fullSessionData.encounter,
       needPatientBanner: fullSessionData.needPatientBanner,

@@ -149,6 +149,11 @@ export interface Appointment {
   start: string;
   end?: string;
   description?: string;
+  comment?: string;
+  supportingInformation?: Array<{
+    reference: string;
+    display?: string;
+  }>;
   reasonCode?: Array<{
     text: string;
   }>;
@@ -789,7 +794,7 @@ export interface ExplanationOfBenefit {
 export interface Encounter {
   resourceType: 'Encounter';
   id?: string;
-  status: 'planned' | 'arrived' | 'triaged' | 'in-progress' | 'onleave' | 'finished' | 'cancelled' | 'entered-in-error' | 'unknown';
+  status: 'planned' | 'in-progress' | 'on-hold' | 'discharged' | 'completed' | 'cancelled' | 'discontinued' | 'entered-in-error' | 'unknown';
   class: {
     system?: string;
     code?: string;

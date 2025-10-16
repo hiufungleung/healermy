@@ -1,4 +1,4 @@
-export type UserRole = 'patient' | 'provider';
+export type UserRole = 'patient' | 'provider' | 'practitioner';
 
 export interface AuthConfig {
   clientId: string;
@@ -22,6 +22,8 @@ export interface SessionData {
   patient?: string;
   patientName?: string; // Patient display name for UI
   user?: string; // User ID from token response (provider)
+  practitioner?: string; // Practitioner ID for practitioner role
+  practitionerName?: string; // Practitioner display name for UI
   username?: string; // Username from token response
   encounter?: string;
   needPatientBanner?: boolean;

@@ -14,7 +14,6 @@ export async function middleware(request: NextRequest) {
       '/launch',
       '/auth/callback',
       '/api/auth',
-      '/api/debug-log',
       '/_next',
       '/favicon.ico',
     ].some(path => request.nextUrl.pathname.startsWith(path));
@@ -196,6 +195,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/', baseUrl));
     }
 
+    if (pathname.startsWith('/practitioner/') && sessionData.role !== 'practitioner') {
+      console.log(`❌ [MIDDLEWARE] Practitioner route access denied for role: ${sessionData.role}`);
+      return NextResponse.redirect(new URL('/', baseUrl));
+    }
+
     // Session validated - cookies remain encrypted and HTTP-only for security
     const response = NextResponse.next();
 
@@ -216,6 +220,7 @@ export const config = {
   matcher: [
     '/patient/:path*',
     '/provider/:path*',
+    '/practitioner/:path*',
     '/test/:path*',
     '/api/fhir/:path*'
   ],

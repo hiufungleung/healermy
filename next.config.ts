@@ -11,8 +11,9 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
   compiler: {
-    // Remove all console.* calls in production
-    removeConsole: true,
+    // Remove all console.* calls ONLY in production builds
+    // This won't affect 'pnpm dev' mode
+    removeConsole: process.env.NODE_ENV === 'production',
   },
 };
 

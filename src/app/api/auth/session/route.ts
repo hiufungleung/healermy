@@ -30,6 +30,8 @@ export async function GET() {
         role: sessionData.role,
         fhirBaseUrl: sessionData.fhirBaseUrl,
         patient: sessionData.patient,
+        practitioner: sessionData.practitioner,
+        practitionerName: sessionData.practitionerName,
         fhirUser: sessionData.fhirUser,
         expiresAt: sessionData.expiresAt,
         clientId: sessionData.clientId,

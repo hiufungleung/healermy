@@ -5,20 +5,30 @@ import type { Encounter } from '@/types/fhir';
  *
  * @param patientAppointmentStart - ISO date string of patient's appointment start time
  * @param encounters - List of all encounters for the practitioner/location
- * @returns Object with queue position and estimated wait time
+ * @param patientEncounter - Optional: Patient's own encounter to check status
+ * @returns Object with queue position, estimated wait time, and special status flags
  */
 export function calculateQueuePosition(
   patientAppointmentStart: string,
-  encounters: Encounter[]
+  encounters: Encounter[],
+  patientEncounter?: Encounter
 ): {
   position: number;
   encountersAhead: number;
   estimatedWaitMinutes: number;
+  isOnHold: boolean;
+  hasInProgressAhead: boolean;
 } {
-  // Filter encounters that are in-progress or planned, and before patient's appointment
+  // Check if patient's own encounter is on-hold
+  const isOnHold = patientEncounter?.status === 'on-hold';
+
+  // Filter encounters that are in-progress, on-hold, or planned, and before patient's appointment
   const encountersAhead = encounters.filter(encounter => {
+    // Skip the patient's own encounter
+    if (patientEncounter && encounter.id === patientEncounter.id) return false;
+
     // Only count encounters that are actively blocking the queue
-    const isActive = encounter.status === 'in-progress' || encounter.status === 'planned';
+    const isActive = encounter.status === 'in-progress' || encounter.status === 'on-hold' || encounter.status === 'planned';
     if (!isActive) return false;
 
     // Get encounter start time from period
@@ -41,6 +51,9 @@ export function calculateQueuePosition(
   // Queue position is count + 1 (e.g., if 2 ahead, patient is #3)
   const position = count + 1;
 
+  // Check if there's an in-progress encounter ahead
+  const hasInProgressAhead = encountersAhead.some(enc => enc.status === 'in-progress');
+
   // Estimate wait time based on average encounter duration
   // Default to 15 minutes per encounter if no duration data available
   const averageEncounterMinutes = 15;
@@ -50,6 +63,8 @@ export function calculateQueuePosition(
     position,
     encountersAhead: count,
     estimatedWaitMinutes,
+    isOnHold,
+    hasInProgressAhead,
   };
 }
 
@@ -83,9 +98,25 @@ export function formatWaitTime(minutes: number): string {
  * Get queue status message for patient
  *
  * @param position - Queue position (1 = next, 2 = second, etc.)
+ * @param isOnHold - Whether patient's encounter is on-hold (starting soon)
+ * @param hasInProgressAhead - Whether there's an in-progress encounter ahead
  * @returns Human-readable status message
  */
-export function getQueueStatusMessage(position: number): string {
+export function getQueueStatusMessage(
+  position: number,
+  isOnHold: boolean = false,
+  hasInProgressAhead: boolean = false
+): string {
+  // Special message if patient's encounter is on-hold
+  if (isOnHold) {
+    return "Your appointment will begin within 10 minutes";
+  }
+
+  // If patient is next but there's still an encounter in progress
+  if (position === 1 && hasInProgressAhead) {
+    return "You're next in the queue (estimated wait: more than 10 minutes)";
+  }
+
   if (position === 1) {
     return "You're currently next in the queue";
   }

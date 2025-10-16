@@ -22,9 +22,10 @@ interface LayoutProps {
   children: React.ReactNode;
   patientName?: string;
   providerName?: string;
+  practitionerName?: string;
 }
 
-export function Layout({ children, patientName, providerName }: LayoutProps) {
+export function Layout({ children, patientName, providerName, practitionerName }: LayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { session, logout, isLoading, userName, isLoadingUserName } = useAuth();
@@ -34,9 +35,10 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
 
   const isPatient = session?.role === 'patient';
   const isProvider = session?.role === 'provider';
+  const isPractitioner = session?.role === 'practitioner';
 
-  // Use cached userName from AuthProvider, fallback to prop-based names
-  const displayName = userName || (isPatient ? patientName : providerName);
+  // Use prop-based names first (no flicker), fallback to cached userName from AuthProvider
+  const displayName = (isPatient ? patientName : isPractitioner ? practitionerName : providerName) || userName;
 
   // Close mobile menu when viewport changes to desktop size
   useEffect(() => {
@@ -81,7 +83,7 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
   };
 
   const handleProfileClick = () => {
-    const profilePath = isPatient ? '/patient/profile' : '/provider/profile';
+    const profilePath = isPatient ? '/patient/profile' : isPractitioner ? '/practitioner/profile' : '/provider/profile';
     router.push(profilePath);
   };
 
@@ -97,10 +99,48 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
         { href: '/provider/practitioner', label: 'Manage Practitioners', icon: Users },
         { href: '/provider/appointments', label: 'Appointments', icon: Calendar },
       ]
+    : isPractitioner
+    ? [
+        { href: '/practitioner/dashboard', label: 'Dashboard', icon: Home },
+        { href: '/practitioner/appointments', label: 'Appointments', icon: Calendar },
+        { href: '/practitioner/workstation', label: 'Workstation', icon: Users },
+      ]
     : [];
 
-  // Get avatar initial
-  const avatarInitial = session ? (session.role === 'patient' ? 'P' : 'D') : '';
+  // Get avatar initials
+  const getAvatarInitials = () => {
+    if (!session) return '';
+
+    if (session.role === 'patient') {
+      // Extract patient initials from displayName
+      if (displayName && displayName !== 'Patient' && !displayName.startsWith('Patient ')) {
+        const names = displayName.trim().split(' ');
+        if (names.length >= 2) {
+          return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+        } else if (names.length === 1 && names[0].length > 0) {
+          return names[0][0].toUpperCase();
+        }
+      }
+      return 'P';
+    } else if (session.role === 'provider') {
+      return 'HP';
+    } else if (session.role === 'practitioner') {
+      // Extract practitioner initials from displayName
+      if (displayName) {
+        const names = displayName.trim().split(' ');
+        if (names.length >= 2) {
+          return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+        } else if (names.length === 1 && names[0].length > 0) {
+          return names[0][0].toUpperCase();
+        }
+      }
+      return 'HP';
+    }
+
+    return '';
+  };
+
+  const avatarInitial = getAvatarInitials();
 
   return (
     <div className="min-h-screen bg-background">
@@ -197,7 +237,7 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
                             )}
                           </p>
                           <p className="text-xs leading-none text-muted-foreground">
-                            {session.role === 'patient' ? 'Patient' : 'Provider'}
+                            {session.role === 'patient' ? 'Patient' : session.role === 'practitioner' ? 'Practitioner' : 'Provider'}
                           </p>
                         </div>
                       </DropdownMenuLabel>
