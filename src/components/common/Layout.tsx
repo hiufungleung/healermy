@@ -324,10 +324,10 @@ export function Layout({ children, patientName, providerName, practitionerName }
               {/* Profile Link in Mobile Menu */}
               {session && (
                 <Link
-                  href={isPatient ? '/patient/profile' : '/provider/profile'}
+                  href={isPatient ? '/patient/profile' : isPractitioner ? '/practitioner/profile' : '/provider/profile'}
                   className={clsx(
                     'flex items-center gap-3 px-4 py-3 text-base font-medium rounded-md transition-colors',
-                    pathname === (isPatient ? '/patient/profile' : '/provider/profile')
+                    pathname === (isPatient ? '/patient/profile' : isPractitioner ? '/practitioner/profile' : '/provider/profile')
                       ? 'bg-blue-50 text-primary'
                       : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                   )}
@@ -348,7 +348,7 @@ export function Layout({ children, patientName, providerName, practitionerName }
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-900">{displayName}</p>
                       <p className="text-xs text-gray-500">
-                        {session.role === 'patient' ? 'Patient' : 'Provider'}
+                        {session.role === 'patient' ? 'Patient' : session.role === 'practitioner' ? 'Practitioner' : 'Provider'}
                       </p>
                     </div>
                   </div>
