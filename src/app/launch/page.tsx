@@ -163,32 +163,31 @@ function LaunchContent() {
             .replace(/=/g, '');
         }
 
-        // Store state and configuration for callback
-        // Use launch token as key if available, otherwise use state
-        const sessionKey = launchToken || state;
-        const stateKey = `oauth_state_${sessionKey}`;
-        const tokenUrlKey = `oauth_token_url_${sessionKey}`;
-        const revokeUrlKey = `oauth_revoke_url_${sessionKey}`;
-        const issKey = `oauth_iss_${sessionKey}`;
-        const clientIdKey = `oauth_client_id_${sessionKey}`;
-        const clientSecretKey = `oauth_client_secret_${sessionKey}`;
-        const redirectUriKey = `oauth_redirect_uri_${sessionKey}`;
-        const codeVerifierKey = `oauth_code_verifier_${sessionKey}`;
+        // Store OAuth state data server-side (secure, encrypted HTTP-only cookie)
+        // This prevents sensitive data (clientSecret, codeVerifier) from being stored in browser
+        const stateData = {
+          iss,
+          role: currentRole,
+          codeVerifier,
+          tokenUrl,
+          revokeUrl,
+          launchToken: launchToken || undefined
+        };
 
-        sessionStorage.setItem(stateKey, state);
-        sessionStorage.setItem(tokenUrlKey, tokenUrl);
-        sessionStorage.setItem(revokeUrlKey, revokeUrl || ''); // Store revoke URL (may be undefined)
-        sessionStorage.setItem(issKey, iss);
-        sessionStorage.setItem(clientIdKey, config.clientId);
-        sessionStorage.setItem(clientSecretKey, config.clientSecret);
-        sessionStorage.setItem(redirectUriKey, config.redirectUri);
+        const storeStateResponse = await fetch('/api/auth/store-state', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ state, data: stateData }),
+        });
 
-        if (codeVerifier) {
-          sessionStorage.setItem(codeVerifierKey, codeVerifier);
+        if (!storeStateResponse.ok) {
+          throw new Error('Failed to store OAuth state');
         }
 
-        // Store mapping for callback lookup
-        sessionStorage.setItem(`launch_token_${state}`, launchToken || '');
+        console.log('✅ OAuth state stored securely on server');
 
         // Construct authorization URL
         const params = new URLSearchParams({

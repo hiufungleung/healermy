@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+/**
+ * GET /api/auth/config?iss=xxx&role=xxx
+ *
+ * Returns OAuth2 configuration for SMART launch.
+ * SECURITY: clientSecret is NEVER returned to browser - only used server-side.
+ */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -23,7 +29,6 @@ export async function GET(request: NextRequest) {
 
     // Use single client credentials for MELD sandbox
     const clientId = process.env.CLIENT_ID;
-    const clientSecret = process.env.CLIENT_SECRET || ''; // Public clients have no secret
 
     if (!clientId) {
       throw new Error('Missing client credentials. Ensure CLIENT_ID is set');
@@ -40,9 +45,10 @@ export async function GET(request: NextRequest) {
       throw new Error(`Missing ${role} scope configuration for ${accessType} access`);
     }
 
+    // SECURITY: clientSecret is NEVER returned to browser
+    // It's only used server-side in token-exchange endpoint
     const config = {
       clientId,
-      clientSecret,
       scope,
       redirectUri: `${baseUrl}/api/auth/callback`,
       launchUri: `${baseUrl}/launch`,

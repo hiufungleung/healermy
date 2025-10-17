@@ -1,14 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+/**
+ * POST /api/auth/token-exchange
+ *
+ * Server-side token exchange for OAuth2 authorization code flow.
+ * Retrieves clientSecret from server-side environment (never exposed to browser).
+ */
 export async function POST(request: NextRequest) {
   try {
-    const { code, tokenUrl, clientId, clientSecret, redirectUri, codeVerifier } = await request.json();
+    const { code, tokenUrl, clientId, redirectUri, codeVerifier, role } = await request.json();
 
     if (!code || !tokenUrl || !clientId || !redirectUri) {
       return NextResponse.json(
         { error: 'Missing required parameters for token exchange' },
         { status: 400 }
       );
+    }
+
+    // Get clientSecret from server-side environment (SECURE - never sent to browser)
+    // Uses single CLIENT_SECRET for all roles (shared FHIR app configuration)
+    const clientSecret = process.env.CLIENT_SECRET;
+
+    if (!clientSecret) {
+      console.warn(`⚠️ No CLIENT_SECRET found. Treating as public client.`);
+    } else {
+      console.log('🔐 Using server-side CLIENT_SECRET for role:', role);
     }
 
     // Prepare token exchange request

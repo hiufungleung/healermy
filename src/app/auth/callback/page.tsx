@@ -42,36 +42,46 @@ export default function CallbackPage() {
           throw new Error('Authorization code not received');
         }
         
-        // Verify state to prevent CSRF attacks - lookup launch token using state
-        const launchToken = sessionStorage.getItem(`launch_token_${receivedState}`) || '';
-        const sessionKey = launchToken || receivedState; // Use state as key for standalone launch
-        const storedState = sessionStorage.getItem(`oauth_state_${sessionKey}`);
+        // Retrieve OAuth state from server (secure, encrypted cookie)
+        console.log('🔍 Retrieving OAuth state from server for state:', receivedState?.substring(0, 8) + '...');
 
-        if (!storedState || storedState !== receivedState) {
-          throw new Error('Invalid OAuth state - possible CSRF attack');
+        const retrieveStateResponse = await fetch(`/api/auth/retrieve-state?state=${receivedState}`, {
+          credentials: 'include'
+        });
+
+        if (!retrieveStateResponse.ok) {
+          const errorData = await retrieveStateResponse.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(`Failed to retrieve OAuth state: ${errorData.error || 'Invalid or expired state'}`);
         }
 
-        // Get stored OAuth configuration using appropriate key
-        const tokenUrl = sessionStorage.getItem(`oauth_token_url_${sessionKey}`);
-        const revokeUrl = sessionStorage.getItem(`oauth_revoke_url_${sessionKey}`);
-        const iss = sessionStorage.getItem(`oauth_iss_${sessionKey}`);
-        const clientId = sessionStorage.getItem(`oauth_client_id_${sessionKey}`);
-        const clientSecret = sessionStorage.getItem(`oauth_client_secret_${sessionKey}`); // Can be empty for public clients
-        const redirectUri = sessionStorage.getItem(`oauth_redirect_uri_${sessionKey}`);
-        const codeVerifier = sessionStorage.getItem(`oauth_code_verifier_${sessionKey}`);
+        const stateData = await retrieveStateResponse.json();
+        console.log('✅ OAuth state retrieved from server');
 
-        // Note: clientSecret can be empty for public clients
-        if (!tokenUrl || !iss || !clientId || !redirectUri) {
-          throw new Error('Missing OAuth configuration from session storage');
+        const { iss, role: storedRole, codeVerifier, tokenUrl, revokeUrl, launchToken } = stateData;
+
+        if (!tokenUrl || !iss) {
+          throw new Error('Missing OAuth configuration from server state');
         }
+
+        // Get auth config to retrieve clientId and redirectUri
+        const configResponse = await fetch(`/api/auth/config?iss=${encodeURIComponent(iss)}&role=${storedRole}`);
+        if (!configResponse.ok) {
+          throw new Error('Failed to get auth configuration');
+        }
+
+        const config = await configResponse.json();
+        const clientId = config.clientId;
+        const redirectUri = config.redirectUri;
         
         console.log('🔄 Server-side token exchange:', {
           tokenUrl,
           clientId,
-          iss
+          iss,
+          hasPKCE: !!codeVerifier
         });
-        
+
         // Use server-side token exchange to avoid CORS issues
+        // Note: clientSecret is retrieved server-side, never exposed to browser
         const tokenExchangeResponse = await fetch('/api/auth/token-exchange', {
           method: 'POST',
           headers: {
@@ -81,9 +91,9 @@ export default function CallbackPage() {
             code,
             tokenUrl,
             clientId,
-            clientSecret: clientSecret || '', // Send empty string for public clients
             redirectUri,
-            codeVerifier // Include code verifier for PKCE if available
+            codeVerifier, // Include code verifier for PKCE if available
+            role: storedRole // Pass role so server can get clientSecret
           })
         });
         
@@ -129,13 +139,11 @@ export default function CallbackPage() {
           }
         }
 
-        // Get role from stored session (user selection from launch page)
-        const storedRole = sessionStorage.getItem('auth_role') as UserRole;
-        if (!storedRole || !['patient', 'provider', 'practitioner'].includes(storedRole)) {
+        // Role already retrieved from server-side state
+        const role = storedRole as UserRole;
+        if (!role || !['patient', 'provider', 'practitioner'].includes(role)) {
           throw new Error('Invalid or missing role selection from launch');
         }
-
-        const role = storedRole;
         console.log(`🎯 Using selected role: ${role}`);
 
         // Validate role selection against token data
@@ -224,6 +232,7 @@ export default function CallbackPage() {
         }
 
         // Create complete session data - URLs stored in session cookie
+        // Note: clientSecret is NOT included here - it's only used server-side for token refresh
         const sessionData = {
           role,
           accessToken: tokenData.access_token,
@@ -231,7 +240,6 @@ export default function CallbackPage() {
           tokenUrl: tokenUrl,
           revokeUrl: revokeUrl || undefined,
           clientId: clientId,
-          clientSecret: clientSecret,
           patient: tokenData.patient,
           user: tokenData.user, // Store user field from token response
           practitioner: practitionerId, // Store practitioner ID for practitioner role
@@ -260,19 +268,13 @@ export default function CallbackPage() {
           throw new Error('Failed to create session');
         }
         
-        // Clean up OAuth session storage
-        sessionStorage.removeItem(`oauth_state_${sessionKey}`);
-        sessionStorage.removeItem(`oauth_token_url_${sessionKey}`);
-        sessionStorage.removeItem(`oauth_revoke_url_${sessionKey}`);
-        sessionStorage.removeItem(`oauth_iss_${sessionKey}`);
-        sessionStorage.removeItem(`oauth_client_id_${sessionKey}`);
-        sessionStorage.removeItem(`oauth_client_secret_${sessionKey}`);
-        sessionStorage.removeItem(`oauth_redirect_uri_${sessionKey}`);
-        sessionStorage.removeItem(`oauth_code_verifier_${sessionKey}`);
-        sessionStorage.removeItem(`launch_token_${receivedState}`);
+        // Clean up remaining OAuth session storage (auth context only)
+        // Note: OAuth state is already deleted from server-side cookie by retrieve-state endpoint
         sessionStorage.removeItem('auth_iss');
         sessionStorage.removeItem('auth_launch');
         sessionStorage.removeItem('auth_role');
+
+        console.log('✅ OAuth state cleaned up (server-side cookie deleted)');
         
         console.log('🚀 Authentication successful, redirecting...');
         
