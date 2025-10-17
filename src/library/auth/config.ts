@@ -1,14 +1,7 @@
 // Cookie and session configuration constants
-const SESSION_COOKIE_NAME_ENV = process.env.SESSION_COOKIE_NAME;
-const TOKEN_COOKIE_NAME_ENV = process.env.TOKEN_COOKIE_NAME;
+// Default values for build-time - can be overridden at runtime
+const DEFAULT_SESSION_COOKIE_NAME = 'healermy_session';
+const DEFAULT_TOKEN_COOKIE_NAME = 'healermy_tokens';
 
-if (!SESSION_COOKIE_NAME_ENV) {
-  throw new Error('SESSION_COOKIE_NAME environment variable is required');
-}
-
-if (!TOKEN_COOKIE_NAME_ENV) {
-  throw new Error('TOKEN_COOKIE_NAME environment variable is required');
-}
-
-export const SESSION_COOKIE_NAME = SESSION_COOKIE_NAME_ENV;
-export const TOKEN_COOKIE_NAME = TOKEN_COOKIE_NAME_ENV;
+export const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || DEFAULT_SESSION_COOKIE_NAME;
+export const TOKEN_COOKIE_NAME = process.env.TOKEN_COOKIE_NAME || DEFAULT_TOKEN_COOKIE_NAME;
