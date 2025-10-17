@@ -7,7 +7,6 @@ import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { getPatient, getPatientConditions, getPatientMedications, getPatientObservations } from '@/app/api/fhir/patients/operations';
 import type { Patient, Condition, MedicationRequest, Observation, Appointment } from '@/types/fhir';
 
 export default function PreVisitSummary() {
@@ -29,21 +28,26 @@ export default function PreVisitSummary() {
   }, []);
 
   const fetchPatientData = async () => {
-    if (!session?.accessToken || !session?.patient || !session?.fhirBaseUrl) return;
-    
+    if (!session?.patient) return;
+
     setLoading(true);
     try {
-      const [patientData, conditionsBundle, medicationsBundle, observationsBundle] = await Promise.all([
-        getPatient(session.accessToken, session.fhirBaseUrl, session.patient),
-        getPatientConditions(session.accessToken, session.fhirBaseUrl, session.patient),
-        getPatientMedications(session.accessToken, session.fhirBaseUrl, session.patient),
-        getPatientObservations(session.accessToken, session.fhirBaseUrl, session.patient)
-      ]);
+      // Use the new consolidated profile endpoint
+      const response = await fetch('/api/fhir/patients/profile', {
+        method: 'GET',
+        credentials: 'include',
+      });
 
-      setPatient(patientData);
-      setConditions(conditionsBundle.entry?.map(e => e.resource).filter((r): r is Condition => !!r) || []);
-      setMedications(medicationsBundle.entry?.map(e => e.resource).filter((r): r is MedicationRequest => !!r) || []);
-      setObservations(observationsBundle.entry?.map(e => e.resource).filter((r): r is Observation => !!r) || []);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch profile: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      setPatient(data.patient);
+      setConditions(data.conditions || []);
+      setMedications(data.medications || []);
+      setObservations(data.observations || []);
     } catch (error) {
       console.error('Error fetching patient data:', error);
       // Use mock data for demo

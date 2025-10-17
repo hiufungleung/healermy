@@ -291,7 +291,7 @@ function LaunchContent() {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="card max-w-lg w-full">
           <div className="text-center mb-6">
-            <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold mb-2">Select Your Role</h1>
+            <h1 className="text-xl sm:text-2xl font-bold mb-2">Select Your Role</h1>
             <p className="text-text-secondary">
               {isEhrLaunch
                 ? 'How do you want to access the system?'

@@ -1,21 +1,21 @@
 import { FHIRClient } from '@/app/api/fhir/client';
-import type { Patient, Condition, MedicationRequest, MedicationDispense, Observation, AllergyIntolerance, Procedure, FamilyMemberHistory, DiagnosticReport, ServiceRequest, Bundle, Encounter, ExplanationOfBenefit } from '@/types/fhir';
+import type { Patient, Bundle } from '@/types/fhir';
 
-// Inline Coverage type to avoid import issues
-interface Coverage {
-  resourceType: 'Coverage';
-  id: string;
-  status: 'active' | 'cancelled' | 'draft' | 'entered-in-error';
-  kind: 'insurance' | 'self-pay' | 'other';
-  beneficiary: {
-    reference: string;
-    display?: string;
-  };
-  payor: Array<{
-    reference: string;
-    display?: string;
-  }>;
-  [key: string]: any;
+/**
+ * Helper function to build FHIR query string from params
+ */
+function buildQueryString(params: Record<string, any>): string {
+  const queryParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (Array.isArray(value)) {
+      value.forEach(v => queryParams.append(key, v));
+    } else if (value !== undefined && value !== null) {
+      queryParams.append(key, value);
+    }
+  }
+
+  return queryParams.toString();
 }
 
 /**
@@ -23,6 +23,8 @@ interface Coverage {
  * Supports both:
  * - Resource ID: /Patient/12742571
  * - Business Identifier: /Patient?identifier=claim-a5a3869c
+ *
+ * Note: This still uses direct FHIR access since it fetches a single resource, not a search
  */
 export async function getPatient(
   token: string,
@@ -62,10 +64,17 @@ export async function getPatientConditions(
   token: string,
   fhirBaseUrl: string,
   patientId: string
-): Promise<Bundle<Condition>> {
-  const url = `${fhirBaseUrl}/Condition?patient=${patientId}`;
-  const response = await FHIRClient.fetchWithAuth(url, token);
-  return response.json();
+) {
+  const queryString = buildQueryString({ patient: patientId });
+  const response = await FHIRClient.fetchWithAuth(
+    `${fhirBaseUrl}/Condition?${queryString}`,
+    token
+  );
+  const bundle = await response.json();
+  return {
+    conditions: bundle.entry?.map((entry: any) => entry.resource) || [],
+    total: bundle.total || 0
+  };
 }
 
 /**
@@ -75,10 +84,17 @@ export async function getPatientMedications(
   token: string,
   fhirBaseUrl: string,
   patientId: string
-): Promise<Bundle<MedicationRequest>> {
-  const url = `${fhirBaseUrl}/MedicationRequest?patient=${patientId}`;
-  const response = await FHIRClient.fetchWithAuth(url, token);
-  return response.json();
+) {
+  const queryString = buildQueryString({ patient: patientId });
+  const response = await FHIRClient.fetchWithAuth(
+    `${fhirBaseUrl}/MedicationRequest?${queryString}`,
+    token
+  );
+  const bundle = await response.json();
+  return {
+    medications: bundle.entry?.map((entry: any) => entry.resource) || [],
+    total: bundle.total || 0
+  };
 }
 
 /**
@@ -88,10 +104,17 @@ export async function getPatientMedicationDispenses(
   token: string,
   fhirBaseUrl: string,
   patientId: string
-): Promise<Bundle<MedicationDispense>> {
-  const url = `${fhirBaseUrl}/MedicationDispense?patient=${patientId}`;
-  const response = await FHIRClient.fetchWithAuth(url, token);
-  return response.json();
+) {
+  const queryString = buildQueryString({ patient: patientId });
+  const response = await FHIRClient.fetchWithAuth(
+    `${fhirBaseUrl}/MedicationDispense?${queryString}`,
+    token
+  );
+  const bundle = await response.json();
+  return {
+    medicationDispenses: bundle.entry?.map((entry: any) => entry.resource) || [],
+    total: bundle.total || 0
+  };
 }
 
 /**
@@ -101,10 +124,17 @@ export async function getPatientObservations(
   token: string,
   fhirBaseUrl: string,
   patientId: string
-): Promise<Bundle<Observation>> {
-  const url = `${fhirBaseUrl}/Observation?patient=${patientId}`;
-  const response = await FHIRClient.fetchWithAuth(url, token);
-  return response.json();
+) {
+  const queryString = buildQueryString({ patient: patientId });
+  const response = await FHIRClient.fetchWithAuth(
+    `${fhirBaseUrl}/Observation?${queryString}`,
+    token
+  );
+  const bundle = await response.json();
+  return {
+    observations: bundle.entry?.map((entry: any) => entry.resource) || [],
+    total: bundle.total || 0
+  };
 }
 
 /**
@@ -114,11 +144,18 @@ export async function getPatientAllergies(
   token: string,
   fhirBaseUrl: string,
   patientId: string
-): Promise<Bundle<AllergyIntolerance>> {
+) {
   // Use Patient/{id} format as required by FHIR specification
-  const url = `${fhirBaseUrl}/AllergyIntolerance?patient=Patient/${patientId}`;
-  const response = await FHIRClient.fetchWithAuth(url, token);
-  return response.json();
+  const queryString = buildQueryString({ patient: `Patient/${patientId}` });
+  const response = await FHIRClient.fetchWithAuth(
+    `${fhirBaseUrl}/AllergyIntolerance?${queryString}`,
+    token
+  );
+  const bundle = await response.json();
+  return {
+    allergies: bundle.entry?.map((entry: any) => entry.resource) || [],
+    total: bundle.total || 0
+  };
 }
 
 /**
@@ -129,11 +166,20 @@ export async function getPatientProcedures(
   token: string,
   fhirBaseUrl: string,
   patientId: string
-): Promise<Bundle<Procedure>> {
-  // Include Practitioner and Condition resources to show context
-  const url = `${fhirBaseUrl}/Procedure?patient=${patientId}&_include=Procedure:performer&_include=Procedure:reason-reference`;
-  const response = await FHIRClient.fetchWithAuth(url, token);
-  return response.json();
+) {
+  const queryString = buildQueryString({
+    patient: patientId,
+    '_include': ['Procedure:performer', 'Procedure:reason-reference']
+  });
+  const response = await FHIRClient.fetchWithAuth(
+    `${fhirBaseUrl}/Procedure?${queryString}`,
+    token
+  );
+  const bundle = await response.json();
+  return {
+    procedures: bundle.entry?.map((entry: any) => entry.resource) || [],
+    total: bundle.total || 0
+  };
 }
 
 /**
@@ -143,10 +189,17 @@ export async function getPatientFamilyHistory(
   token: string,
   fhirBaseUrl: string,
   patientId: string
-): Promise<Bundle<FamilyMemberHistory>> {
-  const url = `${fhirBaseUrl}/FamilyMemberHistory?patient=${patientId}`;
-  const response = await FHIRClient.fetchWithAuth(url, token);
-  return response.json();
+) {
+  const queryString = buildQueryString({ patient: patientId });
+  const response = await FHIRClient.fetchWithAuth(
+    `${fhirBaseUrl}/FamilyMemberHistory?${queryString}`,
+    token
+  );
+  const bundle = await response.json();
+  return {
+    familyHistory: bundle.entry?.map((entry: any) => entry.resource) || [],
+    total: bundle.total || 0
+  };
 }
 
 /**
@@ -156,10 +209,17 @@ export async function getPatientDiagnosticReports(
   token: string,
   fhirBaseUrl: string,
   patientId: string
-): Promise<Bundle<DiagnosticReport>> {
-  const url = `${fhirBaseUrl}/DiagnosticReport?patient=${patientId}`;
-  const response = await FHIRClient.fetchWithAuth(url, token);
-  return response.json();
+) {
+  const queryString = buildQueryString({ patient: patientId });
+  const response = await FHIRClient.fetchWithAuth(
+    `${fhirBaseUrl}/DiagnosticReport?${queryString}`,
+    token
+  );
+  const bundle = await response.json();
+  return {
+    diagnosticReports: bundle.entry?.map((entry: any) => entry.resource) || [],
+    total: bundle.total || 0
+  };
 }
 
 /**
@@ -169,10 +229,17 @@ export async function getPatientServiceRequests(
   token: string,
   fhirBaseUrl: string,
   patientId: string
-): Promise<Bundle<ServiceRequest>> {
-  const url = `${fhirBaseUrl}/ServiceRequest?patient=${patientId}`;
-  const response = await FHIRClient.fetchWithAuth(url, token);
-  return response.json();
+) {
+  const queryString = buildQueryString({ patient: patientId });
+  const response = await FHIRClient.fetchWithAuth(
+    `${fhirBaseUrl}/ServiceRequest?${queryString}`,
+    token
+  );
+  const bundle = await response.json();
+  return {
+    serviceRequests: bundle.entry?.map((entry: any) => entry.resource) || [],
+    total: bundle.total || 0
+  };
 }
 
 /**
@@ -182,29 +249,75 @@ export async function getPatientCoverage(
   token: string,
   fhirBaseUrl: string,
   patientId: string
-): Promise<Coverage[]> {
-  const url = `${fhirBaseUrl}/Coverage?patient=${patientId}&status=active`;
-  const response = await FHIRClient.fetchWithAuth(url, token);
-  const bundle: Bundle<Coverage> = await response.json();
-  return bundle.entry ? bundle.entry.map(entry => entry.resource) : [];
+) {
+  const queryString = buildQueryString({
+    beneficiary: patientId,
+    status: 'active'
+  });
+  const response = await FHIRClient.fetchWithAuth(
+    `${fhirBaseUrl}/Coverage?${queryString}`,
+    token
+  );
+  const bundle = await response.json();
+  return {
+    coverage: bundle.entry?.map((entry: any) => entry.resource) || [],
+    total: bundle.total || 0
+  };
 }
 
 /**
  * Get patient encounters with related resources
  * Uses _include to fetch related Practitioners, Conditions, and Accounts in a single request
  */
-export async function getPatientEncounters(
+export async function getPatientEncountersWithRelated(
   token: string,
   fhirBaseUrl: string,
   patientId: string
-): Promise<Bundle<Encounter>> {
-  const url = `${fhirBaseUrl}/Encounter?patient=${patientId}&_include=Encounter:participant&_include=Encounter:diagnosis&_include=Encounter:reason-reference&_include=Encounter:account`;
-  const response = await FHIRClient.fetchWithAuth(url, token);
-  return response.json();
+) {
+  const queryString = buildQueryString({
+    patient: `Patient/${patientId}`,
+    '_include': [
+      'Encounter:participant',
+      'Encounter:diagnosis',
+      'Encounter:reason-reference',
+      'Encounter:account'
+    ]
+  });
+  const response = await FHIRClient.fetchWithAuth(
+    `${fhirBaseUrl}/Encounter?${queryString}`,
+    token
+  );
+  const bundle = await response.json();
+
+  // Process the response to separate encounters from included resources
+  const encounters: any[] = [];
+  const practitioners: Record<string, any> = {};
+  const conditions: Record<string, any> = {};
+  const accounts: Record<string, any> = {};
+
+  bundle.entry?.forEach((entry: any) => {
+    if (entry.resource.resourceType === 'Encounter') {
+      encounters.push(entry.resource);
+    } else if (entry.resource.resourceType === 'Practitioner' && entry.resource.id) {
+      practitioners[entry.resource.id] = entry.resource;
+    } else if (entry.resource.resourceType === 'Condition' && entry.resource.id) {
+      conditions[entry.resource.id] = entry.resource;
+    } else if (entry.resource.resourceType === 'Account' && entry.resource.id) {
+      accounts[entry.resource.id] = entry.resource;
+    }
+  });
+
+  return {
+    encounters,
+    practitioners,
+    conditions,
+    accounts
+  };
 }
 
 /**
  * Get a specific Account by ID
+ * Note: This still uses direct FHIR access since it fetches a single resource
  */
 export async function getAccount(
   token: string,
@@ -218,6 +331,7 @@ export async function getAccount(
 
 /**
  * Get a specific Organization by ID
+ * Note: This still uses direct FHIR access since it fetches a single resource
  */
 export async function getOrganization(
   token: string,
@@ -236,8 +350,15 @@ export async function getPatientExplanationOfBenefit(
   token: string,
   fhirBaseUrl: string,
   patientId: string
-): Promise<Bundle<ExplanationOfBenefit>> {
-  const url = `${fhirBaseUrl}/ExplanationOfBenefit?patient=${patientId}`;
-  const response = await FHIRClient.fetchWithAuth(url, token);
-  return response.json();
+) {
+  const queryString = buildQueryString({ patient: patientId });
+  const response = await FHIRClient.fetchWithAuth(
+    `${fhirBaseUrl}/ExplanationOfBenefit?${queryString}`,
+    token
+  );
+  const bundle = await response.json();
+  return {
+    explanationOfBenefit: bundle.entry?.map((entry: any) => entry.resource) || [],
+    total: bundle.total || 0
+  };
 }

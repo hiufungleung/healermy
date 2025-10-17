@@ -4,7 +4,24 @@ import React from 'react';
 import { Card } from '@/components/common/Card';
 import { Badge } from '@/components/common/Badge';
 import type { Coverage, ExplanationOfBenefit } from '@/types/fhir';
-import type { CoverageDetails } from '@/app/api/fhir/patients/[id]/coverage/operations';
+
+// CoverageDetails type definition (formerly from operations)
+interface CoverageDetails {
+  id?: string;
+  status?: string;
+  kind?: string;
+  subscriberId?: string;
+  network?: string;
+  effectivePeriod?: { start?: string; end?: string };
+  insurerName?: string;
+  groupNumber?: string;
+  planName?: string;
+  memberNumber?: string;
+  copay?: string;
+  deductible?: string;
+  coverage?: Coverage;
+  organization?: any;
+}
 
 interface Account {
   id: string;
