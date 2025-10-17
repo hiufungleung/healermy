@@ -133,7 +133,7 @@ export default function DashboardClient({
       const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json-patch+json',
         },
         credentials: 'include',
         body: JSON.stringify([
