@@ -6,7 +6,8 @@ import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import {
   PatientInfoSkeleton,
-  AppointmentSkeleton
+  AppointmentSkeleton,
+  LoadingSpinner
 } from '@/components/common/LoadingSpinner';
 import { formatDateForDisplay, getNowInAppTimezone } from '@/library/timezone';
 import type { Patient } from '@/types/fhir';
@@ -572,7 +573,7 @@ export default function DashboardClient({
 
                   {loadingQueue ? (
                     <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      <LoadingSpinner size="sm" />
                       <p className="text-sm text-text-secondary">Checking queue...</p>
                     </div>
                   ) : todayStatus.queuePosition !== null && todayStatus.queuePosition !== undefined ? (

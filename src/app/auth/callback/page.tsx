@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserRole } from '@/types/auth';
-import { FancyLoader } from '@/components/common/FancyLoader';
+import { AuthorisationLoader } from '@/components/common/AuthorisationLoader';
 
 export default function CallbackPage() {
   const router = useRouter();
@@ -347,7 +347,7 @@ export default function CallbackPage() {
   }
 
   return (
-    <FancyLoader 
+    <AuthorisationLoader
       message="Completing Authentication"
       submessage="Processing your SMART on FHIR authentication. Please wait..."
     />

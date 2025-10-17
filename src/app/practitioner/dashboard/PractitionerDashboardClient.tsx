@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { AuthSession } from '@/types/auth';
 import type { Appointment, Schedule, Slot } from '@/types/fhir';
 
@@ -235,7 +236,7 @@ export default function PractitionerDashboardClient({
         <div className="space-y-3">
           {loading ? (
             <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <LoadingSpinner size="md" />
             </div>
           ) : todayAppointments.length > 0 ? (
             todayAppointments.map((appointment) => (

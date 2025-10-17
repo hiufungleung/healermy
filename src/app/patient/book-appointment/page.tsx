@@ -11,6 +11,7 @@ import { Badge } from '@/components/common/Badge';
 import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { SlotSelectionGrid } from '@/components/common/SlotDisplay';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { formatTimeForDisplay, formatDateForDisplay } from '@/library/timezone';
 import type { Practitioner, Slot, Schedule } from '@/types/fhir';
 
@@ -744,7 +745,7 @@ export default function NewBookingFlow() {
                 {/* Doctor List */}
                 {loading ? (
                   <div className="text-center py-12">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <LoadingSpinner size="md" />
                     <p className="mt-2 text-gray-600">Loading doctors...</p>
                   </div>
                 ) : filteredPractitioners.length > 0 ? (
@@ -899,7 +900,7 @@ export default function NewBookingFlow() {
                 <h3 className="font-semibold mb-3">Available Times</h3>
                 {loading ? (
                   <div className="text-center py-8">
-                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    <LoadingSpinner size="sm" />
                     <p className="mt-2 text-gray-600">Loading available times...</p>
                   </div>
                 ) : availableSlots.length > 0 ? (

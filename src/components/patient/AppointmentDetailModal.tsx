@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { formatDateForDisplay } from '@/library/timezone';
 import type { Appointment, Practitioner } from '@/types/fhir';
 
@@ -129,7 +130,7 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} title="Appointment Details" size="lg">
       {loading ? (
         <div className="py-12 text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <LoadingSpinner size="lg" />
           <p className="mt-4 text-gray-600">Loading appointment details...</p>
         </div>
       ) : error ? (

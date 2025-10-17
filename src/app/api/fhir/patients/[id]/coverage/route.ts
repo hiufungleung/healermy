@@ -42,7 +42,7 @@ export async function GET(
     const { id: patientId } = await context.params;
     console.log('🔍 [COVERAGE] Patient ID:', patientId);
 
-    const token = `Bearer ${session.accessToken}`;
+    const token = session.accessToken;
     const fhirBaseUrl = session.fhirBaseUrl;
     if (!fhirBaseUrl) {
       console.error('🔍 [COVERAGE] FHIR Base URL not found in session');
@@ -105,7 +105,7 @@ export async function POST(
 
     const { id: patientId } = await context.params;
     const coverageData = await request.json();
-    const token = `Bearer ${session.accessToken}`;
+    const token = session.accessToken;
     const fhirBaseUrl = session.fhirBaseUrl;
     if (!fhirBaseUrl) {
       console.error('🔍 [COVERAGE POST] FHIR Base URL not found in session');

@@ -68,7 +68,7 @@ export async function PATCH(
     // Determine user reference based on role
     const userRef = session.role === 'patient'
       ? `Patient/${session.patient}`
-      : `Practitioner/${session.fhirUser || session.patient}`;
+      : `Practitioner/${session.practitioner || session.fhirUser || session.patient}`;
 
     let result;
 

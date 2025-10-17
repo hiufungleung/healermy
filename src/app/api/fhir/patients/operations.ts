@@ -183,7 +183,7 @@ export async function getPatientCoverage(
   fhirBaseUrl: string,
   patientId: string
 ): Promise<Coverage[]> {
-  const url = `${fhirBaseUrl}/Coverage?patient=${patientId}&_count=50&status=active`;
+  const url = `${fhirBaseUrl}/Coverage?patient=${patientId}&status=active`;
   const response = await FHIRClient.fetchWithAuth(url, token);
   const bundle: Bundle<Coverage> = await response.json();
   return bundle.entry ? bundle.entry.map(entry => entry.resource) : [];

@@ -52,7 +52,7 @@ export async function getSessionFromHeaders(): Promise<AuthSession> {
 /**
  * Check if user has required role
  */
-export function validateRole(session: AuthSession, requiredRole: 'patient' | 'provider'): void {
+export function validateRole(session: AuthSession, requiredRole: 'patient' | 'provider' | 'practitioner'): void {
   if (session.role !== requiredRole) {
     throw new Error(`Unauthorized: ${requiredRole} role required`);
   }

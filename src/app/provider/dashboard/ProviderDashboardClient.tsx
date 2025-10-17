@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { AuthSession } from '@/types/auth';
 import type { Practitioner, Appointment } from '@/types/fhir';
 
@@ -366,7 +367,7 @@ export default function ProviderDashboardClient({
 
             {loading && (
               <div className="text-center py-4">
-                <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                <LoadingSpinner size="sm" />
               </div>
             )}
           </Card>

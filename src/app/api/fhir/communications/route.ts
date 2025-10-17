@@ -6,7 +6,7 @@ import {
   createManualMessage,
   getUnreadCommunicationsCount,
   isCommunicationRead
-} from '@/app/api/fhir/communications/operations';
+} from './operations';
 import type { Communication } from '@/types/fhir';
 
 /**
@@ -22,16 +22,17 @@ export async function GET(request: NextRequest) {
     const unreadOnly = searchParams.get('unread') === 'true';
     const count = parseInt(searchParams.get('_count') || '1000'); // Increased default to fetch all communications
     
-    // For providers, we need to query differently since we don't have a specific practitioner ID
-    // Providers should see all communications in the system (clinic-wide view)
-    const isProvider = session.role === 'provider' || session.role !== 'patient';
-    
+    // Only providers have clinic-wide view
+    // Practitioners and patients see only their relevant communications
+    const isProvider = session.role === 'provider';
+    const isPractitioner = session.role === 'practitioner';
+
     if (unreadOnly) {
       // Return unread count
       let unreadCount = 0;
 
       if (isProvider) {
-        // For providers, get all communications and count unread ones
+        // For providers, get all communications and count unread ones (clinic-wide)
         const allCommunications = await searchCommunications(token, session.fhirBaseUrl, {
           _count: 100,
           _sort: '-sent'
@@ -44,8 +45,16 @@ export async function GET(request: NextRequest) {
             }
           }
         }
+      } else if (isPractitioner) {
+        // For practitioners, get communications where they are recipient
+        const practitionerRef = `Practitioner/${session.practitioner || session.fhirUser}`;
+        unreadCount = await getUnreadCommunicationsCount(
+          token,
+          session.fhirBaseUrl,
+          practitionerRef
+        );
       } else {
-        // For patients, use the existing function with patient reference
+        // For patients, get communications where they are recipient
         const patientRef = `Patient/${session.patient}`;
         unreadCount = await getUnreadCommunicationsCount(
           token,
@@ -86,6 +95,16 @@ export async function GET(request: NextRequest) {
         );
         return !deletedExtension?.valueBoolean;
       });
+    } else if (isPractitioner) {
+      // For practitioners, ONLY get communications where practitioner is recipient
+      const practitionerRef = `Practitioner/${session.practitioner || session.fhirUser}`;
+
+      const result = await searchCommunications(token, session.fhirBaseUrl, {
+        ...searchOptions,
+        recipient: practitionerRef
+      });
+
+      allCommunications = result.entry || [];
     } else {
       // For patients, ONLY get communications where patient is recipient
       // This prevents patients from seeing appointment-request notifications they sent to providers
@@ -147,9 +166,9 @@ export async function POST(request: NextRequest) {
     }
     
     // Determine sender reference based on role
-    const senderRef = session.role === 'patient' 
-      ? `Patient/${session.patient}` 
-      : `Practitioner/${session.fhirUser || session.patient}`;
+    const senderRef = session.role === 'patient'
+      ? `Patient/${session.patient}`
+      : `Practitioner/${session.practitioner || session.fhirUser || session.patient}`;
     
     // Determine subject (usually the patient)
     const subjectRef = session.role === 'patient' 

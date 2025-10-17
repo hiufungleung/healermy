@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromHeaders, prepareToken } from '@/app/api/fhir/utils/auth';
+import { getSessionFromCookies, prepareToken } from '@/app/api/fhir/utils/auth';
 import { getPatientExplanationOfBenefit } from '@/app/api/fhir/patients/operations';
 
 /**
@@ -12,8 +12,8 @@ export async function GET(
   let patientId: string = 'unknown';
 
   try {
-    // Extract session from middleware headers
-    const session = await getSessionFromHeaders();
+    // Extract session from cookies
+    const session = await getSessionFromCookies();
 
     // Await params in Next.js 15
     const { id } = await params;

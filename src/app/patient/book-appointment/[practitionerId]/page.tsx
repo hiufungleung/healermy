@@ -9,6 +9,7 @@ import { Badge } from '@/components/common/Badge';
 import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { SlotSelectionGrid } from '@/components/common/SlotDisplay';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { formatTimeForDisplay } from '@/library/timezone';
 import type { Practitioner, Slot } from '@/types/fhir';
 
@@ -545,7 +546,7 @@ export default function SelectAppointment() {
               </div>
             ) : loading ? (
               <div className="text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                <LoadingSpinner size="sm" />
                 <p className="mt-2 text-text-secondary">Loading available times...</p>
               </div>
             ) : filteredSchedules.length === 0 ? (

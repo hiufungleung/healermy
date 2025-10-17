@@ -1,20 +1,20 @@
 /**
- * Fancy Loading Component
+ * Authorisation Loading Component
  * Inspired by UIverse design: https://uiverse.io/mobinkakei/proud-ladybug-46
  * Used during authentication flows and page transitions
  */
 
 import React from 'react';
 
-interface FancyLoaderProps {
+interface AuthorisationLoaderProps {
   message?: string;
   submessage?: string;
 }
 
-export function FancyLoader({ 
-  message = "Loading...", 
-  submessage 
-}: FancyLoaderProps) {
+export function AuthorisationLoader({
+  message = "Loading...",
+  submessage
+}: AuthorisationLoaderProps) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-green-50">
       <div className="text-center">

@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { FancyLoader } from '@/components/common/FancyLoader';
+import { AuthorisationLoader } from '@/components/common/AuthorisationLoader';
 
 function LaunchContent() {
   const searchParams = useSearchParams();
@@ -393,7 +393,7 @@ function LaunchContent() {
   }
 
   return (
-    <FancyLoader 
+    <AuthorisationLoader
       message="Authorising"
       submessage="Connecting to your healthcare provider. Please wait..."
     />
@@ -403,7 +403,7 @@ function LaunchContent() {
 export default function LaunchPage() {
   return (
     <Suspense fallback={
-      <FancyLoader 
+      <AuthorisationLoader
         message="Loading"
         submessage="Please wait..."
       />
