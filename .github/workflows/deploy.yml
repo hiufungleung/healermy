@@ -95,6 +95,7 @@ jobs:
               -e CLIENT_ID="${{ vars.CLIENT_ID }}" \
               -e CLIENT_SECRET="${{ secrets.CLIENT_SECRET }}" \
               -e SESSION_SECRET="${{ secrets.SESSION_SECRET }}" \
+              -e SESSION_SALT="${{ secrets.SESSION_SALT }}" \
               -e SESSION_EXPIRY="${{ vars.SESSION_EXPIRY }}" \
               -e PATIENT_SCOPE_OFFLINE="${{ vars.PATIENT_SCOPE_OFFLINE }}" \
               -e PATIENT_SCOPE_ONLINE="${{ vars.PATIENT_SCOPE_ONLINE }}" \

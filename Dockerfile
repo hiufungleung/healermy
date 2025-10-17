@@ -29,6 +29,7 @@ ENV NODE_ENV=production \
     PROVIDER_SCOPE_OFFLINE="launch/encounter launch/patient openid profile offline_access launch fhirUser user/*:* patient/*:*" \
     PROVIDER_SCOPE_ONLINE="launch/encounter launch/patient openid profile online_access launch fhirUser user/*:* patient/*:*" \
     SESSION_EXPIRY=90d
+# (Other environment variables like CLIENT_ID, CLIENT_SECRET, SESSION_SECRET, SESSION_SALT should be provided at runtime)
 
 # Install curl for health checks and create non-root user
 RUN apk add --no-cache curl && \
