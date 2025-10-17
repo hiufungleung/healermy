@@ -1,13 +1,19 @@
 // Web Crypto API compatible encryption for Edge Runtime
-const ENCRYPTION_KEY = process.env.SESSION_SECRET;
-const ENCRYPTION_SALT = process.env.SESSION_SALT;
+// Default values for build-time only - MUST be overridden at runtime in production
+const DEFAULT_SECRET = 'DEFAULT-SECRET-MUSTNOTUSE-REPLACE-IN-PRODUCTION';
+const DEFAULT_SALT = 'DEFAULT-SALT-MUSTNOTUSE-REPLACE-IN-PRODUCTION';
 
-if (!ENCRYPTION_KEY) {
-  throw new Error('SESSION_SECRET environment variable is required');
-}
+const ENCRYPTION_KEY = process.env.SESSION_SECRET || DEFAULT_SECRET;
+const ENCRYPTION_SALT = process.env.SESSION_SALT || DEFAULT_SALT;
 
-if (!ENCRYPTION_SALT) {
-  throw new Error('SESSION_SALT environment variable is required');
+// Warn if using default values in production
+if (process.env.NODE_ENV === 'production') {
+  if (ENCRYPTION_KEY === DEFAULT_SECRET) {
+    console.warn('WARNING: Using default SESSION_SECRET in production! This is insecure. Set SESSION_SECRET environment variable.');
+  }
+  if (ENCRYPTION_SALT === DEFAULT_SALT) {
+    console.warn('WARNING: Using default SESSION_SALT in production! This is insecure. Set SESSION_SALT environment variable.');
+  }
 }
 
 // Derive a proper key using Web Crypto API

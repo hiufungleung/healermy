@@ -311,30 +311,9 @@ function LaunchContent() {
                   <div className="text-sm text-text-secondary">
                     {!isEhrLaunch ? (
                       <>
-                        <strong>You can select any practitioner in the context picker. You will be loggin in as the patient you select.<br/></strong>
+                        Select any practitioner in the context picker.<br/><strong>You will be loggin in as the patient you select.</strong>
                       </>
                     ) : (<></>)}
-                    Access your personal health records, view appointments, and book new appointments
-                  </div>
-                </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleRoleSelection('provider')}
-              className="w-full p-5 text-left border-2 border-gray-200 rounded-lg hover:border-green-600 hover:bg-green-50 transition-all hover:shadow-md group"
-            >
-              <div className="flex items-start">
-                <div className="text-4xl mr-4">🏥</div>
-                <div className="flex-1">
-                  <div className="font-bold text-xl text-green-600 mb-1">Healthcare Provider (Admin)</div>
-                  <div className="text-sm text-text-secondary">
-                    {!isEhrLaunch ? (
-                      <>
-                        <strong>You can select any practitioner and patient in the context picker.<br/></strong>
-                      </>
-                    ) : (<></>)}
-                    Manage clinic operations, practitioners, appointments, and access all patient records.
                   </div>
                 </div>
               </div>
@@ -351,14 +330,33 @@ function LaunchContent() {
                   <div className="text-sm text-text-secondary">
                     {!isEhrLaunch ? (
                       <>
-                        <strong>You will select your practitioner profile in the context picker.<br/></strong>
+                        Select any patient in the context picker.<br/> <strong>You will be loggin in as the practitioner you select.</strong>
                       </>
                     ) : (<></>)}
-                    Manage your appointments, encounters, patient queue, and clinical workflow.
+                    </div>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleRoleSelection('provider')}
+              className="w-full p-5 text-left border-2 border-gray-200 rounded-lg hover:border-green-600 hover:bg-green-50 transition-all hover:shadow-md group"
+            >
+              <div className="flex items-start">
+                <div className="text-4xl mr-4">🏥</div>
+                <div className="flex-1">
+                  <div className="font-bold text-xl text-green-600 mb-1">Healthcare Provider (Admin)</div>
+                  <div className="text-sm text-text-secondary">
+                    {!isEhrLaunch ? (
+                      <>
+                        You can select any practitioner and patient in the context picker to complete the authorisation.
+                      </>
+                    ) : (<></>)}
                   </div>
                 </div>
               </div>
             </button>
+            
           </div>
 
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">

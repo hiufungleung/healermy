@@ -4,6 +4,7 @@ WORKDIR /app
 
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
     NEXT_TELEMETRY_DISABLED=1
+
 RUN corepack enable
 
 # Copy package files
@@ -14,6 +15,8 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 # Build the application
+# Note: Default SESSION_SECRET and SESSION_SALT are in src/library/auth/encryption.ts
+# These defaults allow build to succeed, but MUST be overridden at runtime
 RUN pnpm build
 
 # Runner image

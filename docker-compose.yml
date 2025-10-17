@@ -5,6 +5,8 @@ services:
     image: hiufungleung/healermy:latest
     # ============================================================================
     # OPTIONAL: Build from local Dockerfile instead of pulling from Docker Hub
+    # Uncomment the build section below to build locally
+    # ============================================================================
     # build:
     #   context: .
     #   dockerfile: Dockerfile
@@ -26,6 +28,7 @@ services:
       CLIENT_ID: ${CLIENT_ID} # From your FHIR app registration
       CLIENT_SECRET: ${CLIENT_SECRET} # From your FHIR app registration
       SESSION_SECRET: ${SESSION_SECRET} # Generate: openssl rand -hex 32
+      SESSION_SALT: ${SESSION_SALT} # Generate: openssl rand -hex 32
 
       # ============================================================================
       # OPTIONAL: Override Defaults (uncomment to customize)
