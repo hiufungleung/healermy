@@ -12,6 +12,9 @@ import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { SlotSelectionGrid } from '@/components/common/SlotDisplay';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { FilterSheet } from '@/components/patient/FilterSheet';
 import { Input } from '@/components/ui/input';
 import { formatTimeForDisplay, formatDateForDisplay } from '@/library/timezone';
 import type { Practitioner, Slot, Schedule } from '@/types/fhir';
@@ -95,6 +98,10 @@ export default function NewBookingFlow() {
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
+  const [hasNextPage, setHasNextPage] = useState<boolean>(false); // Whether next page exists
+
+  // Cache for optimization: store all practitioners with their schedules
+  const [cachedPractitionersWithSchedules, setCachedPractitionersWithSchedules] = useState<any[]>([]);
 
   // Step 2: Date & Time
   const [selectedDate, setSelectedDate] = useState<string>('');
@@ -110,45 +117,178 @@ export default function NewBookingFlow() {
   // Step 4: Confirmation
   const [submitting, setSubmitting] = useState(false);
 
+  // Filter sheet state (mobile)
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+
   // Set default date to today
   useEffect(() => {
     const today = new Date();
     setSelectedDate(today.toISOString().split('T')[0]);
   }, []);
 
-  // Load first 30 practitioners on page mount
+  // Load first page of practitioners on mount
   useEffect(() => {
-    fetchInitialPractitioners();
+    fetchPractitionersPage(1);
   }, []);
+
+  // Client-side filter function to filter cached results
+  const filterCachedResults = () => {
+    if (cachedPractitionersWithSchedules.length === 0) {
+      return [];
+    }
+
+    console.log('🔍 [CLIENT FILTER] Filtering cached results with:', {
+      specialty: selectedSpecialty,
+      serviceCategory: selectedServiceCategory,
+      serviceType: selectedServiceType
+    });
+
+    // Map UI values to FHIR codes
+    const specialtyCodeMap: Record<string, string> = {
+      'General Practice': 'general-practice',
+      'Internal Medicine': 'internal-medicine',
+      'Family Medicine': 'family-medicine',
+      'Pediatrics': 'pediatrics',
+      'Cardiology': 'cardiology',
+      'Dermatology': 'dermatology',
+      'Orthopedics': 'orthopedics',
+      'Psychiatry': 'psychiatry',
+      'Neurology': 'neurology',
+      'Oncology': 'oncology'
+    };
+
+    const serviceTypeCodeMap: Record<string, string> = {
+      'Consultation': 'consultation',
+      'Follow-up': 'follow-up',
+      'Screening': 'screening',
+      'Vaccination': 'vaccination',
+      'Minor Procedure': 'minor-procedure',
+      'Home Consultation': 'consultation',
+      'Home Follow-up': 'follow-up',
+      'Home Vaccination': 'vaccination',
+      'Wound Care': 'wound-care',
+      'Virtual Consultation': 'consultation',
+      'Virtual Follow-up': 'follow-up',
+      'Mental Health Consultation': 'mental-health',
+      'Preventive Screening': 'screening',
+      'Wellness Consultation': 'consultation',
+      'Preventive Vaccination': 'vaccination'
+    };
+
+    const specialtyCode = selectedSpecialty ? specialtyCodeMap[selectedSpecialty] : null;
+    const serviceTypeCode = selectedServiceType ? serviceTypeCodeMap[selectedServiceType] : null;
+
+    // Filter practitioners based on their schedules
+    const filtered = cachedPractitionersWithSchedules.filter((practitioner) => {
+      const schedules = practitioner.matchingSchedules || [];
+
+      // Check if any schedule matches all selected criteria
+      return schedules.some((schedule: Schedule) => {
+        let match = true;
+
+        // Check specialty
+        if (specialtyCode) {
+          const scheduleSpecialty = schedule.specialty?.[0]?.coding?.[0]?.code;
+          if (scheduleSpecialty !== specialtyCode) {
+            match = false;
+          }
+        }
+
+        // Check service category
+        if (selectedServiceCategory) {
+          const scheduleCategory = schedule.serviceCategory?.[0]?.coding?.[0]?.code;
+          if (scheduleCategory !== selectedServiceCategory) {
+            match = false;
+          }
+        }
+
+        // Check service type
+        if (serviceTypeCode) {
+          const scheduleTypes = schedule.serviceType?.map((st: any) => st.coding?.[0]?.code) || [];
+          if (!scheduleTypes.includes(serviceTypeCode)) {
+            match = false;
+          }
+        }
+
+        return match;
+      });
+    });
+
+    console.log('🔍 [CLIENT FILTER] Filtered from', cachedPractitionersWithSchedules.length, 'to', filtered.length, 'practitioners');
+    return filtered;
+  };
+
+  // Count active filters
+  const countActiveFilters = () => {
+    let count = 0;
+    if (selectedSpecialty) count++;
+    if (selectedServiceCategory) count++;
+    if (selectedServiceType) count++;
+    return count;
+  };
+
+  // Track previous filter count to detect if filters were added or removed
+  const previousFilterCount = React.useRef(0);
 
   // Apply filters progressively when any filter changes
   useEffect(() => {
-    if (selectedSpecialty || selectedServiceCategory || selectedServiceType) {
-      // If any filter is active, apply filtering
-      applyServiceFilters();
-    } else {
-      // No filters active, show all initial practitioners
-      setFilteredPractitioners(practitioners);
-    }
-  }, [selectedSpecialty, selectedServiceCategory, selectedServiceType, practitioners]);
+    const currentFilterCount = countActiveFilters();
+    const hasFilters = selectedSpecialty || selectedServiceCategory || selectedServiceType;
 
-  // Fetch initial practitioners (first 30)
-  const fetchInitialPractitioners = async () => {
+    if (hasFilters) {
+      // Filters are active
+      const filterIncreased = currentFilterCount > previousFilterCount.current;
+
+      if (cachedPractitionersWithSchedules.length > 0 && filterIncreased) {
+        // Adding more filters - use client-side filtering on cached results
+        console.log('🔍 [OPTIMIZATION] Filter added, using cached results for client-side filtering');
+        setLoading(true);
+        const filtered = filterCachedResults();
+        setFilteredPractitioners(filtered);
+        setCurrentPage(1);
+        setLoading(false);
+      } else {
+        // First filter OR filter was removed/changed - fetch from API
+        console.log('🔍 [API CALL] First filter or filter changed, fetching from API');
+        setCurrentPage(1);
+        applyServiceFilters();
+      }
+    } else {
+      // No filters active, clear cache and fetch first page
+      console.log('🔍 [RESET] No filters active, clearing cache');
+      setCachedPractitionersWithSchedules([]);
+      setCurrentPage(1);
+      fetchPractitionersPage(1);
+    }
+
+    previousFilterCount.current = currentFilterCount;
+  }, [selectedSpecialty, selectedServiceCategory, selectedServiceType]);
+
+  // Fetch practitioners by page (5 per page)
+  const fetchPractitionersPage = async (page: number) => {
     setLoading(true);
     try {
-      const response = await fetch('/api/fhir/practitioners?count=30', {
+      const params = new URLSearchParams();
+      params.append('count', ITEMS_PER_PAGE.toString());
+      if (page > 1) {
+        params.append('page', page.toString());
+      }
+
+      const response = await fetch(`/api/fhir/practitioners?${params.toString()}`, {
         credentials: 'include'
       });
 
       if (!response.ok) throw new Error('Failed to fetch practitioners');
 
       const result = await response.json();
-      const allPractitioners = result.practitioners || [];
-
-      setPractitioners(allPractitioners);
-      setFilteredPractitioners(allPractitioners);
+      setPractitioners(result.practitioners || []);
+      setFilteredPractitioners(result.practitioners || []);
+      setHasNextPage(!!result.nextUrl);
+      setCurrentPage(page);
     } catch (error) {
-      console.error('Error fetching initial practitioners:', error);
+      console.error('Error fetching practitioners:', error);
+      setPractitioners([]);
+      setFilteredPractitioners([]);
     } finally {
       setLoading(false);
     }
@@ -206,7 +346,7 @@ export default function NewBookingFlow() {
 
       // Build query parameters for server-side filtering
       const params = new URLSearchParams();
-      params.append('_count', '200');
+      // Removed _count parameter - use FHIR server's default pagination
 
       // Add specialty filter (using FHIR code)
       if (selectedSpecialty) {
@@ -298,6 +438,9 @@ export default function NewBookingFlow() {
         }));
 
         console.log('🔍 [FILTER] Returning', practitionersWithSchedules.length, 'practitioners with matching schedules');
+
+        // Cache the full results for future client-side filtering
+        setCachedPractitionersWithSchedules(practitionersWithSchedules);
         setFilteredPractitioners(practitionersWithSchedules);
       } catch (error) {
         console.error('🔍 [FILTER] Error batch fetching practitioners:', error);
@@ -405,9 +548,9 @@ export default function NewBookingFlow() {
     setCurrentPage(1); // Reset to first page on search
 
     if (!term) {
-      // If search cleared and no service filters active, show initial 30
+      // If search cleared and no service filters active, fetch first page
       if (!selectedSpecialty && !selectedServiceCategory && !selectedServiceType) {
-        await fetchInitialPractitioners();
+        await fetchPractitionersPage(1);
       } else {
         // Otherwise show service-filtered results
         setFilteredPractitioners(practitioners);
@@ -442,6 +585,7 @@ export default function NewBookingFlow() {
 
       setPractitioners(allPractitioners);
       setFilteredPractitioners(filtered);
+      setHasNextPage(false); // Search results show all at once
     } catch (error) {
       console.error('Error searching practitioners:', error);
     } finally {
@@ -584,7 +728,7 @@ export default function NewBookingFlow() {
     <Layout>
       <ContentContainer size="xl">
         <div className="mb-8">
-          <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary">
+          <h1 className="text-3xl font-bold text-text-primary">
             Book New Appointment
           </h1>
         </div>
@@ -605,110 +749,101 @@ export default function NewBookingFlow() {
 
         {/* Step 1: Service Details & Doctor Selection */}
         {currentStep === 1 && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* LEFT COLUMN: Service Details Filters */}
-            <div className="lg:col-span-1">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* LEFT COLUMN: Service Details Filters - Desktop Only */}
+            <div className="hidden lg:block lg:col-span-1">
               <Card>
-                <h2 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-6">Filter by Service</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-6">Filter by Service</h2>
 
                 {/* Specialty */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-900 mb-3">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
                     Specialty
                   </label>
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
                     {SPECIALTIES.map((specialty) => (
-                      <button
-                        key={specialty}
-                        onClick={() => {
-                          setSelectedSpecialty(specialty);
-                          setSelectedServiceCategory('');
-                          setSelectedServiceType('');
-                          setSearchTerm(''); // Clear search when using filters
-                        }}
-                        className={`w-full px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all text-left ${
-                          selectedSpecialty === specialty
-                            ? 'border-primary bg-primary text-white'
-                            : 'border-gray-200 bg-white text-gray-700 hover:border-primary'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span>{specialty}</span>
-                          {selectedSpecialty === specialty && (
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                        </div>
-                      </button>
+                      <div key={specialty} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`specialty-${specialty}`}
+                          checked={selectedSpecialty === specialty}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedSpecialty(specialty);
+                              setSearchTerm('');
+                            } else {
+                              setSelectedSpecialty('');
+                            }
+                          }}
+                        />
+                        <Label
+                          htmlFor={`specialty-${specialty}`}
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {specialty}
+                        </Label>
+                      </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Service Category */}
-                {selectedSpecialty && (
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-900 mb-3">
-                      Service Category
-                    </label>
-                    <div className="space-y-2">
-                      {SERVICE_CATEGORIES.map((category) => (
-                        <button
-                          key={category.id}
-                          onClick={() => {
-                            setSelectedServiceCategory(category.id);
-                            setSelectedServiceType('');
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Service Category
+                  </label>
+                  <div className="space-y-2">
+                    {SERVICE_CATEGORIES.map((category) => (
+                      <div key={category.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`category-${category.id}`}
+                          checked={selectedServiceCategory === category.id}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedServiceCategory(category.id);
+                            } else {
+                              setSelectedServiceCategory('');
+                            }
                           }}
-                          className={`w-full px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all text-left ${
-                            selectedServiceCategory === category.id
-                              ? 'border-primary bg-primary text-white'
-                              : 'border-gray-200 bg-white text-gray-700 hover:border-primary'
-                          }`}
+                        />
+                        <Label
+                          htmlFor={`category-${category.id}`}
+                          className="text-sm font-normal cursor-pointer leading-tight"
                         >
-                          <div className="flex items-center justify-between">
-                            <span>{category.name}</span>
-                            {selectedServiceCategory === category.id && (
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
+                          {category.name}
+                        </Label>
+                      </div>
+                    ))}
                   </div>
-                )}
+                </div>
 
                 {/* Service Type */}
-                {selectedServiceCategory && (
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-900 mb-3">
-                      Service Type
-                    </label>
-                    <div className="space-y-2">
-                      {SERVICE_TYPES[selectedServiceCategory]?.map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => setSelectedServiceType(type)}
-                          className={`w-full px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all text-left ${
-                            selectedServiceType === type
-                              ? 'border-primary bg-primary text-white'
-                              : 'border-gray-200 bg-white text-gray-700 hover:border-primary'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span>{type}</span>
-                            {selectedServiceType === type && (
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Service Type
+                  </label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {/* Show all service types from all categories */}
+                    {Object.entries(SERVICE_TYPES).flatMap(([categoryId, types]) =>
+                      types.map((type) => (
+                        <div key={type} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`type-${type}`}
+                            checked={selectedServiceType === type}
+                            onCheckedChange={(checked) => {
+                              setSelectedServiceType(checked ? type : '');
+                            }}
+                          />
+                          <Label
+                            htmlFor={`type-${type}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {type}
+                          </Label>
+                        </div>
+                      ))
+                    )}
                   </div>
-                )}
+                </div>
 
                 {/* Clear Filters Button */}
                 {(selectedSpecialty || selectedServiceCategory || selectedServiceType) && (
@@ -717,9 +852,8 @@ export default function NewBookingFlow() {
                       setSelectedSpecialty('');
                       setSelectedServiceCategory('');
                       setSelectedServiceType('');
-                      // Will automatically show all practitioners via useEffect
                     }}
-                    className="w-full px-4 py-2 text-sm font-medium text-primary hover:bg-blue-50 border border-primary rounded-lg transition-colors"
+                    className="w-full px-3 py-2 text-sm font-medium text-primary hover:bg-blue-50 border border-primary rounded-lg transition-colors"
                   >
                     Clear all filters
                   </button>
@@ -728,7 +862,31 @@ export default function NewBookingFlow() {
             </div>
 
             {/* RIGHT COLUMN: Doctor Search & Results */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-3">
+              {/* Mobile Filter Sheet - Single button that opens full-screen filter */}
+              <div className="lg:hidden mb-4">
+                <FilterSheet
+                  specialties={SPECIALTIES}
+                  serviceCategories={SERVICE_CATEGORIES}
+                  serviceTypes={SERVICE_TYPES}
+                  selectedSpecialty={selectedSpecialty}
+                  selectedServiceCategory={selectedServiceCategory}
+                  selectedServiceType={selectedServiceType}
+                  onSpecialtyChange={(value) => {
+                    setSelectedSpecialty(value);
+                    setSearchTerm('');
+                  }}
+                  onServiceCategoryChange={setSelectedServiceCategory}
+                  onServiceTypeChange={setSelectedServiceType}
+                  onClearAll={() => {
+                    setSelectedSpecialty('');
+                    setSelectedServiceCategory('');
+                    setSelectedServiceType('');
+                  }}
+                  open={filterSheetOpen}
+                  onOpenChange={setFilterSheetOpen}
+                />
+              </div>
               <Card>
                 <h2 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Select Doctor</h2>
 
@@ -752,7 +910,7 @@ export default function NewBookingFlow() {
                 ) : filteredPractitioners.length > 0 ? (
                   <>
                     <div className="space-y-3">
-                      {filteredPractitioners.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((practitioner: any) => {
+                      {filteredPractitioners.map((practitioner: any) => {
                         const name = practitioner.name?.[0];
                         const displayName = name?.text ||
                           `${name?.given?.join(' ') || ''} ${name?.family || ''}`.trim();
@@ -800,27 +958,25 @@ export default function NewBookingFlow() {
                     </div>
 
                     {/* Pagination */}
-                    {filteredPractitioners.length > ITEMS_PER_PAGE && (
-                      <div className="mt-6 flex items-center justify-between border-t pt-4">
-                        <div className="text-sm text-gray-600">
-                          Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredPractitioners.length)} of {filteredPractitioners.length} doctors
+                    {(currentPage > 1 || hasNextPage) && (
+                      <div className="mt-6 flex items-center justify-center gap-4 border-t pt-4">
+                        <button
+                          onClick={() => fetchPractitionersPage(currentPage - 1)}
+                          disabled={currentPage === 1 || loading}
+                          className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        >
+                          Previous
+                        </button>
+                        <div className="text-sm font-medium text-gray-700">
+                          Page {currentPage}
                         </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                            disabled={currentPage === 1}
-                            className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                          >
-                            Previous
-                          </button>
-                          <button
-                            onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredPractitioners.length / ITEMS_PER_PAGE), p + 1))}
-                            disabled={currentPage >= Math.ceil(filteredPractitioners.length / ITEMS_PER_PAGE)}
-                            className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                          >
-                            Next
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => fetchPractitionersPage(currentPage + 1)}
+                          disabled={!hasNextPage || loading}
+                          className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        >
+                          Next
+                        </button>
                       </div>
                     )}
                   </>
@@ -835,16 +991,13 @@ export default function NewBookingFlow() {
               </Card>
 
               {/* Navigation */}
-              <div className="flex justify-between mt-6">
-                <Button variant="outline" onClick={() => router.push('/patient/dashboard')}>
-                  Cancel
-                </Button>
-                {selectedPractitioner && (
+              {selectedPractitioner && (
+                <div className="flex justify-end mt-6">
                   <Button variant="primary" onClick={handleNext}>
                     Next: Date & Time →
                   </Button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         )}

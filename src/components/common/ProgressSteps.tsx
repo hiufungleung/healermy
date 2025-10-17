@@ -1,5 +1,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
+import { Progress } from '@/components/ui/progress';
 
 export interface Step {
   id: number;
@@ -54,49 +55,103 @@ export function ProgressSteps({ steps, currentStep, className, onStepClick }: Pr
 
   return (
     <div className={clsx('mb-8', className)}>
-      <div className="flex items-center justify-between">
-        {steps.map((step, index) => (
-          <React.Fragment key={step.id}>
-            {/* Step Circle and Label */}
-            <div
-              className={clsx(
-                'flex items-center',
-                isClickable(step) && 'cursor-pointer hover:opacity-80 transition-opacity'
-              )}
-              onClick={() => handleStepClick(step)}
-              role={isClickable(step) ? 'button' : undefined}
-              tabIndex={isClickable(step) ? 0 : undefined}
-              onKeyDown={(e) => {
-                if (isClickable(step) && (e.key === 'Enter' || e.key === ' ')) {
-                  e.preventDefault();
-                  handleStepClick(step);
-                }
-              }}
-            >
-              <div className={clsx(
-                'w-8 h-8 rounded-full flex items-center justify-center font-semibold',
-                getStepClasses(step)
-              )}>
-                {step.status === 'completed' ? '✓' : step.id}
+      {/* Desktop View - Progress bar with all step labels */}
+      <div className="hidden md:block">
+        <div className="space-y-4">
+          {/* All Step Labels */}
+          <div className="flex justify-between items-center px-1">
+            {steps.map((step) => (
+              <div
+                key={step.id}
+                className={clsx(
+                  'flex flex-col items-center',
+                  isClickable(step) && 'cursor-pointer hover:opacity-80 transition-opacity'
+                )}
+                onClick={() => handleStepClick(step)}
+                role={isClickable(step) ? 'button' : undefined}
+                tabIndex={isClickable(step) ? 0 : undefined}
+                onKeyDown={(e) => {
+                  if (isClickable(step) && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    handleStepClick(step);
+                  }
+                }}
+              >
+                <span className={clsx(
+                  'text-sm mb-2',
+                  step.status === 'active' ? 'font-semibold text-primary' : 'text-gray-600'
+                )}>
+                  {step.id}. {step.label}
+                </span>
               </div>
-              <span className={clsx('ml-2 text-sm', getLabelClasses(step))}>
-                {step.label}
-              </span>
-            </div>
+            ))}
+          </div>
 
-            {/* Connector Line (except after last step) */}
-            {index < steps.length - 1 && (
-              <div className={clsx(
-                'flex-1 h-1 mx-2',
-                getConnectorClasses(index)
-              )} />
-            )}
-          </React.Fragment>
-        ))}
+          {/* Progress Bar */}
+          <div className="relative">
+            <Progress
+              value={(currentStep / steps.length) * 100}
+              className="h-2"
+            />
+            {/* Step Markers */}
+            <div className="absolute top-0 left-0 right-0 flex justify-between items-center" style={{ transform: 'translateY(-25%)' }}>
+              {steps.map((step) => (
+                <div
+                  key={step.id}
+                  className={clsx(
+                    'rounded-full flex items-center justify-center font-semibold text-sm border-2 bg-white',
+                    step.status === 'completed'
+                      ? 'w-7 h-7 border-green-500 text-green-500'
+                      : step.status === 'active'
+                      ? 'w-8 h-8 border-primary text-primary'
+                      : 'w-7 h-7 border-gray-300 text-gray-400'
+                  )}
+                >
+                  {step.status === 'completed' ? '✓' : step.id}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
-      <p className="text-right text-sm text-text-secondary mt-2">
-        Step {currentStep} of {steps.length}
-      </p>
+
+      {/* Mobile View - Progress bar with current step label */}
+      <div className="block md:hidden">
+        <div className="space-y-3">
+          {/* Current Step Label */}
+          <div className="text-center">
+            <span className="text-sm font-semibold text-primary">
+              {currentStep}. {steps[currentStep - 1]?.label}
+            </span>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="relative">
+            <Progress
+              value={(currentStep / steps.length) * 100}
+              className="h-2"
+            />
+            {/* Step Markers */}
+            <div className="absolute top-0 left-0 right-0 flex justify-between items-center" style={{ transform: 'translateY(-25%)' }}>
+              {steps.map((step) => (
+                <div
+                  key={step.id}
+                  className={clsx(
+                    'rounded-full flex items-center justify-center font-semibold text-xs border-2 bg-white',
+                    step.status === 'completed'
+                      ? 'w-5 h-5 border-green-500 text-green-500'
+                      : step.status === 'active'
+                      ? 'w-6 h-6 border-primary text-primary'
+                      : 'w-5 h-5 border-gray-300 text-gray-400'
+                  )}
+                >
+                  {step.status === 'completed' ? '✓' : step.id}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
