@@ -310,7 +310,7 @@ export default function CallbackPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="card max-w-lg w-full">
-          <h1 className="text-2xl font-bold text-danger mb-4">Authentication Error</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-danger mb-4">Authentication Error</h1>
           <p className="text-text-secondary mb-4">{mainErrorMessage}</p>
           {errorUri && (
             <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">

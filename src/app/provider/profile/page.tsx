@@ -105,7 +105,7 @@ export default function ClinicProfile() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-text-primary mb-2">Clinic Profile</h1>
+          <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary mb-2">Clinic Profile</h1>
           <p className="text-text-secondary">Manage your clinic information and settings</p>
         </div>
 
@@ -114,13 +114,13 @@ export default function ClinicProfile() {
             {/* Clinic Header Card */}
             <Card className="mb-6 bg-gradient-to-r from-primary to-blue-600 text-white">
               <div className="flex items-center space-x-4">
-                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-primary text-3xl font-bold">
+                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-primary text-2xl sm:text-3xl font-bold">
                   <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-2xl font-bold">{getOrganizationName()}</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold">{getOrganizationName()}</h2>
                   <p className="text-blue-100">{getEmail()}</p>
                   <div className="flex gap-2 mt-2">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white text-primary">
@@ -156,13 +156,13 @@ export default function ClinicProfile() {
             {/* Tab Content */}
             {activeTab === 'overview' && (
               <Card>
-                <h3 className="text-xl font-semibold mb-4">Clinic Overview</h3>
+                <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Clinic Overview</h3>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-1">
                       Organization Name
                     </label>
-                    <p className="text-lg font-semibold text-text-primary">
+                    <p className="text-sm sm:text-base md:text-lg font-semibold text-text-primary">
                       {getOrganizationName()}
                     </p>
                     {organization.alias && organization.alias.length > 0 && (
@@ -201,7 +201,7 @@ export default function ClinicProfile() {
 
             {activeTab === 'contact' && (
               <Card>
-                <h3 className="text-xl font-semibold mb-4">Contact & Location Information</h3>
+                <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Contact & Location Information</h3>
                 <div className="space-y-6">
                   {/* Contact Information */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -278,7 +278,7 @@ export default function ClinicProfile() {
 
             {activeTab === 'settings' && (
               <Card>
-                <h3 className="text-xl font-semibold mb-4">Notification Settings</h3>
+                <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Notification Settings</h3>
 
                 <div className="space-y-4 mb-6">
                   <div className="flex items-center justify-between py-3 border-b">
@@ -340,7 +340,7 @@ export default function ClinicProfile() {
                 </div>
 
                 <div className="pt-6 border-t">
-                  <h4 className="text-lg font-semibold mb-4">Clinic Management</h4>
+                  <h4 className="text-sm sm:text-base md:text-lg font-semibold mb-4">Clinic Management</h4>
                   <div className="space-y-3">
                     <Button variant="outline" className="w-full md:w-auto">
                       Update Clinic Information

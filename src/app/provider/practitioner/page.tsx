@@ -227,7 +227,7 @@ export default function PractitionerManagement() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-text-primary">
+            <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary">
               Practitioner
             </h1>
             <Button
@@ -306,7 +306,7 @@ export default function PractitionerManagement() {
                       
                       <div className="flex-1 min-w-0">
                         <div className="mb-2">
-                          <h3 className="text-xl font-semibold text-text-primary">{displayName}</h3>
+                          <h3 className="text-base sm:text-lg md:text-xl font-semibold text-text-primary">{displayName}</h3>
                           {qualifications.length > 0 && (
                             <p className="text-sm text-primary font-medium">{qualifications.join(', ')}</p>
                           )}
@@ -419,7 +419,7 @@ export default function PractitionerManagement() {
             <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <h3 className="text-lg font-medium text-text-primary mb-2">
+            <h3 className="text-sm sm:text-base md:text-lg font-medium text-text-primary mb-2">
               {loading ? 'Loading Practitioners...' : 'No Practitioners Found'}
             </h3>
             <p className="text-text-secondary mb-4">

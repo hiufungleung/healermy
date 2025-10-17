@@ -110,7 +110,7 @@ export default function PractitionerProfile() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-text-primary mb-2">My Profile</h1>
+          <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary mb-2">My Profile</h1>
           <p className="text-text-secondary">Manage your professional information and settings</p>
         </div>
 
@@ -119,11 +119,11 @@ export default function PractitionerProfile() {
             {/* Profile Header Card */}
             <Card className="mb-6 bg-gradient-to-r from-primary to-blue-600 text-white">
               <div className="flex items-center space-x-4">
-                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-primary text-3xl font-bold">
+                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-primary text-2xl sm:text-3xl font-bold">
                   {getPractitionerName().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-2xl font-bold">{getPractitionerName()}</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold">{getPractitionerName()}</h2>
                   <p className="text-blue-100">{getEmail()}</p>
                   <div className="flex gap-2 mt-2">
                     <Badge variant={practitioner.active ? 'success' : 'danger'} size="sm">
@@ -156,13 +156,13 @@ export default function PractitionerProfile() {
             {/* Tab Content */}
             {activeTab === 'overview' && (
               <Card>
-                <h3 className="text-xl font-semibold mb-4">Professional Overview</h3>
+                <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Professional Overview</h3>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-1">
                       Full Name
                     </label>
-                    <p className="text-lg font-semibold text-text-primary">
+                    <p className="text-sm sm:text-base md:text-lg font-semibold text-text-primary">
                       {getPractitionerName()}
                     </p>
                   </div>
@@ -211,7 +211,7 @@ export default function PractitionerProfile() {
 
             {activeTab === 'contact' && (
               <Card>
-                <h3 className="text-xl font-semibold mb-4">Contact & Location Information</h3>
+                <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Contact & Location Information</h3>
                 <div className="space-y-6">
                   {/* Contact Information */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -245,7 +245,7 @@ export default function PractitionerProfile() {
 
             {activeTab === 'settings' && (
               <Card>
-                <h3 className="text-xl font-semibold mb-4">Notification Settings (Demo)</h3>
+                <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Notification Settings (Demo)</h3>
 
                 <div className="space-y-4 mb-6">
                   <div className="flex items-center justify-between py-3 border-b">
@@ -307,7 +307,7 @@ export default function PractitionerProfile() {
                 </div>
 
                 <div className="pt-6 border-t">
-                  <h4 className="text-lg font-semibold mb-4">Account Management (Demo)</h4>
+                  <h4 className="text-sm sm:text-base md:text-lg font-semibold mb-4">Account Management (Demo)</h4>
                   <div className="space-y-3">
                     <Button variant="outline" className="w-full md:w-auto">
                       Change Password

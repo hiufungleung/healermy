@@ -142,7 +142,7 @@ export default function VisitInfoClient({
   return (
     <ContentContainer size="xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-text-primary">
+        <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary">
           Book New Appointment
         </h1>
       </div>
@@ -167,7 +167,7 @@ export default function VisitInfoClient({
       />
 
       <Card>
-        <h2 className="text-xl font-semibold mb-4">Visit Information</h2>
+        <h2 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Visit Information</h2>
         <p className="text-text-secondary mb-6">
           Please provide information about your visit
         </p>

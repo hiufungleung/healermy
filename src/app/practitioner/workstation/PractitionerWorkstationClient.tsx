@@ -297,7 +297,7 @@ export default function PractitionerWorkstationClient({
     <>
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-text-primary mb-2">
+        <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary mb-2">
           Workstation
         </h1>
         <p className="text-text-secondary">
@@ -308,7 +308,7 @@ export default function PractitionerWorkstationClient({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Current Encounter Card */}
         <Card className="p-6">
-          <h2 className="text-xl font-bold text-text-primary mb-4">
+          <h2 className="text-base sm:text-lg md:text-xl font-bold text-text-primary mb-4">
             Current Encounter
           </h2>
 
@@ -316,7 +316,7 @@ export default function PractitionerWorkstationClient({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-text-primary">
+                  <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary">
                     {getPatientName(currentEncounter.patient)}
                   </h3>
                   <p className="text-sm text-text-secondary">
@@ -392,7 +392,7 @@ export default function PractitionerWorkstationClient({
         {/* Upcoming Queue Card */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-text-primary">
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-text-primary">
               Upcoming Queue ({upcomingQueue.length})
             </h2>
             {upcomingQueue.length > 0 && upcomingQueue[0].encounter?.status !== 'on-hold' && (

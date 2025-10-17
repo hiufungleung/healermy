@@ -699,7 +699,7 @@ export default function NotificationsClient({
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-text-primary mb-2">Notifications & Messages</h1>
+          <h1 className="text-xl sm:text-2xl sm:text-2xl sm:text-3xl font-bold text-text-primary mb-2">Notifications & Messages</h1>
           <p className="text-text-secondary">Stay updated with your healthcare communications</p>
         </div>
 
@@ -718,21 +718,21 @@ export default function NotificationsClient({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <Card padding="sm">
           <div className="text-center py-2">
-            <div className="text-xl sm:text-2xl font-bold text-primary">{unreadCount}</div>
+            <div className="text-xl sm:text-xl sm:text-2xl font-bold text-primary">{unreadCount}</div>
             <div className="text-xs sm:text-sm text-text-secondary">Unread Messages</div>
           </div>
         </Card>
 
         <Card padding="sm">
           <div className="text-center py-2">
-            <div className="text-xl sm:text-2xl font-bold text-red-500">{actionRequiredCount}</div>
+            <div className="text-xl sm:text-xl sm:text-2xl font-bold text-red-500">{actionRequiredCount}</div>
             <div className="text-xs sm:text-sm text-text-secondary">Action Required</div>
           </div>
         </Card>
 
         <Card padding="sm">
           <div className="text-center py-2">
-            <div className="text-xl sm:text-2xl font-bold text-text-primary">{totalCount}</div>
+            <div className="text-xl sm:text-xl sm:text-2xl font-bold text-text-primary">{totalCount}</div>
             <div className="text-xs sm:text-sm text-text-secondary">Total Messages</div>
           </div>
         </Card>

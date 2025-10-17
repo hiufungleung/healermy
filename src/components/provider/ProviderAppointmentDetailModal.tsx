@@ -119,7 +119,7 @@ export function ProviderAppointmentDetailModal({
         <div className="space-y-6">
           {/* Status Badge */}
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">Status</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900">Status</h3>
             <Badge variant={getStatusVariant(appointment.status)} size="md">
               {getStatusLabel(appointment.status)}
             </Badge>

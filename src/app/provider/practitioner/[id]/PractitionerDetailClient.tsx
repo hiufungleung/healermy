@@ -881,7 +881,7 @@ export default function PractitionerDetailClient({
                           {/* Header with Title and Actions */}
                           <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-2 md:gap-3 mb-3 md:mb-4">
                             <div className="min-w-0 flex-1">
-                              <h3 className="text-base md:text-lg font-bold text-text-primary mb-0.5">Schedule {schedule.id}</h3>
+                              <h3 className="text-base md:text-sm sm:text-base md:text-lg font-bold text-text-primary mb-0.5">Schedule {schedule.id}</h3>
                               <p className="text-xs md:text-sm text-gray-500">
                                 {schedule.planningHorizon?.start && formatDateForDisplay(schedule.planningHorizon.start)} -{' '}
                                 {schedule.planningHorizon?.end && formatDateForDisplay(schedule.planningHorizon.end)}
@@ -1142,7 +1142,7 @@ export default function PractitionerDetailClient({
         {/* Main Content - Calendar */}
         <div className="flex-1 space-y-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-            <h2 className="text-lg md:text-xl font-semibold">
+            <h2 className="text-lg md:text-base sm:text-lg md:text-xl font-semibold">
               Slot Calendar
               {filteredSlots.length < slots.length && (
                 <span className="text-sm text-gray-500 ml-2">
@@ -1504,7 +1504,7 @@ export default function PractitionerDetailClient({
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h2 className="text-lg md:text-xl font-semibold">
+          <h2 className="text-lg md:text-base sm:text-lg md:text-xl font-semibold">
             Appointments for this Practitioner
           </h2>
         </div>

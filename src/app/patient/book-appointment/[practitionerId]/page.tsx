@@ -321,7 +321,7 @@ export default function SelectAppointment() {
     <Layout>
       <ContentContainer size="xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-text-primary">
+          <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary">
             Book New Appointment
           </h1>
         </div>
@@ -345,7 +345,7 @@ export default function SelectAppointment() {
 
         {/* Service Selection Card - Required before viewing slots */}
         <Card className="mb-6">
-          <h2 className="text-xl font-semibold mb-4">Select Service Details</h2>
+          <h2 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Select Service Details</h2>
           <p className="text-text-secondary mb-6">
             Choose the type of service you need to find available schedules
           </p>
@@ -465,7 +465,7 @@ export default function SelectAppointment() {
         {/* Only show date/time selection after service criteria are selected */}
         {selectedServiceCategory && selectedServiceType && selectedSpecialty && (
           <Card className="mb-6">
-          <h2 className="text-xl font-semibold mb-4">Select Date & Time</h2>
+          <h2 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Select Date & Time</h2>
 
           {/* Selected Doctor */}
           <div className="mb-6">

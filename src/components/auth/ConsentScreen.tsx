@@ -28,7 +28,7 @@ export function ConsentScreen({ onAccept, onDecline }: ConsentScreenProps) {
             />
           </div>
           
-          <h1 className="text-3xl font-bold mb-4">Consent & Privacy</h1>
+          <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold mb-4">Consent & Privacy</h1>
         </div>
 
         <div className="space-y-6 mb-8">

@@ -271,7 +271,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
       {/* Page Header */}
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-text-primary">My Appointments</h1>
+          <h1 className="text-xl sm:text-2xl sm:text-2xl sm:text-3xl font-bold text-text-primary">My Appointments</h1>
 
           {/* Book Appointment Button - Dashboard Style */}
           <button
@@ -298,7 +298,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-            <h2 className="text-xl font-semibold">
+            <h2 className="text-base sm:text-lg md:text-xl font-semibold">
               {filterStatus === 'all' ? 'All Appointments' :
                filterStatus === 'booked' ? 'Confirmed Appointments' :
                `${filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)} Appointments`}
@@ -337,7 +337,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
               <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-sm sm:text-base md:text-lg font-medium text-gray-900 mb-2">
                 {searchTerm || filterStatus !== 'all' ? 'No matching appointments' : 'No appointments found'}
               </h3>
               <p className="text-gray-500 mb-6">

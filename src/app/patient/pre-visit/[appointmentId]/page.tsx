@@ -179,7 +179,7 @@ export default function PreVisitSummary() {
               </svg>
               <span>{patientName}</span>
             </div>
-            <h1 className="text-3xl font-bold text-text-primary">Patient Information</h1>
+            <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary">Patient Information</h1>
           </div>
           
           <div className="flex items-center space-x-3">
@@ -203,11 +203,11 @@ export default function PreVisitSummary() {
           <div className="bg-gradient-to-r from-primary to-purple-600 text-white rounded-lg p-6 -m-6 mb-6">
             <div className="flex items-start justify-between">
               <div className="flex items-center space-x-4">
-                <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center text-2xl font-bold">
+                <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold">
                   {patientName.split(' ').map(n => n[0]).join('')}
                 </div>
                 <div>
-                  <h2 className="text-3xl font-bold mb-1">{patientName}</h2>
+                  <h2 className="text-xl sm:text-2xl sm:text-3xl font-bold mb-1">{patientName}</h2>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
                       <span className="opacity-75">ID:</span> {patientId}
@@ -238,15 +238,15 @@ export default function PreVisitSummary() {
             <div className="bg-white/10 backdrop-blur rounded-lg p-4 mt-6">
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <div className="text-3xl font-bold">{totalVisits}</div>
+                  <div className="text-xl sm:text-2xl sm:text-3xl font-bold">{totalVisits}</div>
                   <div className="text-sm opacity-75">Total Visits</div>
                 </div>
                 <div>
-                  <div className="text-3xl font-bold">{activeOrders}</div>
+                  <div className="text-xl sm:text-2xl sm:text-3xl font-bold">{activeOrders}</div>
                   <div className="text-sm opacity-75">Active Orders</div>
                 </div>
                 <div>
-                  <div className="text-3xl font-bold">{totalMedications}</div>
+                  <div className="text-xl sm:text-2xl sm:text-3xl font-bold">{totalMedications}</div>
                   <div className="text-sm opacity-75">Medications</div>
                 </div>
               </div>
@@ -263,7 +263,7 @@ export default function PreVisitSummary() {
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold">Upcoming Appointment</h3>
+              <h3 className="text-sm sm:text-base md:text-lg font-semibold">Upcoming Appointment</h3>
               <p className="text-text-secondary">
                 {new Date(mockAppointment.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} | {mockAppointment.time}
               </p>
@@ -300,7 +300,7 @@ export default function PreVisitSummary() {
         {/* Tab Content */}
         {activeTab === 'current' && (
           <Card>
-            <h3 className="text-xl font-semibold mb-4">Visit Reason & Health Concerns</h3>
+            <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Visit Reason & Health Concerns</h3>
             
             <div className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
@@ -337,7 +337,7 @@ export default function PreVisitSummary() {
 
         {activeTab === 'history' && (
           <Card>
-            <h3 className="text-xl font-semibold mb-4">Medical History</h3>
+            <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Medical History</h3>
             
             <div className="space-y-6">
               <div>
@@ -379,7 +379,7 @@ export default function PreVisitSummary() {
 
         {activeTab === 'results' && (
           <Card>
-            <h3 className="text-xl font-semibold mb-4">Recent Test Results</h3>
+            <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Recent Test Results</h3>
             
             <div className="space-y-3">
               {observations.map((observation) => (
@@ -404,7 +404,7 @@ export default function PreVisitSummary() {
 
         {/* Clinician Notes */}
         <Card className="mt-6">
-          <h3 className="text-xl font-semibold mb-4">Clinician Notes</h3>
+          <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Clinician Notes</h3>
           <textarea
             value={clinicianNotes}
             onChange={(e) => setClinicianNotes(e.target.value)}

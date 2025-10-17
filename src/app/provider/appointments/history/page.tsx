@@ -96,7 +96,7 @@ export default async function ProviderAppointmentsHistoryPage() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-text-primary">All Appointments History</h1>
+            <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary">All Appointments History</h1>
             <p className="text-text-secondary">Complete appointment history for the clinic</p>
           </div>
           <div className="flex space-x-3">

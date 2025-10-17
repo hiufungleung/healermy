@@ -363,7 +363,7 @@ export default function AppointmentView(props: AppointmentViewProps) {
   return (
     <ContentContainer size="md">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-text-primary">
+        <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary">
           {mode === 'confirm' ? 'Book New Appointment' : 'Appointment Details'}
         </h1>
       </div>
@@ -404,7 +404,7 @@ export default function AppointmentView(props: AppointmentViewProps) {
       <Card>
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-text-primary mb-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-text-primary mb-2">
               {appointmentData.doctorName}
             </h2>
             <p className="text-text-secondary">{appointmentData.specialty}</p>

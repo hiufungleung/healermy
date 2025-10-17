@@ -262,7 +262,7 @@ function LaunchContent() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="card max-w-md w-full">
-          <h1 className="text-2xl font-bold text-danger mb-4">Authorization Error</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-danger mb-4">Authorization Error</h1>
           <p className="text-text-secondary mb-4">{error}</p>
           <div className="flex space-x-3">
             <button
@@ -291,7 +291,7 @@ function LaunchContent() {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="card max-w-lg w-full">
           <div className="text-center mb-6">
-            <h1 className="text-3xl font-bold mb-2">Select Your Role</h1>
+            <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold mb-2">Select Your Role</h1>
             <p className="text-text-secondary">
               {isEhrLaunch
                 ? 'How do you want to access the system?'

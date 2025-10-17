@@ -138,7 +138,7 @@ export const EncountersOverview: React.FC<EncountersOverviewProps> = ({
   if (loading) {
     return (
       <div className="mb-8">
-        <h3 className="text-lg font-semibold text-text-primary mb-3">Visit History</h3>
+        <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-3">Visit History</h3>
         <Card>
           <div className="flex items-center justify-center py-8">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-3"></div>
@@ -152,13 +152,13 @@ export const EncountersOverview: React.FC<EncountersOverviewProps> = ({
   if (encounters.length === 0) {
     return (
       <div className="mb-8">
-        <h3 className="text-lg font-semibold text-text-primary mb-3">Visit History</h3>
+        <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-3">Visit History</h3>
         <Card>
           <div className="text-center py-8">
             <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="currentColor" viewBox="0 0 24 24">
               <path d="M19,4H18V2H16V4H8V2H6V4H5C3.89,4 3,4.9 3,6V20A2,2 0 0,0 5,22H19A2,2 0 0,0 21,20V6A2,2 0 0,0 19,4M19,20H5V10H19V20M5,8V6H19V8H5Z"/>
             </svg>
-            <h4 className="text-lg font-medium text-gray-900 mb-1">No Visit History</h4>
+            <h4 className="text-sm sm:text-base md:text-lg font-medium text-gray-900 mb-1">No Visit History</h4>
             <p className="text-gray-500">No encounters found for this patient.</p>
           </div>
         </Card>
@@ -200,7 +200,7 @@ export const EncountersOverview: React.FC<EncountersOverviewProps> = ({
 
   return (
     <div className="mb-8" data-section="procedures">
-      <h3 className="text-lg font-semibold text-text-primary mb-3">
+      <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-3">
         Visit History ({encounters.length})
       </h3>
 

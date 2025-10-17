@@ -12,6 +12,7 @@ import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { SlotSelectionGrid } from '@/components/common/SlotDisplay';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { Input } from '@/components/ui/input';
 import { formatTimeForDisplay, formatDateForDisplay } from '@/library/timezone';
 import type { Practitioner, Slot, Schedule } from '@/types/fhir';
 
@@ -583,7 +584,7 @@ export default function NewBookingFlow() {
     <Layout>
       <ContentContainer size="xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-text-primary">
+          <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary">
             Book New Appointment
           </h1>
         </div>
@@ -608,7 +609,7 @@ export default function NewBookingFlow() {
             {/* LEFT COLUMN: Service Details Filters */}
             <div className="lg:col-span-1">
               <Card>
-                <h2 className="text-lg font-semibold text-gray-900 mb-6">Filter by Service</h2>
+                <h2 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-6">Filter by Service</h2>
 
                 {/* Specialty */}
                 <div className="mb-6">
@@ -729,16 +730,16 @@ export default function NewBookingFlow() {
             {/* RIGHT COLUMN: Doctor Search & Results */}
             <div className="lg:col-span-2">
               <Card>
-                <h2 className="text-xl font-semibold mb-4">Select Doctor</h2>
+                <h2 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Select Doctor</h2>
 
                 {/* Search Bar */}
                 <div className="mb-6">
-                  <input
+                  <Input
                     type="text"
                     placeholder="Search doctor by name..."
                     value={searchTerm}
                     onChange={(e) => handleDoctorSearch(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="px-4 py-3"
                   />
                 </div>
 
@@ -852,7 +853,7 @@ export default function NewBookingFlow() {
         {currentStep === 2 && (
           <div className="space-y-8">
             <Card>
-              <h2 className="text-xl font-semibold mb-6">Select Date & Time</h2>
+              <h2 className="text-base sm:text-lg md:text-xl font-semibold mb-6">Select Date & Time</h2>
 
               {/* Selected Doctor Info */}
               {selectedPractitioner && (
@@ -937,7 +938,7 @@ export default function NewBookingFlow() {
           <div className="space-y-8">
             <Card>
               <div className="bg-blue-50 px-6 py-4 -mx-6 -mt-6 mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Visit Information</h2>
+                <h2 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">Visit Information</h2>
               </div>
 
               {/* Reason for Visit */}
@@ -1028,7 +1029,7 @@ export default function NewBookingFlow() {
           <div className="space-y-8">
             <Card>
               <div className="bg-blue-50 px-6 py-4 -mx-6 -mt-6 mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Review & Confirm</h2>
+                <h2 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">Review & Confirm</h2>
               </div>
 
               {/* Appointment Details */}

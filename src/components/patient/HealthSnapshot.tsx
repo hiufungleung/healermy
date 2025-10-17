@@ -34,7 +34,7 @@ const StatCard: React.FC<StatCardProps> = ({
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
           {title}
         </p>
-        <p className="mt-1 text-2xl font-semibold text-text-primary">{value}</p>
+        <p className="mt-1 text-xl sm:text-2xl font-semibold text-text-primary">{value}</p>
         {subtitle && (
           <p className="text-sm text-text-secondary">{subtitle}</p>
         )}
@@ -69,7 +69,7 @@ export const HealthSnapshot: React.FC<HealthSnapshotProps> = ({
   if (loading) {
     return (
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Health Snapshot</h2>
+        <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 mb-4">Health Snapshot</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="animate-pulse">
@@ -85,7 +85,7 @@ export const HealthSnapshot: React.FC<HealthSnapshotProps> = ({
 
   return (
     <div className="mb-8">
-      <h2 className="text-xl font-bold text-gray-900 mb-4">Health Snapshot</h2>
+      <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 mb-4">Health Snapshot</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Active Conditions */}
         <StatCard

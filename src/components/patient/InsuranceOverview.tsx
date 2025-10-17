@@ -269,7 +269,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
   if (loading) {
     return (
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-text-primary mb-4 border-b border-gray-200 pb-2">
+        <h2 className="text-base sm:text-lg md:text-xl font-bold text-text-primary mb-4 border-b border-gray-200 pb-2">
           Insurance Information
         </h2>
         <Card>
@@ -284,7 +284,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
 
   return (
     <div className="mb-8">
-      <h2 className="text-xl font-bold text-text-primary mb-4 border-b border-gray-200 pb-2">
+      <h2 className="text-base sm:text-lg md:text-xl font-bold text-text-primary mb-4 border-b border-gray-200 pb-2">
         Insurance Information
       </h2>
 
@@ -294,7 +294,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
             <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,7C13.4,7 14.8,8.6 14.8,10.5V11.5C14.8,12.4 14.4,13.2 13.7,13.7C13.9,13.9 14,14.2 14,14.5V16.5C14,17.3 13.3,18 12.5,18H11.5C10.7,18 10,17.3 10,16.5V14.5C10,14.2 10.1,13.9 10.3,13.7C9.6,13.2 9.2,12.4 9.2,11.5V10.5C9.2,8.6 10.6,7 12,7M12,8.2C11.2,8.2 10.4,8.7 10.4,10.5V11.5C10.4,12.3 11.1,12.8 11.5,12.8H12.5C12.9,12.8 13.6,12.3 13.6,11.5V10.5C13.6,8.7 12.8,8.2 12,8.2Z"/>
             </svg>
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No Insurance Information</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-medium text-gray-900 mb-1">No Insurance Information</h3>
             <p className="text-gray-500">No insurance coverage or billing accounts found for this patient.</p>
           </div>
         </Card>
@@ -305,7 +305,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
             <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
               <div className="mb-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 flex items-center">
                     <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M6,16.5L3,19.44V11H6M11,14.66L9.43,13.32L8,14.64V7H11M16,13L13,16V3H16M18.81,12.81L17,11H22V16L20.21,14.21L13,21.36L9.53,18.34L5.75,22H3L9.47,15.66L13,18.64"/>
                     </svg>
@@ -321,7 +321,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
                 {/* Total Billed */}
                 <div className="bg-white rounded-lg p-4 border border-gray-200">
                   <div className="text-sm font-medium text-gray-600 mb-1">Total Billed</div>
-                  <div className="text-2xl font-bold text-gray-900">
+                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
                     ${financialSummary.totalBilled.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
@@ -332,7 +332,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
                 {/* Insurance Paid */}
                 <div className="bg-white rounded-lg p-4 border border-green-200">
                   <div className="text-sm font-medium text-green-700 mb-1">Insurance Paid</div>
-                  <div className="text-2xl font-bold text-green-600">
+                  <div className="text-xl sm:text-2xl font-bold text-green-600">
                     ${financialSummary.insurancePaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div className="text-xs text-green-600 mt-1">
@@ -346,7 +346,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
                 {/* You Paid */}
                 <div className="bg-white rounded-lg p-4 border border-orange-200">
                   <div className="text-sm font-medium text-orange-700 mb-1">You Paid</div>
-                  <div className="text-2xl font-bold text-orange-600">
+                  <div className="text-xl sm:text-2xl font-bold text-orange-600">
                     ${financialSummary.patientPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div className="text-xs text-orange-600 mt-1">
@@ -367,7 +367,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     {getKindIcon(primaryCoverage.kind)}
-                    <h3 className="ml-2 text-lg font-semibold text-gray-900">
+                    <h3 className="ml-2 text-sm sm:text-base md:text-lg font-semibold text-gray-900">
                       Primary Insurance
                     </h3>
                   </div>
@@ -534,7 +534,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
           {/* Recent Claims */}
           {explanationOfBenefit && explanationOfBenefit.length > 0 && (
             <Card>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center justify-between">
+              <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-4 flex items-center justify-between">
                 <span>Recent Claims</span>
                 {explanationOfBenefit.length > 5 && (
                   <span className="text-sm font-normal text-gray-500">
@@ -606,7 +606,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
                           <div className="text-right ml-4">
                             {totalAmount > 0 && (
                               <>
-                                <div className="text-lg font-bold text-gray-900">
+                                <div className="text-sm sm:text-base md:text-lg font-bold text-gray-900">
                                   ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                 </div>
                                 <div className="text-xs text-green-600">
@@ -631,7 +631,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
           {/* All Coverage List */}
           {coverage.length > 1 && (
             <Card>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-4">
                 All Coverage ({coverage.length})
               </h3>
               <div className="space-y-3">
@@ -710,7 +710,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
           {/* Billing Accounts Section */}
           {accounts.length > 0 && (
             <Card className="mt-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-4">
                 Billing Accounts ({accounts.length})
               </h3>
               <div className="space-y-4">

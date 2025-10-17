@@ -138,14 +138,14 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
           <svg className="w-16 h-16 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Details</h3>
+          <h3 className="text-sm sm:text-base md:text-lg font-medium text-gray-900 mb-2">Error Loading Details</h3>
           <p className="text-gray-600">{error}</p>
         </div>
       ) : appointment ? (
         <div className="space-y-6">
           {/* Status Badge */}
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">Status</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900">Status</h3>
             <Badge
               variant={
                 appointmentStatus === 'booked' || appointmentStatus === 'fulfilled' ? 'success' :
@@ -163,7 +163,7 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
 
           {/* Doctor Information */}
           <div className="border-t pt-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Doctor Information</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-4">Doctor Information</h3>
             <div className="space-y-3">
               <div className="flex items-start">
                 <svg className="w-5 h-5 text-gray-400 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -188,7 +188,7 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
 
           {/* Appointment Details */}
           <div className="border-t pt-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Appointment Details</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-4">Appointment Details</h3>
             <div className="space-y-3">
               <div className="flex items-start">
                 <svg className="w-5 h-5 text-gray-400 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -215,7 +215,7 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
 
           {/* Contact Information */}
           <div className="border-t pt-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
             <div className="space-y-3">
               <div className="flex items-start">
                 <svg className="w-5 h-5 text-gray-400 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

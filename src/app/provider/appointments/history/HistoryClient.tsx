@@ -139,7 +139,7 @@ export default function HistoryClient({ appointments: initialAppointments }: His
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-text-primary mb-2">No Appointments</h3>
+          <h3 className="text-sm sm:text-base md:text-lg font-medium text-text-primary mb-2">No Appointments</h3>
           <p className="text-text-secondary">No appointment history found.</p>
         </div>
       ) : (

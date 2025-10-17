@@ -182,7 +182,7 @@ export function Layout({ children, patientName, providerName, practitionerName }
               {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
                 <Link href="/" className="flex items-center">
-                  <span className="text-2xl font-bold text-brand">HealerMy</span>
+                  <span className="text-xl sm:text-2xl font-bold text-brand">HealerMy</span>
                 </Link>
               </div>
 

@@ -54,7 +54,7 @@ export default function PractitionerWrapper({
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-text-primary">
+              <h1 className="text-xl sm:text-2xl font-bold text-text-primary">
                 {practitionerName}
               </h1>
               <p className="text-text-secondary">
@@ -63,11 +63,11 @@ export default function PractitionerWrapper({
             </div>
             <div className="flex items-center space-x-6 text-sm">
               <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{activeSchedules}</div>
+                <div className="text-xl sm:text-2xl font-bold text-primary">{activeSchedules}</div>
                 <div className="text-gray-600">Active Schedules</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{availableSlots}</div>
+                <div className="text-xl sm:text-2xl font-bold text-green-600">{availableSlots}</div>
                 <div className="text-gray-600">Available Slots</div>
               </div>
             </div>

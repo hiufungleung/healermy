@@ -308,7 +308,7 @@ export default function PractitionerAppointmentsClient({
     <>
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-text-primary mb-2">
+        <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary mb-2">
           My Appointments
         </h1>
         <p className="text-text-secondary">
@@ -389,7 +389,7 @@ export default function PractitionerAppointmentsClient({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-lg font-semibold text-text-primary">
+                    <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary">
                       {appointment.patientName}
                     </h3>
                     <Badge variant={getStatusBadgeVariant(appointment.status)}>

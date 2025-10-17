@@ -167,7 +167,7 @@ export const VitalsDashboard: React.FC<VitalsDashboardProps> = ({
   if (loading) {
     return (
       <div className="mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Current Vitals</h2>
+        <h2 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-4">Current Vitals</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i} className="p-4">
@@ -184,7 +184,7 @@ export const VitalsDashboard: React.FC<VitalsDashboardProps> = ({
   if (vitals.length === 0) {
     return (
       <div className="mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Current Vitals</h2>
+        <h2 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-4">Current Vitals</h2>
         <Card className="p-6">
           <p className="text-gray-500 text-center">No vital signs recorded</p>
         </Card>
@@ -194,7 +194,7 @@ export const VitalsDashboard: React.FC<VitalsDashboardProps> = ({
 
   return (
     <div className="mb-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Current Vitals</h2>
+      <h2 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-4">Current Vitals</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {vitals.map((vital) => (
           <Card key={vital.name} className="p-4 hover:shadow-md transition-shadow">
@@ -205,7 +205,7 @@ export const VitalsDashboard: React.FC<VitalsDashboardProps> = ({
 
             {/* Value and Unit */}
             <div className="flex items-baseline gap-2 mb-1">
-              <span className="text-3xl font-bold text-gray-900">
+              <span className="text-xl sm:text-2xl sm:text-3xl font-bold text-gray-900">
                 {vital.value}
               </span>
               <span className="text-sm font-medium text-gray-600">

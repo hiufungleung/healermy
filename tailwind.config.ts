@@ -160,13 +160,61 @@ const config: Config = {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		typography: {
+  			// Custom typography scale for consistent font sizes
+  			'display-lg': ['2.5rem', { lineHeight: '1.2', fontWeight: '700' }],  // 40px
+  			'display': ['2rem', { lineHeight: '1.25', fontWeight: '700' }],      // 32px
+  			'h1': ['1.875rem', { lineHeight: '1.3', fontWeight: '700' }],        // 30px
+  			'h2': ['1.5rem', { lineHeight: '1.35', fontWeight: '600' }],         // 24px
+  			'h3': ['1.25rem', { lineHeight: '1.4', fontWeight: '600' }],         // 20px
+  			'h4': ['1.125rem', { lineHeight: '1.45', fontWeight: '600' }],       // 18px
+  			'body-lg': ['1rem', { lineHeight: '1.6', fontWeight: '400' }],       // 16px
+  			'body': ['0.875rem', { lineHeight: '1.6', fontWeight: '400' }],      // 14px
+  			'body-sm': ['0.8125rem', { lineHeight: '1.5', fontWeight: '400' }],  // 13px
+  			'caption': ['0.75rem', { lineHeight: '1.5', fontWeight: '400' }],    // 12px
   		}
   	}
   },
   plugins: [
     tailwindForms,
     tailwindTypography,
-      require("tailwindcss-animate")
+      require("tailwindcss-animate"),
+    // Custom typography plugin for utility classes
+    function({ addComponents }: any) {
+      addComponents({
+        '.typo-display-lg': {
+          '@apply text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold': {},
+        },
+        '.typo-display': {
+          '@apply text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold': {},
+        },
+        '.typo-h1': {
+          '@apply text-2xl sm:text-3xl font-bold': {},
+        },
+        '.typo-h2': {
+          '@apply text-xl sm:text-2xl font-semibold': {},
+        },
+        '.typo-h3': {
+          '@apply text-base sm:text-lg md:text-xl font-semibold': {},
+        },
+        '.typo-h4': {
+          '@apply text-sm sm:text-base md:text-lg font-semibold': {},
+        },
+        '.typo-body-lg': {
+          '@apply text-base sm:text-lg': {},
+        },
+        '.typo-body': {
+          '@apply text-sm sm:text-base': {},
+        },
+        '.typo-body-sm': {
+          '@apply text-xs sm:text-sm': {},
+        },
+        '.typo-caption': {
+          '@apply text-xs': {},
+        },
+      })
+    }
 ],
 };
 

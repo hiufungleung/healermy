@@ -24,9 +24,10 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DatePicker } from '@/components/ui/date-picker';
 import { TimePicker } from '@/components/ui/time-picker';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { createFHIRDateTime } from '@/library/timezone';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { Schedule, Slot } from '@/types/fhir';
 
 interface GenerateSlotsFormProps {
@@ -774,7 +775,7 @@ export function GenerateSlotsForm({
             >
               {loading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <LoadingSpinner size="sm" className="mr-2 inline-block" />
                   {progress ? `Creating slots: ${progress.current}/${progress.total}...` : 'Generating...'}
                 </>
               ) : (

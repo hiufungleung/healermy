@@ -51,7 +51,7 @@ export const PatientInfoBanner: React.FC<PatientInfoBannerProps> = ({
       <div className="flex items-start justify-between mb-4">
         {/* Patient Name and ID */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{name}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{name}</h1>
           <p className="text-sm text-gray-500 mt-1">Patient ID: <span className="font-mono text-gray-700">{patientId}</span></p>
         </div>
 

@@ -444,7 +444,7 @@ export default function ProviderAppointmentsClient({
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary">Appointments</h1>
+          <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary">Appointments</h1>
           <p className="text-text-secondary">
             {(() => {
               const today = new Date();
@@ -488,7 +488,7 @@ export default function ProviderAppointmentsClient({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <div className="text-2xl font-bold text-blue-600">{stats.today}</div>
+          <div className="text-xl sm:text-2xl font-bold text-blue-600">{stats.today}</div>
           <div className="text-sm text-text-secondary">Today</div>
         </Card>
 
@@ -498,7 +498,7 @@ export default function ProviderAppointmentsClient({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
+          <div className="text-xl sm:text-2xl font-bold text-yellow-600">{stats.pending}</div>
           <div className="text-sm text-text-secondary">Pending</div>
         </Card>
 
@@ -508,7 +508,7 @@ export default function ProviderAppointmentsClient({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
+          <div className="text-xl sm:text-2xl font-bold text-green-600">{stats.completed}</div>
           <div className="text-sm text-text-secondary">Completed</div>
         </Card>
 
@@ -518,7 +518,7 @@ export default function ProviderAppointmentsClient({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <div className="text-2xl font-bold text-red-600">{stats.cancelled}</div>
+          <div className="text-xl sm:text-2xl font-bold text-red-600">{stats.cancelled}</div>
           <div className="text-sm text-text-secondary">Cancelled</div>
         </Card>
       </div>
@@ -535,7 +535,7 @@ export default function ProviderAppointmentsClient({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-text-primary mb-2">No Appointments</h3>
+              <h3 className="text-sm sm:text-base md:text-lg font-medium text-text-primary mb-2">No Appointments</h3>
               <p className="text-text-secondary">No appointments found for the selected period.</p>
             </div>
           ) : (

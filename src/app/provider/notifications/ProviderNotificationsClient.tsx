@@ -921,7 +921,7 @@ export default function ProviderNotificationsClient() {
         <div className="pl-0 sm:pl-32 lg:pl-36 pr-0 sm:pr-32 lg:pr-36">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-text-primary mb-2">Provider Notifications</h1>
+          <h1 className="text-xl sm:text-2xl sm:text-2xl sm:text-3xl font-bold text-text-primary mb-2">Provider Notifications</h1>
           <p className="text-text-secondary">Manage patient communications and clinical updates</p>
         </div>
 
@@ -940,28 +940,28 @@ export default function ProviderNotificationsClient() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-6">
         <Card padding="sm">
           <div className="text-center py-1 md:py-2">
-            <div className="text-lg md:text-xl font-bold text-primary">{unreadCount}</div>
+            <div className="text-lg md:text-base sm:text-lg md:text-xl font-bold text-primary">{unreadCount}</div>
             <div className="text-xs text-text-secondary">Unread</div>
           </div>
         </Card>
 
         <Card padding="sm">
           <div className="text-center py-1 md:py-2">
-            <div className="text-lg md:text-xl font-bold text-red-500">{urgentCount}</div>
+            <div className="text-lg md:text-base sm:text-lg md:text-xl font-bold text-red-500">{urgentCount}</div>
             <div className="text-xs text-text-secondary">Urgent</div>
           </div>
         </Card>
 
         <Card padding="sm">
           <div className="text-center py-1 md:py-2">
-            <div className="text-lg md:text-xl font-bold text-orange-500">{actionRequiredCount}</div>
+            <div className="text-lg md:text-base sm:text-lg md:text-xl font-bold text-orange-500">{actionRequiredCount}</div>
             <div className="text-xs text-text-secondary">Action Required</div>
           </div>
         </Card>
 
         <Card padding="sm">
           <div className="text-center py-1 md:py-2">
-            <div className="text-lg md:text-xl font-bold text-text-primary">{totalCount}</div>
+            <div className="text-lg md:text-base sm:text-lg md:text-xl font-bold text-text-primary">{totalCount}</div>
             <div className="text-xs text-text-secondary">Total</div>
           </div>
         </Card>

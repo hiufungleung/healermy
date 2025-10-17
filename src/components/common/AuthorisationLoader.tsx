@@ -48,7 +48,7 @@ export function AuthorisationLoader({
         </div>
         
         {/* Loading text with gradient */}
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-green-600 bg-clip-text text-transparent mb-2">
+        <h2 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-green-600 bg-clip-text text-transparent mb-2">
           {message}
         </h2>
         

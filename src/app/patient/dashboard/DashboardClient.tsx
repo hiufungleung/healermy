@@ -363,15 +363,15 @@ export default function DashboardClient({
   return (
     <>
       {/* Welcome Section */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-text-primary mb-2">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-xl sm:text-2xl sm:text-2xl sm:text-3xl font-bold text-text-primary mb-2">
           Welcome, {firstName}
         </h1>
       </div>
 
       {/* Quick Actions - Hidden on mobile */}
-      <div className="hidden sm:block bg-white rounded-xl border border-gray-200 p-6 mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+      <div className="hidden sm:block bg-white rounded-xl border border-gray-200 p-4 sm:p-6 mb-6 sm:mb-8">
+        <h2 className="text-base sm:text-lg md:text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
         <div className="grid md:grid-cols-3 gap-4">
           <button
             onClick={() => router.push('/patient/book-appointment')}
@@ -426,9 +426,9 @@ export default function DashboardClient({
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Upcoming Appointments */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg border border-border p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold">Upcoming Appointments</h2>
+          <div className="bg-white rounded-lg border border-border p-4 sm:p-6">
+            <div className="flex justify-between items-center mb-4 sm:mb-6">
+              <h2 className="text-base sm:text-lg md:text-base sm:text-lg md:text-xl font-semibold">Upcoming Appointments</h2>
               <Button
                 variant="outline"
                 size="sm"
@@ -447,7 +447,7 @@ export default function DashboardClient({
                     <svg className="w-8 h-8 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <h3 className="text-lg font-semibold">Unable to Load Appointments</h3>
+                    <h3 className="text-sm sm:text-base md:text-lg font-semibold">Unable to Load Appointments</h3>
                   </div>
                   <p className="text-gray-600 mb-4">{appointmentsError}</p>
                   <button
@@ -544,7 +544,7 @@ export default function DashboardClient({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No appointments scheduled</h3>
+                  <h3 className="text-sm sm:text-base md:text-lg font-medium text-gray-900 mb-2">No appointments scheduled</h3>
                   <p className="text-text-secondary mb-6">You don't have any upcoming appointments at the moment.</p>
                   <Button
                     variant="primary"
@@ -561,14 +561,14 @@ export default function DashboardClient({
         {/* Next Appointment Queue Status */}
         <div>
           <div className="bg-white rounded-lg border border-border p-6">
-            <h2 className="text-xl font-semibold mb-6">Next Appointment Status</h2>
+            <h2 className="text-base sm:text-lg md:text-xl font-semibold mb-6">Next Appointment Status</h2>
             
             <div className="space-y-4">
               {todayStatus.nextAppointment ? (
                 <>
                   <div>
                     <p className="text-sm text-text-secondary mb-1">Next Appointment</p>
-                    <p className="text-2xl font-bold text-primary">{todayStatus.nextAppointment}</p>
+                    <p className="text-xl sm:text-2xl font-bold text-primary">{todayStatus.nextAppointment}</p>
                   </div>
 
                   {loadingQueue ? (
@@ -579,7 +579,7 @@ export default function DashboardClient({
                   ) : todayStatus.queuePosition !== null && todayStatus.queuePosition !== undefined ? (
                     <div>
                       <p className="text-sm text-text-secondary mb-1">Patients Ahead of You</p>
-                      <p className="text-xl font-semibold text-amber-600">
+                      <p className="text-base sm:text-lg md:text-xl font-semibold text-amber-600">
                         {todayStatus.queuePosition === 0 ? "You're first! 🎉" : todayStatus.queuePosition}
                       </p>
                     </div>
@@ -588,7 +588,7 @@ export default function DashboardClient({
                   {todayStatus.waitTime && (
                     <div>
                       <p className="text-sm text-text-secondary mb-1">Estimated Wait Time</p>
-                      <p className="text-xl font-semibold">{todayStatus.waitTime} mins</p>
+                      <p className="text-base sm:text-lg md:text-xl font-semibold">{todayStatus.waitTime} mins</p>
                     </div>
                   )}
                 </>

@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { cn } from '@/lib/utils';
 
 interface PopupConfirmationProps {
@@ -95,10 +95,7 @@ export function PopupConfirmation({
           {isLoading && progressMessage ? (
             <div className="mt-4">
               <div className="flex items-center justify-center mb-3">
-                <Loader2 className={cn(
-                  'animate-spin h-5 w-5 mr-3',
-                  variant === 'danger' ? 'text-red-600' : 'text-blue-600'
-                )} />
+                <LoadingSpinner size="sm" className="mr-3" />
                 <span className="text-sm text-gray-700">{loadingText || 'Processing...'}</span>
               </div>
               <div className="bg-gray-50 rounded-md p-3">
@@ -134,7 +131,7 @@ export function PopupConfirmation({
           >
             {isLoading ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <LoadingSpinner size="sm" className="mr-2 inline-block" />
                 {loadingText || 'Processing...'}
               </>
             ) : confirmText}

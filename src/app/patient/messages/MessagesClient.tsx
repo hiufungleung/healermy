@@ -292,7 +292,7 @@ export default function MessagesClient({
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary">Messages</h1>
+          <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary">Messages</h1>
           <p className="text-text-secondary">Your healthcare communications and notifications</p>
         </div>
         <Button 
@@ -339,7 +339,7 @@ export default function MessagesClient({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.959 8.959 0 01-2.4-.322C9.584 20.11 8.592 21 7.5 21c-1.162 0-2.5-.897-2.5-2.197 0-.972.826-1.8 1.819-1.8.191 0 .377.021.558.064A6.978 6.978 0 016 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-medium text-text-primary mb-2">No messages</h3>
+                  <h3 className="text-sm sm:text-base md:text-lg font-medium text-text-primary mb-2">No messages</h3>
                   <p className="text-text-secondary">
                     {filter === 'all' ? 'You have no messages yet.' : `No ${filter} messages found.`}
                   </p>
@@ -402,7 +402,7 @@ export default function MessagesClient({
               <div>
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-text-primary">
+                    <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary">
                       {getSenderDisplay(selectedMessage)}
                     </h3>
                     <p className="text-sm text-text-secondary">
@@ -451,7 +451,7 @@ export default function MessagesClient({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.959 8.959 0 01-2.4-.322C9.584 20.11 8.592 21 7.5 21c-1.162 0-2.5-.897-2.5-2.197 0-.972.826-1.8 1.819-1.8.191 0 .377.021.558.064A6.978 6.978 0 016 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-medium text-text-primary mb-2">Select a message</h3>
+                <h3 className="text-sm sm:text-base md:text-lg font-medium text-text-primary mb-2">Select a message</h3>
                 <p className="text-sm text-text-secondary">
                   Choose a message from the list to view its details
                 </p>

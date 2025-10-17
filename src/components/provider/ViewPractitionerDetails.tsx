@@ -85,7 +85,7 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
               <div className="flex-1">
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <h3 className="text-2xl font-bold text-text-primary">{displayName}</h3>
+                    <h3 className="text-xl sm:text-2xl font-bold text-text-primary">{displayName}</h3>
                     {qualifications.length > 0 && (
                       <p className="text-lg text-primary font-medium">{qualifications.join(', ')}</p>
                     )}
@@ -110,7 +110,7 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
 
           {/* Personal Information */}
           <Card>
-            <h3 className="text-lg font-semibold text-text-primary mb-4">Personal Information</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-4">Personal Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h4 className="font-medium text-text-secondary mb-2">Full Name</h4>
@@ -154,7 +154,7 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
 
           {/* Contact Information */}
           <Card>
-            <h3 className="text-lg font-semibold text-text-primary mb-4">Contact Information</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-4">Contact Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h4 className="font-medium text-text-secondary mb-2">Communication</h4>
@@ -209,7 +209,7 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
 
           {/* Professional Information */}
           <Card>
-            <h3 className="text-lg font-semibold text-text-primary mb-4">Professional Information</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-4">Professional Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h4 className="font-medium text-text-secondary mb-2">Identifiers</h4>
@@ -258,7 +258,7 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
 
           {/* System Information */}
           <Card>
-            <h3 className="text-lg font-semibold text-text-primary mb-4">System Information</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-4">System Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h4 className="font-medium text-text-secondary mb-2">Resource Metadata</h4>

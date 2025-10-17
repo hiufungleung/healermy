@@ -259,7 +259,7 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Personal Information */}
           <Card>
-            <h3 className="text-lg font-semibold text-text-primary mb-4">Personal Information</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-4">Personal Information</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <div className="space-y-2">
@@ -343,7 +343,7 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
 
           {/* Contact Information */}
           <Card>
-            <h3 className="text-lg font-semibold text-text-primary mb-4">Contact Information</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-4">Contact Information</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -376,7 +376,7 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
 
           {/* Address Information */}
           <Card>
-            <h3 className="text-lg font-semibold text-text-primary mb-4">Address Information</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-4">Address Information</h3>
 
             <div className="space-y-4">
               <div className="space-y-2">
@@ -457,7 +457,7 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
 
           {/* Professional Information */}
           <Card>
-            <h3 className="text-lg font-semibold text-text-primary mb-4">Professional Information</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-4">Professional Information</h3>
 
             <div className="flex items-center space-x-2">
               <Checkbox

@@ -274,7 +274,7 @@ export function ModernPatientProfile({
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 sm:p-6 mb-4 shadow-lg">
             <div className="flex items-start gap-4">
               {/* Avatar */}
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-2xl sm:text-3xl font-bold text-white flex-shrink-0">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-2xl sm:text-2xl sm:text-3xl font-bold text-white flex-shrink-0">
                 {patientName?.[0]?.toUpperCase() || 'P'}
               </div>
 
@@ -282,7 +282,7 @@ export function ModernPatientProfile({
               <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
                 {/* Left Column */}
                 <div className="space-y-2">
-                  <h1 className="text-xl sm:text-2xl font-bold text-white mb-1">{patientName}</h1>
+                  <h1 className="text-xl sm:text-xl sm:text-2xl font-bold text-white mb-1">{patientName}</h1>
                   {age && (
                     <div className="flex items-center gap-2">
                       <User className="w-4 h-4 text-white/80" />
@@ -372,7 +372,7 @@ export function ModernPatientProfile({
                 {latestVitals.map((vital, index) => (
                   <div key={index} className="bg-blue-50 rounded-lg p-3">
                     <p className="text-xs text-gray-600 mb-1">{vital.name}</p>
-                    <p className="text-lg font-semibold text-primary">
+                    <p className="text-sm sm:text-base md:text-lg font-semibold text-primary">
                       {vital.value} <span className="text-sm font-normal">{vital.unit}</span>
                     </p>
                   </div>

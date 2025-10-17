@@ -119,23 +119,23 @@ export function SlotCalendar({ slots, onSlotUpdate }: SlotCalendarProps) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-3 md:mb-4">
         <div className="bg-gray-50 p-2 md:p-3 rounded-lg">
           <div className="text-xs md:text-sm text-gray-600">Total Slots</div>
-          <div className="text-lg md:text-2xl font-bold">{slots.length}</div>
+          <div className="text-lg md:text-xl sm:text-2xl font-bold">{slots.length}</div>
         </div>
         <div className="bg-green-50 p-2 md:p-3 rounded-lg">
           <div className="text-xs md:text-sm text-green-600">Available</div>
-          <div className="text-lg md:text-2xl font-bold text-green-600">
+          <div className="text-lg md:text-xl sm:text-2xl font-bold text-green-600">
             {slots.filter((s) => s.status === 'free').length}
           </div>
         </div>
         <div className="bg-red-50 p-2 md:p-3 rounded-lg">
           <div className="text-xs md:text-sm text-red-600">Booked</div>
-          <div className="text-lg md:text-2xl font-bold text-red-600">
+          <div className="text-lg md:text-xl sm:text-2xl font-bold text-red-600">
             {slots.filter((s) => s.status === 'busy').length}
           </div>
         </div>
         <div className="bg-yellow-50 p-2 md:p-3 rounded-lg">
           <div className="text-xs md:text-sm text-yellow-600">Tentative</div>
-          <div className="text-lg md:text-2xl font-bold text-yellow-600">
+          <div className="text-lg md:text-xl sm:text-2xl font-bold text-yellow-600">
             {slots.filter((s) => s.status === 'busy-tentative').length}
           </div>
         </div>

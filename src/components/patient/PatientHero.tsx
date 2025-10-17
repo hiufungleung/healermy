@@ -49,12 +49,12 @@ export const PatientHero: React.FC<PatientHeroProps> = ({
     <div className="mb-6 rounded-2xl border border-gray-200 bg-white shadow-sm">
       <div className="flex flex-col gap-6 px-6 py-6 md:flex-row md:items-start md:justify-between">
         <div className="flex flex-1 items-start gap-5">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-primary text-2xl font-semibold text-white shadow-sm md:h-24 md:w-24">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-primary text-xl sm:text-2xl font-semibold text-white shadow-sm md:h-24 md:w-24">
             {initials}
           </div>
           <div className="space-y-4">
             <div>
-              <h1 className="text-3xl font-bold text-text-primary">{patientName}</h1>
+              <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary">{patientName}</h1>
               <p className="mt-1 text-sm text-text-secondary">
                 Patient ID:{' '}
                 <span className="font-mono text-text-primary">

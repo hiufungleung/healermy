@@ -204,7 +204,7 @@ export default function PendingAppointmentsClient({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 4v10m6-10v10" />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Pending Appointments</h3>
+          <h3 className="text-sm sm:text-base md:text-lg font-medium text-gray-900 mb-2">No Pending Appointments</h3>
           <p className="text-gray-500">All appointment requests have been processed.</p>
         </div>
       </div>
@@ -214,7 +214,7 @@ export default function PendingAppointmentsClient({
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Pending Appointments</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Pending Appointments</h1>
         <p className="text-gray-600">Review and approve patient appointment requests</p>
       </div>
 

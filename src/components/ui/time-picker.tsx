@@ -160,7 +160,7 @@ export function TimePicker({
         className="w-16 text-center font-mono text-lg"
         maxLength={2}
       />
-      <span className="text-2xl font-bold">:</span>
+      <span className="text-xl sm:text-2xl font-bold">:</span>
       <Input
         ref={minuteRef}
         type="text"

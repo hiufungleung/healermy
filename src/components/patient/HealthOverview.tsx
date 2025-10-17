@@ -70,7 +70,7 @@ export const HealthOverview: React.FC<HealthOverviewProps> = ({
 
   return (
     <div className="mb-8">
-      <h2 className="text-xl font-bold text-text-primary mb-4 border-b border-gray-200 pb-2">
+      <h2 className="text-base sm:text-lg md:text-xl font-bold text-text-primary mb-4 border-b border-gray-200 pb-2">
         Health Overview
       </h2>
 
@@ -104,7 +104,7 @@ export const HealthOverview: React.FC<HealthOverviewProps> = ({
                   )}
                 </div>
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900">
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
                     Overall Health Status
                   </h3>
                   <p className="text-base text-gray-600 mt-1">{healthStatus.reason}</p>
