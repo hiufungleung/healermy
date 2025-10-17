@@ -381,10 +381,33 @@ export interface MedicationRequest {
   subject?: {
     reference?: string;
   };
+  encounter?: {
+    reference?: string;
+    display?: string;
+  };
   authoredOn?: string;
   dosageInstruction?: Array<{
     text?: string;
   }>;
+  reasonReference?: Array<{
+    reference?: string;
+    display?: string;
+  }>;
+  dispenseRequest?: {
+    validityPeriod?: {
+      start?: string;
+      end?: string;
+    };
+    numberOfRepeatsAllowed?: number;
+    quantity?: {
+      value?: number;
+      unit?: string;
+    };
+    expectedSupplyDuration?: {
+      value?: number;
+      unit?: string;
+    };
+  };
 }
 
 export interface MedicationDispense {
@@ -417,6 +440,7 @@ export interface MedicationDispense {
     system?: string;
     code?: string;
   };
+  whenPrepared?: string;
   whenHandedOver?: string;
   dosageInstruction?: Array<{
     text?: string;
@@ -510,6 +534,10 @@ export interface Procedure {
       reference?: string;
       display?: string;
     };
+  }>;
+  reasonReference?: Array<{
+    reference?: string;
+    display?: string;
   }>;
   outcome?: {
     coding?: Array<{

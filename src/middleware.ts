@@ -218,6 +218,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/',
     '/patient/:path*',
     '/provider/:path*',
     '/practitioner/:path*',
