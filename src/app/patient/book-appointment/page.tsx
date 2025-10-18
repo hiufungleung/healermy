@@ -495,29 +495,25 @@ export default function NewBookingFlow() {
         return;
       }
 
-      // ✅ BATCH FETCHING: Single API call with multiple schedule parameters
-      // This is efficient - only ONE HTTP request regardless of schedule count
+      // ✅ DIRECT PRACTITIONER QUERY: Use schedule.actor to query all practitioner slots
+      // Oracle FHIR supports schedule.actor parameter to directly query slots by practitioner
+      // This avoids the need to query schedules first, then slots by schedule IDs
       const startOfDay = new Date(`${selectedDate}T00:00:00`);
       const endOfDay = new Date(`${selectedDate}T23:59:59`);
       const now = new Date();
 
-      console.log(`[SLOT FETCH] Fetching slots for ${scheduleIds.length} schedules on ${selectedDate}`);
+      console.log(`[SLOT FETCH] Fetching slots for practitioner ${selectedPractitioner.id} on ${selectedDate}`);
       console.log(`[SLOT FETCH] Date range: ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
 
-      // Build query parameters for batch slot fetching
-      // Multiple 'schedule' parameters = FHIR OR semantics (returns slots from ANY of these schedules)
+      // Use schedule.actor parameter to query all slots for this practitioner
       const params = new URLSearchParams();
-      scheduleIds.forEach((scheduleId: string) => {
-        params.append('schedule', `Schedule/${scheduleId}`);
-      });
-
-      // Add filters for status and date range
+      params.append('schedule.actor', `Practitioner/${selectedPractitioner.id}`);
       params.append('status', 'free');
       params.append('start', `ge${startOfDay.toISOString()}`);
       params.append('start', `lt${endOfDay.toISOString()}`);
 
       const slotUrl = `/api/fhir/slots?${params.toString()}`;
-      console.log(`[SLOT FETCH] Fetching free slots from: ${slotUrl}`);
+      console.log(`[SLOT FETCH] Using schedule.actor query: ${slotUrl}`);
 
       const response = await fetch(slotUrl, { credentials: 'include' });
 
