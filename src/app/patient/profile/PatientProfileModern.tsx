@@ -120,6 +120,9 @@ export function ModernPatientProfile({
 
   const age = patient?.birthDate ? calculateAge(patient.birthDate) : null;
   
+  // State for showing all procedures (must be at component top level, before all other hooks)
+  const [showAllProcedures, setShowAllProcedures] = React.useState(false);
+  
   // Safe patient name extraction with loading state check
   const patientName = React.useMemo(() => {
     if (loading.patient || !patient) {
@@ -684,20 +687,81 @@ export function ModernPatientProfile({
             onRetry={refetchers?.procedures}
             skeletonVariant="list"
           >
-              <div className="space-y-4">
-                {procedures.map((proc, index) => {
-                  // Try to find related condition by checking if procedure mentions condition in reasonReference
-                  const relatedCondition = proc.reasonReference?.find(ref => 
-                    ref.reference?.startsWith('Condition/')
-                  );
-                  const conditionId = relatedCondition?.reference?.replace('Condition/', '');
-                  const linkedCondition = conditionId ? conditions.find(c => c.id === conditionId) : null;
-                  
-                  // Try to find related encounter
-                  const encounterId = proc.encounter?.reference?.replace('Encounter/', '');
-                  const linkedEncounter = encounterId ? encounters.find(e => e.id === encounterId) : null;
-                  
-                  return (
+              {(() => {
+                // Group procedures by year
+                const proceduresByYear = procedures.reduce((acc, proc) => {
+                  const date = proc.performedDateTime || proc.performedPeriod?.start;
+                  const year = date ? new Date(date).getFullYear() : 'Unknown';
+                  if (!acc[year]) acc[year] = [];
+                  acc[year].push(proc);
+                  return acc;
+                }, {} as Record<string, typeof procedures>);
+
+                // Sort years descending
+                const sortedYears = Object.keys(proceduresByYear).sort((a, b) => {
+                  if (a === 'Unknown') return 1;
+                  if (b === 'Unknown') return -1;
+                  return Number(b) - Number(a);
+                });
+
+                const displayLimit = 10;
+                const shouldShowButton = procedures.length > displayLimit;
+
+                return (
+                  <div className="space-y-6">
+                    {sortedYears.map((year, yearIndex) => {
+                      const yearProcedures = proceduresByYear[year];
+                      
+                      // Sort procedures by date within year (most recent first)
+                      const sortedProcedures = yearProcedures.sort((a, b) => {
+                        const dateA = new Date(a.performedDateTime || a.performedPeriod?.start || 0);
+                        const dateB = new Date(b.performedDateTime || b.performedPeriod?.start || 0);
+                        return dateB.getTime() - dateA.getTime();
+                      });
+
+                      // Calculate how many procedures from this year to show
+                      let proceduresToShow = sortedProcedures;
+                      if (!showAllProcedures && shouldShowButton) {
+                        const previousYearsCount = sortedYears
+                          .slice(0, yearIndex)
+                          .reduce((sum, y) => sum + proceduresByYear[y].length, 0);
+                        
+                        if (previousYearsCount >= displayLimit) {
+                          return null; // Don't show this year at all
+                        }
+                        
+                        const remainingSlots = displayLimit - previousYearsCount;
+                        proceduresToShow = sortedProcedures.slice(0, remainingSlots);
+                      }
+
+                      if (proceduresToShow.length === 0) return null;
+
+                      return (
+                        <div key={year}>
+                          {/* Year Header */}
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="flex-1 h-px bg-gradient-to-r from-purple-200 to-transparent"></div>
+                            <h3 className="text-sm font-semibold text-purple-700 bg-purple-50 px-3 py-1 rounded-full">
+                              {year} ({yearProcedures.length} procedure{yearProcedures.length > 1 ? 's' : ''})
+                            </h3>
+                            <div className="flex-1 h-px bg-gradient-to-l from-purple-200 to-transparent"></div>
+                          </div>
+
+                          {/* Procedures for this year */}
+                          <div className="space-y-3">
+                            {proceduresToShow.map((proc, index) => {
+                              // Try to find related condition
+                              const relatedCondition = proc.reasonReference?.find(ref => 
+                                ref.reference?.startsWith('Condition/')
+                              );
+                              const conditionId = relatedCondition?.reference?.replace('Condition/', '');
+                              const linkedCondition = conditionId ? conditions.find(c => c.id === conditionId) : null;
+                              
+                              // Try to find related encounter
+                              const encounterId = proc.encounter?.reference?.replace('Encounter/', '');
+                              const linkedEncounter = encounterId ? encounters.find(e => e.id === encounterId) : null;
+                              
+                              return (
                     <div key={proc.id || index} className="bg-purple-50 border-l-4 border-purple-400 rounded-r-xl p-4 hover:shadow-sm transition-shadow">
                       <div className="flex items-start justify-between">
                         <p className="font-semibold text-gray-900 text-base">
@@ -772,16 +836,39 @@ export function ModernPatientProfile({
                             <span className="font-medium">Notes:</span> {proc.note[0].text}
                           </div>
                         )}
-                        {proc.id && (
-                          <div className="text-xs text-gray-400 mt-2">
-                            ID: {proc.id}
-                          </div>
-                        )}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Show More/Less Button */}
+                    {shouldShowButton && (
+                      <div className="flex justify-center pt-4">
+                        <button
+                          onClick={() => setShowAllProcedures(!showAllProcedures)}
+                          className="flex items-center gap-2 px-6 py-3 bg-purple-50 hover:bg-purple-100 text-purple-700 font-medium rounded-lg transition-colors border-2 border-purple-200 hover:border-purple-300"
+                        >
+                          {showAllProcedures ? (
+                            <>
+                              <ChevronDown className="w-4 h-4 rotate-180" />
+                              Show Less
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="w-4 h-4" />
+                              Show {procedures.length - displayLimit} More Procedures
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
           </SectionCard>
 
           {/* Family History */}
