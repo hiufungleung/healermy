@@ -78,17 +78,17 @@ export function PopupConfirmation({
 
   return (
     <AlertDialog open={isOpen}>
-      <AlertDialogContent className="sm:max-w-md">
+      <AlertDialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <AlertDialogHeader>
           <div className="flex items-center space-x-3">
             {/* Icon */}
             <div className={cn(
-              'flex items-center justify-center h-12 w-12 rounded-full',
+              'flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full flex-shrink-0',
               variant === 'danger' ? 'bg-red-100' : 'bg-blue-100'
             )}>
               {defaultIcon}
             </div>
-            <AlertDialogTitle>{title}</AlertDialogTitle>
+            <AlertDialogTitle className="text-left">{title}</AlertDialogTitle>
           </div>
 
           {/* Loading State with Progress */}
@@ -118,16 +118,20 @@ export function PopupConfirmation({
           )}
         </AlertDialogHeader>
 
-        <AlertDialogFooter>
+        <AlertDialogFooter className="gap-2 sm:gap-0">
           {showCancel && onCancel && (
-            <AlertDialogCancel onClick={onCancel} disabled={isLoading}>
+            <AlertDialogCancel 
+              onClick={onCancel} 
+              disabled={isLoading}
+              className="w-full sm:w-auto"
+            >
               {cancelText}
             </AlertDialogCancel>
           )}
           <AlertDialogAction
             onClick={onConfirm}
             disabled={isLoading}
-            className={cn(variantActionClasses[variant])}
+            className={cn(variantActionClasses[variant], "w-full sm:w-auto")}
           >
             {isLoading ? (
               <>

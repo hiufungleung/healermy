@@ -61,7 +61,7 @@ export function FilterSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>
-        <Button variant="outline" className="w-full relative">
+        <Button variant="outline" className="w-full relative border-2 border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600">
           <svg
             className="w-5 h-5 mr-2"
             fill="none"
@@ -77,7 +77,7 @@ export function FilterSheet({
           </svg>
           Filters
           {activeFilterCount > 0 && (
-            <span className="ml-2 px-2 py-0.5 text-xs font-semibold text-white bg-primary rounded-full">
+            <span className="ml-2 px-2 py-0.5 text-xs font-semibold text-white bg-blue-600 rounded-full">
               {activeFilterCount}
             </span>
           )}

@@ -271,7 +271,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
       {/* Page Header */}
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <h1 className="text-xl sm:text-2xl sm:text-2xl sm:text-3xl font-bold text-text-primary">My Appointments</h1>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-text-primary">My Appointments</h1>
 
           {/* Book Appointment Button - Dashboard Style */}
           <button
