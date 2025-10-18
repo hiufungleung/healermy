@@ -134,10 +134,8 @@ export default function NewBookingFlow() {
     setSelectedDate(today.toISOString().split('T')[0]);
   }, []);
 
-  // Load all practitioners on mount
-  useEffect(() => {
-    fetchAllPractitioners();
-  }, []);
+  // Note: Initial practitioner loading is handled by the filter useEffect below
+  // (when no filters are active on mount, it calls fetchAllPractitioners)
 
   // Client-side filter function to filter cached results
   const filterCachedResults = () => {
@@ -562,7 +560,7 @@ export default function NewBookingFlow() {
     // If user is searching directly, fetch more practitioners and filter by name
     setLoading(true);
     try {
-      const response = await fetch('/api/fhir/practitioners?count=100', {
+      const response = await fetch('/api/fhir/practitioners', {
         credentials: 'include'
       });
 
@@ -677,9 +675,6 @@ export default function NewBookingFlow() {
       const response = await fetch('/api/fhir/appointments', {
         method: 'POST',
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(appointmentRequestData),
       });
 

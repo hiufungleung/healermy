@@ -31,7 +31,6 @@ export async function GET(request: NextRequest) {
     if (session.role === 'patient' && !patientId) {
       patientId = session.patient || null;
     }
-    // Provider端不自动添加practitioner过滤，保持clinic-wide view
 
     // Call FHIR operations
     const token = prepareToken(session.accessToken);
