@@ -11,7 +11,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/common/Button';
-import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -98,25 +98,24 @@ export function FilterSheet({
               <h3 className="text-base font-semibold text-gray-900 mb-3">
                 Specialty
               </h3>
-              <div className="space-y-3">
-                {specialties.map((specialty) => (
-                  <div key={specialty} className="flex items-center space-x-3">
-                    <Checkbox
-                      id={`sheet-specialty-${specialty}`}
-                      checked={selectedSpecialty === specialty}
-                      onCheckedChange={(checked) => {
-                        onSpecialtyChange(checked ? specialty : '');
-                      }}
-                    />
-                    <Label
-                      htmlFor={`sheet-specialty-${specialty}`}
-                      className="text-sm font-normal cursor-pointer flex-1"
-                    >
-                      {specialty}
-                    </Label>
-                  </div>
-                ))}
-              </div>
+              <RadioGroup value={selectedSpecialty} onValueChange={onSpecialtyChange}>
+                <div className="space-y-3">
+                  {specialties.map((specialty) => (
+                    <div key={specialty} className="flex items-center space-x-3">
+                      <RadioGroupItem
+                        value={specialty}
+                        id={`sheet-specialty-${specialty}`}
+                      />
+                      <Label
+                        htmlFor={`sheet-specialty-${specialty}`}
+                        className="text-sm font-normal cursor-pointer flex-1"
+                      >
+                        {specialty}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </RadioGroup>
             </div>
 
             {/* Service Category Section */}
@@ -124,26 +123,25 @@ export function FilterSheet({
               <h3 className="text-base font-semibold text-gray-900 mb-3">
                 Service Category
               </h3>
-              <div className="space-y-3">
-                {serviceCategories.map((category) => (
-                  <div key={category.id} className="flex items-start space-x-3">
-                    <Checkbox
-                      id={`sheet-category-${category.id}`}
-                      checked={selectedServiceCategory === category.id}
-                      onCheckedChange={(checked) => {
-                        onServiceCategoryChange(checked ? category.id : '');
-                      }}
-                      className="mt-1"
-                    />
-                    <Label
-                      htmlFor={`sheet-category-${category.id}`}
-                      className="text-sm font-normal cursor-pointer flex-1 leading-relaxed"
-                    >
-                      {category.name}
-                    </Label>
-                  </div>
-                ))}
-              </div>
+              <RadioGroup value={selectedServiceCategory} onValueChange={onServiceCategoryChange}>
+                <div className="space-y-3">
+                  {serviceCategories.map((category) => (
+                    <div key={category.id} className="flex items-start space-x-3">
+                      <RadioGroupItem
+                        value={category.id}
+                        id={`sheet-category-${category.id}`}
+                        className="mt-1"
+                      />
+                      <Label
+                        htmlFor={`sheet-category-${category.id}`}
+                        className="text-sm font-normal cursor-pointer flex-1 leading-relaxed"
+                      >
+                        {category.name}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </RadioGroup>
             </div>
 
             {/* Service Type Section */}
@@ -151,27 +149,26 @@ export function FilterSheet({
               <h3 className="text-base font-semibold text-gray-900 mb-3">
                 Service Type
               </h3>
-              <div className="space-y-3">
-                {Object.entries(serviceTypes).flatMap(([categoryId, types]) =>
-                  types.map((type) => (
-                    <div key={type} className="flex items-center space-x-3">
-                      <Checkbox
-                        id={`sheet-type-${type}`}
-                        checked={selectedServiceType === type}
-                        onCheckedChange={(checked) => {
-                          onServiceTypeChange(checked ? type : '');
-                        }}
-                      />
-                      <Label
-                        htmlFor={`sheet-type-${type}`}
-                        className="text-sm font-normal cursor-pointer flex-1"
-                      >
-                        {type}
-                      </Label>
-                    </div>
-                  ))
-                )}
-              </div>
+              <RadioGroup value={selectedServiceType} onValueChange={onServiceTypeChange}>
+                <div className="space-y-3">
+                  {Object.entries(serviceTypes).flatMap(([categoryId, types]) =>
+                    types.map((type) => (
+                      <div key={type} className="flex items-center space-x-3">
+                        <RadioGroupItem
+                          value={type}
+                          id={`sheet-type-${type}`}
+                        />
+                        <Label
+                          htmlFor={`sheet-type-${type}`}
+                          className="text-sm font-normal cursor-pointer flex-1"
+                        >
+                          {type}
+                        </Label>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </RadioGroup>
             </div>
           </div>
         </ScrollArea>

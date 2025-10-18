@@ -442,7 +442,7 @@ export function GenerateSlotsForm({
 
         const chunkResult = await response.json();
         createdSlots = [...createdSlots, ...(chunkResult.results?.created || [])];
-        totalRejected = [...totalRejected, ...(chunkResult.rejected || [])];
+        totalRejected = [...totalRejected, ...(chunkResult.results?.rejected || [])];
 
         // Update progress after each chunk
         processedSlots += chunk.length;

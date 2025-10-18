@@ -138,53 +138,48 @@ export default function SelectAppointment() {
 
       // Fetch slots for this practitioner's schedules
       console.log('Fetching slots for date:', selectedDate);
-
-      // IMPORTANT: FHIR API may not support multiple schedule parameters
-      // Query each schedule separately and combine results
       console.log('Fetching slots from schedules:', scheduleIds);
+
+      // Build query parameters for batch slot fetching
+      // Use multiple 'schedule' parameters for FHIR OR semantics
+      const params = new URLSearchParams();
+      scheduleIds.forEach((scheduleId: string) => {
+        params.append('schedule', `Schedule/${scheduleId}`);
+      });
+
+      const requestUrl = `/api/fhir/slots?${params.toString()}`;
+      console.log('=== BATCH SLOT FETCH ===');
+      console.log('Request URL:', requestUrl);
+
+      const response = await fetch(requestUrl, {
+        credentials: 'include',
+      });
+
+      console.log('Response status:', response.status, response.statusText);
 
       let allSlots: Slot[] = [];
 
-      for (const scheduleId of scheduleIds) {
-        console.log(`=== FETCHING SLOTS FOR SCHEDULE ${scheduleId} ===`);
-        const params = new URLSearchParams({
-          schedule: `Schedule/${scheduleId}`,
-          _count: '100'
-        });
-
-        const requestUrl = `/api/fhir/slots?${params.toString()}`;
-        console.log('Request URL:', requestUrl);
-
-        const response = await fetch(requestUrl, {
-          credentials: 'include',
-        });
-
-        console.log('Response status:', response.status, response.statusText);
-
-        if (!response.ok) {
-          console.error(`Slots API failed for schedule ${scheduleId}:`, response.status, response.statusText);
-          const error = await response.json().catch(() => ({
-            error: 'Unknown error',
-            status: response.status,
-            statusText: response.statusText
-          }));
-          console.error('Error details:', error);
-          continue; // Skip this schedule and try the next one
-        }
-
+      if (!response.ok) {
+        console.error('Slots API failed:', response.status, response.statusText);
+        const error = await response.json().catch(() => ({
+          error: 'Unknown error',
+          status: response.status,
+          statusText: response.statusText
+        }));
+        console.error('Error details:', error);
+      } else {
         const result = await response.json();
-        const scheduleSlots = result.slots || [];
-        console.log(`Schedule ${scheduleId} returned ${scheduleSlots.length} slots`);
+        allSlots = result.slots || [];
+        console.log(`Total slots returned: ${allSlots.length}`);
 
-        if (scheduleSlots.length > 0) {
-          console.log(`First slot from schedule ${scheduleId}:`, {
-            id: scheduleSlots[0].id,
-            start: scheduleSlots[0].start,
-            status: scheduleSlots[0].status
+        if (allSlots.length > 0) {
+          console.log('First slot:', {
+            id: allSlots[0].id,
+            start: allSlots[0].start,
+            status: allSlots[0].status,
+            schedule: allSlots[0].schedule?.reference
           });
         }
-
-        allSlots = [...allSlots, ...scheduleSlots];
       }
 
       console.log('=== COMBINED RESULTS ===');

@@ -102,6 +102,8 @@ export interface Practitioner {
       end?: string;
     };
   }>;
+  // Added for client-side filtering optimization
+  matchingSchedules?: Schedule[];
 }
 
 export interface Slot {
