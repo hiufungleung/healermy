@@ -20,7 +20,7 @@ services:
       # REQUIRED: Application URLs
       # ============================================================================
       BASE_URL: ${BASE_URL} # Your public HTTPS URL
-      NEXT_PUBLIC_FHIR_SERVER_URL: ${FHIR_SERVER_URL} # FHIR server endpoint
+      FHIR_SERVER_URL: ${FHIR_SERVER_URL} # FHIR server endpoint (server-side only, more secure)
 
       # ============================================================================
       # REQUIRED: SMART on FHIR Credentials

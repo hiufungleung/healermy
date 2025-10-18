@@ -82,7 +82,7 @@ Create a `.env.local` file in the root directory:
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
 
 # FHIR server endpoint
-NEXT_PUBLIC_FHIR_SERVER_URL=https://gw.interop.community/healerMy/data
+FHIR_SERVER_URL=https://gw.interop.community/healerMy/data
 
 # =============================================================================
 # APPLICATION CONFIGURATION
@@ -357,7 +357,7 @@ The project includes automated deployment via GitHub Actions:
 - `EC2_HOST`: EC2 instance hostname
 - `EC2_USER`: EC2 SSH username
 - `NEXT_PUBLIC_BASE_URL`: Production URL
-- `NEXT_PUBLIC_FHIR_SERVER_URL`: FHIR server endpoint
+- `FHIR_SERVER_URL`: FHIR server endpoint
 - `CLIENT_ID`: FHIR app client ID
 - `SESSION_EXPIRY`: Session expiry duration (e.g., `90d`)
 - `PATIENT_SCOPE_OFFLINE`, `PATIENT_SCOPE_ONLINE`: Patient permission scopes

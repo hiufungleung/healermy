@@ -42,7 +42,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64, linux/arm64
+          platforms: linux/amd64
+          # platforms: linux/amd64, linux/arm64
           push: true
           tags: |
             ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
@@ -91,7 +92,7 @@ jobs:
               -e PORT=$PORT \
               -e BASE_URL="${{ vars.NEXT_PUBLIC_BASE_URL }}" \
               -e NEXT_PUBLIC_BASE_URL="${{ vars.NEXT_PUBLIC_BASE_URL }}" \
-              -e NEXT_PUBLIC_FHIR_SERVER_URL="${{ vars.NEXT_PUBLIC_FHIR_SERVER_URL }}" \
+              -e FHIR_SERVER_URL="${{ vars.FHIR_SERVER_URL }}" \
               -e CLIENT_ID="${{ vars.CLIENT_ID }}" \
               -e CLIENT_SECRET="${{ secrets.CLIENT_SECRET }}" \
               -e SESSION_SECRET="${{ secrets.SESSION_SECRET }}" \

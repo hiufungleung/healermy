@@ -17,6 +17,7 @@ COPY . .
 # Build the application
 # Note: Default SESSION_SECRET and SESSION_SALT are in src/library/auth/encryption.ts
 # These defaults allow build to succeed, but MUST be overridden at runtime
+# Note: FHIR_SERVER_URL is now read server-side at runtime, not baked into build
 RUN pnpm build
 
 # Runner image
@@ -32,7 +33,7 @@ ENV NODE_ENV=production \
     PROVIDER_SCOPE_OFFLINE="launch/encounter launch/patient openid profile offline_access launch fhirUser user/*:* patient/*:*" \
     PROVIDER_SCOPE_ONLINE="launch/encounter launch/patient openid profile online_access launch fhirUser user/*:* patient/*:*" \
     SESSION_EXPIRY=90d
-# (Other environment variables like CLIENT_ID, CLIENT_SECRET, SESSION_SECRET, SESSION_SALT should be provided at runtime)
+# (Other environment variables like CLIENT_ID, CLIENT_SECRET, SESSION_SECRET, SESSION_SALT, FHIR_SERVER_URL should be provided at runtime)
 
 # Install curl for health checks and create non-root user
 RUN apk add --no-cache curl && \
