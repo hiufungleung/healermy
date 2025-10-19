@@ -15,6 +15,7 @@ export interface SlotDisplayProps {
   maxDisplaySlots?: number; // For calendar mode
   showDeleteButton?: boolean;
   className?: string;
+  schedules?: any[]; // Array of Schedule objects for service-type lookup
 }
 
 export function SlotDisplay({
@@ -25,7 +26,8 @@ export function SlotDisplay({
   selectedSlotId,
   maxDisplaySlots = 3,
   showDeleteButton = false,
-  className = ''
+  className = '',
+  schedules = []
 }: SlotDisplayProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -109,29 +111,99 @@ export function SlotDisplay({
     );
   }
 
+  // Helper function to get service type from schedule (not from slot directly)
+  const getServiceTypeFromSchedule = (slot: Slot) => {
+    // Extract schedule ID from slot.schedule.reference (e.g., "Schedule/133109")
+    const scheduleRef = slot.schedule?.reference;
+    if (!scheduleRef || schedules.length === 0) {
+      return { code: 'general', display: 'General' };
+    }
+
+    const scheduleId = scheduleRef.replace('Schedule/', '');
+    const matchingSchedule = schedules.find((s: any) => s.id === scheduleId);
+
+    if (matchingSchedule) {
+      const code = matchingSchedule.serviceType?.[0]?.coding?.[0]?.code || 'general';
+      const display = matchingSchedule.serviceType?.[0]?.coding?.[0]?.display || 'General';
+      return { code, display };
+    }
+
+    return { code: 'general', display: 'General' };
+  };
+
+  // Helper function to get service type color (border color to identify service type)
+  // Dynamically assigns colors based on unique service types found in schedules
+  const getServiceTypeColor = (slot: Slot) => {
+    const { code } = getServiceTypeFromSchedule(slot);
+
+    // Dynamic color palette (same order as legend)
+    const colorPalette = [
+      'border-blue-500',
+      'border-green-500',
+      'border-red-500',
+      'border-purple-500',
+      'border-indigo-500',
+      'border-yellow-500',
+      'border-pink-500',
+      'border-teal-500',
+      'border-orange-500',
+      'border-cyan-500',
+    ];
+
+    // Build a consistent mapping of service type codes to colors
+    if (schedules.length === 0) {
+      return 'border-gray-400';
+    }
+
+    // Get all unique service type codes from schedules
+    const uniqueServiceTypes = Array.from(
+      new Set(
+        schedules
+          .map((s: any) => s.serviceType?.[0]?.coding?.[0]?.code)
+          .filter(Boolean)
+      )
+    );
+
+    // Find the index of this service type
+    const index = uniqueServiceTypes.indexOf(code);
+
+    // Return color based on index, or grey if not found
+    return index >= 0 ? colorPalette[index % colorPalette.length] : 'border-gray-400';
+  };
+
+  const getServiceTypeLabel = (slot: Slot): string => {
+    const { display } = getServiceTypeFromSchedule(slot);
+    return display;
+  };
+
   if (mode === 'grid') {
-    // Grid mode: For patient booking time selection
+    // Grid mode: For patient booking time selection with service type colors
+    // Mobile: 4 columns, Tablet: 5 columns, Desktop: 6 columns for more compact display
     return (
-      <div className={`grid grid-cols-3 md:grid-cols-4 gap-2 ${className}`}>
+      <div className={`grid grid-cols-4 md:grid-cols-6 lg:grid-cols-10 gap-2 ${className}`}>
         {slots.map(slot => {
           const isSelected = selectedSlotId === slot.id;
           const isAvailable = slot.status === 'free';
+          const serviceTypeColor = getServiceTypeColor(slot);
+          const serviceTypeLabel = getServiceTypeLabel(slot);
 
           return (
-            <button
+            <Button
               key={slot.id}
               onClick={() => isAvailable && onSlotClick?.(slot)}
               disabled={!isAvailable}
-              className={`py-3 px-4 rounded-lg border transition-colors ${
+              variant="outline"
+              size="sm"
+              className={`py-2 px-2 h-auto rounded-lg border-2 transition-all ${
                 isSelected
-                  ? 'bg-primary text-white border-primary'
+                  ? 'bg-primary text-white border-primary hover:bg-primary hover:text-white'
                   : isAvailable
-                  ? 'bg-white hover:bg-gray-50 border-gray-200'
-                  : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  ? `bg-white hover:bg-gray-50 hover:shadow-md hover:text-inherit ${serviceTypeColor}`
+                  : `bg-gray-100 text-gray-400 cursor-not-allowed opacity-50 ${serviceTypeColor}`
               }`}
             >
-              <div>{formatTimeForDisplay(slot.start)}</div>
-            </button>
+              <div className="text-sm font-medium">{formatTimeForDisplay(slot.start)}</div>
+            </Button>
           );
         })}
       </div>
@@ -208,12 +280,14 @@ export function SlotSelectionGrid({
   slots,
   selectedSlotId,
   onSlotSelect,
-  className
+  className,
+  schedules
 }: {
   slots: Slot[];
   selectedSlotId?: string;
   onSlotSelect: (slot: Slot) => void;
   className?: string;
+  schedules?: any[];
 }) {
   return (
     <SlotDisplay
@@ -222,6 +296,7 @@ export function SlotSelectionGrid({
       selectedSlotId={selectedSlotId}
       onSlotClick={onSlotSelect}
       className={className}
+      schedules={schedules}
     />
   );
 }
