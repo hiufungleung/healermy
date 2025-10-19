@@ -29,6 +29,7 @@ import { format } from 'date-fns';
 import { createFHIRDateTime } from '@/library/timezone';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { Schedule, Slot } from '@/types/fhir';
+import { getAllDaysOfWeek, FHIR_DAY_NAME_TO_CODE } from '@/constants/fhir';
 
 interface GenerateSlotsFormProps {
   schedules: Schedule[];
@@ -50,15 +51,8 @@ interface SlotGenerationData {
   breakEndTime?: string;
 }
 
-const DAYS_OF_WEEK = [
-  { value: '1', label: 'Monday' },
-  { value: '2', label: 'Tuesday' },
-  { value: '3', label: 'Wednesday' },
-  { value: '4', label: 'Thursday' },
-  { value: '5', label: 'Friday' },
-  { value: '6', label: 'Saturday' },
-  { value: '0', label: 'Sunday' },
-];
+// Use centralized days of week
+const DAYS_OF_WEEK = getAllDaysOfWeek();
 
 export function GenerateSlotsForm({
   schedules,
@@ -194,13 +188,10 @@ export function GenerateSlotsForm({
       availableTimes.forEach((time) => {
         if (time.daysOfWeek) {
           time.daysOfWeek.forEach((day) => {
-            // Convert FHIR day codes (mon, tue, wed, etc.) to numbers
-            const dayMapping: { [key: string]: string } = {
-              'mon': '1', 'tue': '2', 'wed': '3', 'thu': '4',
-              'fri': '5', 'sat': '6', 'sun': '0'
-            };
-            if (dayMapping[day.toLowerCase()] && !days.includes(dayMapping[day.toLowerCase()])) {
-              days.push(dayMapping[day.toLowerCase()]);
+            // Convert FHIR day codes (mon, tue, wed, etc.) to numbers using centralized mapping
+            const dayCode = FHIR_DAY_NAME_TO_CODE[day.toLowerCase()];
+            if (dayCode && !days.includes(dayCode)) {
+              days.push(dayCode);
             }
           });
         }
@@ -442,7 +433,7 @@ export function GenerateSlotsForm({
 
         const chunkResult = await response.json();
         createdSlots = [...createdSlots, ...(chunkResult.results?.created || [])];
-        totalRejected = [...totalRejected, ...(chunkResult.rejected || [])];
+        totalRejected = [...totalRejected, ...(chunkResult.results?.rejected || [])];
 
         // Update progress after each chunk
         processedSlots += chunk.length;

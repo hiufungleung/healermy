@@ -102,6 +102,8 @@ export interface Practitioner {
       end?: string;
     };
   }>;
+  // Added for client-side filtering optimization
+  matchingSchedules?: Schedule[];
 }
 
 export interface Slot {
@@ -524,6 +526,10 @@ export interface Procedure {
   subject?: {
     reference?: string;
   };
+  encounter?: {
+    reference?: string;
+    type?: string;
+  };
   performedDateTime?: string;
   performedPeriod?: {
     start?: string;
@@ -535,9 +541,18 @@ export interface Procedure {
       display?: string;
     };
   }>;
+  recorder?: {
+    reference?: string;
+    type?: string;
+  };
+  asserter?: {
+    reference?: string;
+    type?: string;
+  };
   reasonReference?: Array<{
     reference?: string;
     display?: string;
+    type?: string;
   }>;
   outcome?: {
     coding?: Array<{
@@ -751,6 +766,13 @@ export interface ExplanationOfBenefit {
   }>;
   item?: Array<{
     sequence: number;
+    revenue?: {
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+    };
     productOrService?: {
       coding?: Array<{
         system?: string;
@@ -759,6 +781,14 @@ export interface ExplanationOfBenefit {
       }>;
       text?: string;
     };
+    modifier?: Array<{
+      coding?: Array<{
+        system?: string;
+        code?: string;
+        display?: string;
+      }>;
+      text?: string;
+    }>;
     servicedDate?: string;
     servicedPeriod?: {
       start?: string;

@@ -83,18 +83,30 @@ export function formatDateForDisplay(date: string | Date): string {
 
 /**
  * Format a date for display in local timezone (time only)
- * Always uses en-US locale to ensure consistent "4:00 PM" format
+ * Uses 24-hour format (e.g., "14:30" instead of "2:30 PM")
  */
 export function formatTimeForDisplay(date: string | Date): string {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
 
-  // Always use en-US locale for consistent time format regardless of browser language
-  return dateObj.toLocaleString('en-US', {
+  // Use 24-hour format for consistent, compact time display
+  return dateObj.toLocaleString('en-GB', {
     timeZone: APP_TIMEZONE,
     hour: '2-digit',
     minute: '2-digit',
-    hour12: true
+    hour12: false
   });
+}
+
+/**
+ * Format a date and time for display in "dd/mm/yyyy HH:MM" format
+ * Example: "23/10/2025 16:30"
+ */
+export function formatDateTimeForDisplay(date: string, time: string): string {
+  // Parse the date string (YYYY-MM-DD format)
+  const [year, month, day] = date.split('-');
+
+  // Return in dd/mm/yyyy HH:MM format
+  return `${day}/${month}/${year} ${time}`;
 }
 
 /**

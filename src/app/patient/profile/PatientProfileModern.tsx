@@ -27,6 +27,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorCard } from '@/components/common/ErrorCard';
 import { ContentSkeleton, VitalsSkeleton } from '@/components/common/ContentSkeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   User,
   Calendar,
@@ -44,6 +45,10 @@ import {
   ScrollText,
   Shield,
   ChevronDown,
+  Heart,
+  DollarSign,
+  CreditCard,
+  FileText,
 } from 'lucide-react';
 
 interface ModernPatientProfileProps {
@@ -114,6 +119,9 @@ export function ModernPatientProfile({
   };
 
   const age = patient?.birthDate ? calculateAge(patient.birthDate) : null;
+  
+  // State for showing all procedures (must be at component top level, before all other hooks)
+  const [showAllProcedures, setShowAllProcedures] = React.useState(false);
   
   // Safe patient name extraction with loading state check
   const patientName = React.useMemo(() => {
@@ -274,8 +282,15 @@ export function ModernPatientProfile({
             <CardContent className="p-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
                 {/* Left Column */}
-                <div className="space-y-2">
-                  <h1 className="text-xl sm:text-2xl font-bold text-white mb-1">{patientName}</h1>
+                <div className="space-y-3">
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{patientName}</h1>
+                    {patient?.id && (
+                      <p className="text-xs text-gray-500 font-mono">
+                        Patient ID: {patient.id}
+                      </p>
+                    )}
+                  </div>
                   {age && (
                     <div className="flex items-center gap-2">
                       <User className="w-4 h-4 text-gray-600" />
@@ -386,6 +401,29 @@ export function ModernPatientProfile({
           </Card>
         )}
 
+        {/* Tab Navigation */}
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6 h-auto p-1.5 bg-gray-100 rounded-xl shadow-sm">
+            <TabsTrigger 
+              value="overview" 
+              className="flex items-center justify-center gap-2 py-4 px-6 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 transition-all duration-200 hover:bg-gray-50 font-medium text-base"
+            >
+              <Heart className="w-5 h-5" />
+              <span className="hidden sm:inline">Health Overview</span>
+              <span className="sm:hidden">Health</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="billing" 
+              className="flex items-center justify-center gap-2 py-4 px-6 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-green-600 transition-all duration-200 hover:bg-gray-50 font-medium text-base"
+            >
+              <DollarSign className="w-5 h-5" />
+              <span className="hidden sm:inline">Insurance & Billing</span>
+              <span className="sm:hidden">Billing</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Health Overview Tab */}
+          <TabsContent value="overview" className="mt-0">
         {/* Medical Information Sections */}
         <div className="space-y-3">
           {/* Conditions */}
@@ -401,11 +439,27 @@ export function ModernPatientProfile({
             defaultOpen={true}
             skeletonVariant="list"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {conditions.map((condition, index) => (
-                <div key={condition.id || index} className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-3 hover:shadow-sm transition-shadow">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <p className="font-semibold text-gray-900 text-sm leading-tight">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {conditions.map((condition, index) => {
+                // Find related procedures that reference this condition
+                const relatedProcedures = procedures.filter(proc =>
+                  proc.reasonReference?.some(ref =>
+                    ref.reference === `Condition/${condition.id}`
+                  )
+                );
+                
+                // Get earliest procedure date as a proxy for condition date
+                const earliestProcedureDate = relatedProcedures.length > 0
+                  ? relatedProcedures
+                      .map(p => p.performedDateTime || p.performedPeriod?.start)
+                      .filter(Boolean)
+                      .sort()[0]
+                  : null;
+                
+                return (
+                <div key={condition.id || index} className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <p className="font-semibold text-gray-900 text-base leading-tight">
                       {condition.code?.text || condition.code?.coding?.[0]?.display || 'Unknown Condition'}
                     </p>
                     {condition.clinicalStatus?.coding?.[0]?.code && (
@@ -414,21 +468,74 @@ export function ModernPatientProfile({
                       </Badge>
                     )}
                   </div>
-                  <div className="space-y-1 text-xs text-gray-600">
-                    {condition.onsetDateTime && (
-                      <div className="flex items-center gap-1.5">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        <span>Onset: {new Date(condition.onsetDateTime).toLocaleDateString()}</span>
+                  <div className="space-y-1.5 text-sm text-gray-600 mt-2">
+                    {condition.recordedDate ? (
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium">Diagnosed: {new Date(condition.recordedDate).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}</span>
+                      </div>
+                    ) : condition.onsetDateTime ? (
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium">Onset: {new Date(condition.onsetDateTime).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}</span>
+                      </div>
+                    ) : earliestProcedureDate ? (
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium">Related procedure: {new Date(earliestProcedureDate).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}</span>
+                      </div>
+                    ) : condition.meta?.lastUpdated ? (
+                      <div className="flex items-center gap-2 text-gray-500">
+                        <Calendar className="w-4 h-4" />
+                        <span className="text-xs">Last updated: {new Date(condition.meta.lastUpdated).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}</span>
+                      </div>
+                    ) : null}
+                    {condition.onsetDateTime && condition.recordedDate && (
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-orange-600" />
+                        <span>Symptoms started: {new Date(condition.onsetDateTime).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}</span>
+                      </div>
+                    )}
+                    {relatedProcedures.length > 0 && (
+                      <div className="flex items-center gap-2 text-purple-600">
+                        <Activity className="w-4 h-4" />
+                        <span className="text-xs">{relatedProcedures.length} related procedure{relatedProcedures.length > 1 ? 's' : ''}</span>
+                      </div>
+                    )}
+                    {condition.verificationStatus?.coding?.[0]?.code && (
+                      <div className="flex items-center gap-2 text-xs mt-2">
+                        <span className="text-gray-500">Verification: <span className="font-medium text-gray-700 capitalize">{condition.verificationStatus.coding[0].code}</span></span>
                       </div>
                     )}
                     {condition.id && (
-                      <div className="text-xs text-gray-400 mt-1 truncate" title={condition.id}>
+                      <div className="text-xs text-gray-400 mt-2 truncate" title={condition.id}>
                         ID: {condition.id}
                       </div>
                     )}
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </SectionCard>
 
@@ -487,8 +594,12 @@ export function ModernPatientProfile({
                       )}
                       {med.authoredOn && (
                         <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5" />
-                          <span>Prescribed: {new Date(med.authoredOn).toLocaleDateString()}</span>
+                          <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                          <span className="font-medium">Prescribed: {new Date(med.authoredOn).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}</span>
                         </div>
                       )}
                       {linkedEncounter && (
@@ -496,7 +607,11 @@ export function ModernPatientProfile({
                           <Activity className="w-3.5 h-3.5" />
                           <span>
                             Visit: {linkedEncounter.period?.start
-                              ? new Date(linkedEncounter.period.start).toLocaleDateString()
+                              ? new Date(linkedEncounter.period.start).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })
                               : 'Unknown date'}
                           </span>
                         </div>
@@ -505,17 +620,45 @@ export function ModernPatientProfile({
                         <div className="flex items-center gap-1.5 text-indigo-600">
                           <Calendar className="w-3.5 h-3.5" />
                           <span>
-                            Valid: {new Date(med.dispenseRequest.validityPeriod.start).toLocaleDateString()} - {new Date(med.dispenseRequest.validityPeriod.end).toLocaleDateString()}
+                            Valid: {new Date(med.dispenseRequest.validityPeriod.start).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })} - {new Date(med.dispenseRequest.validityPeriod.end).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
                           </span>
                         </div>
                       )}
                       {relatedDispenses.length > 0 && (
-                        <div className="flex items-center gap-1.5 text-purple-600">
-                          <Pill className="w-3.5 h-3.5" />
-                          <span>
-                            Last dispensed: {new Date(relatedDispenses[0].whenHandedOver || relatedDispenses[0].whenPrepared || '').toLocaleDateString()}
-                          </span>
-                        </div>
+                        <>
+                          <div className="flex items-center gap-1.5 text-purple-600">
+                            <Pill className="w-3.5 h-3.5" />
+                            <span className="font-medium">
+                              Dispensed: {new Date(relatedDispenses[0].whenHandedOver || relatedDispenses[0].whenPrepared || '').toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                            </span>
+                          </div>
+                          {relatedDispenses[0].quantity?.value && (
+                            <div className="flex items-center gap-1.5 text-gray-600">
+                              <span className="ml-5 text-xs">
+                                Quantity: {relatedDispenses[0].quantity.value} {relatedDispenses[0].quantity.unit || 'units'}
+                              </span>
+                            </div>
+                          )}
+                          {relatedDispenses[0].daysSupply?.value && (
+                            <div className="flex items-center gap-1.5 text-gray-600">
+                              <span className="ml-5 text-xs">
+                                Supply: {relatedDispenses[0].daysSupply.value} {relatedDispenses[0].daysSupply.unit || 'days'}
+                              </span>
+                            </div>
+                          )}
+                        </>
                       )}
                       {linkedCondition && (
                         <div className="flex items-center gap-1.5 text-amber-600">
@@ -544,16 +687,81 @@ export function ModernPatientProfile({
             onRetry={refetchers?.procedures}
             skeletonVariant="list"
           >
-              <div className="space-y-4">
-                {procedures.map((proc, index) => {
-                  // Try to find related condition by checking if procedure mentions condition in reasonReference
-                  const relatedCondition = proc.reasonReference?.find(ref => 
-                    ref.reference?.startsWith('Condition/')
-                  );
-                  const conditionId = relatedCondition?.reference?.replace('Condition/', '');
-                  const linkedCondition = conditionId ? conditions.find(c => c.id === conditionId) : null;
-                  
-                  return (
+              {(() => {
+                // Group procedures by year
+                const proceduresByYear = procedures.reduce((acc, proc) => {
+                  const date = proc.performedDateTime || proc.performedPeriod?.start;
+                  const year = date ? new Date(date).getFullYear() : 'Unknown';
+                  if (!acc[year]) acc[year] = [];
+                  acc[year].push(proc);
+                  return acc;
+                }, {} as Record<string, typeof procedures>);
+
+                // Sort years descending
+                const sortedYears = Object.keys(proceduresByYear).sort((a, b) => {
+                  if (a === 'Unknown') return 1;
+                  if (b === 'Unknown') return -1;
+                  return Number(b) - Number(a);
+                });
+
+                const displayLimit = 10;
+                const shouldShowButton = procedures.length > displayLimit;
+
+                return (
+                  <div className="space-y-6">
+                    {sortedYears.map((year, yearIndex) => {
+                      const yearProcedures = proceduresByYear[year];
+                      
+                      // Sort procedures by date within year (most recent first)
+                      const sortedProcedures = yearProcedures.sort((a, b) => {
+                        const dateA = new Date(a.performedDateTime || a.performedPeriod?.start || 0);
+                        const dateB = new Date(b.performedDateTime || b.performedPeriod?.start || 0);
+                        return dateB.getTime() - dateA.getTime();
+                      });
+
+                      // Calculate how many procedures from this year to show
+                      let proceduresToShow = sortedProcedures;
+                      if (!showAllProcedures && shouldShowButton) {
+                        const previousYearsCount = sortedYears
+                          .slice(0, yearIndex)
+                          .reduce((sum, y) => sum + proceduresByYear[y].length, 0);
+                        
+                        if (previousYearsCount >= displayLimit) {
+                          return null; // Don't show this year at all
+                        }
+                        
+                        const remainingSlots = displayLimit - previousYearsCount;
+                        proceduresToShow = sortedProcedures.slice(0, remainingSlots);
+                      }
+
+                      if (proceduresToShow.length === 0) return null;
+
+                      return (
+                        <div key={year}>
+                          {/* Year Header */}
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="flex-1 h-px bg-gradient-to-r from-purple-200 to-transparent"></div>
+                            <h3 className="text-sm font-semibold text-purple-700 bg-purple-50 px-3 py-1 rounded-full">
+                              {year} ({yearProcedures.length} procedure{yearProcedures.length > 1 ? 's' : ''})
+                            </h3>
+                            <div className="flex-1 h-px bg-gradient-to-l from-purple-200 to-transparent"></div>
+                          </div>
+
+                          {/* Procedures for this year */}
+                          <div className="space-y-3">
+                            {proceduresToShow.map((proc, index) => {
+                              // Try to find related condition
+                              const relatedCondition = proc.reasonReference?.find(ref => 
+                                ref.reference?.startsWith('Condition/')
+                              );
+                              const conditionId = relatedCondition?.reference?.replace('Condition/', '');
+                              const linkedCondition = conditionId ? conditions.find(c => c.id === conditionId) : null;
+                              
+                              // Try to find related encounter
+                              const encounterId = proc.encounter?.reference?.replace('Encounter/', '');
+                              const linkedEncounter = encounterId ? encounters.find(e => e.id === encounterId) : null;
+                              
+                              return (
                     <div key={proc.id || index} className="bg-purple-50 border-l-4 border-purple-400 rounded-r-xl p-4 hover:shadow-sm transition-shadow">
                       <div className="flex items-start justify-between">
                         <p className="font-semibold text-gray-900 text-base">
@@ -572,13 +780,33 @@ export function ModernPatientProfile({
                       <div className="mt-2 space-y-1 text-sm text-gray-600">
                         {(proc.performedDateTime || proc.performedPeriod?.start) && (
                           <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4" />
-                            <span>
+                            <Calendar className="w-4 h-4 text-blue-600" />
+                            <span className="font-medium">
                               Performed: {proc.performedDateTime 
-                                ? new Date(proc.performedDateTime).toLocaleDateString()
+                                ? new Date(proc.performedDateTime).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                })
                                 : proc.performedPeriod?.start 
-                                  ? new Date(proc.performedPeriod.start).toLocaleDateString()
+                                  ? new Date(proc.performedPeriod.start).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                  })
                                   : 'Unknown date'}
+                            </span>
+                          </div>
+                        )}
+                        {linkedEncounter && linkedEncounter.period?.start && (
+                          <div className="flex items-center gap-2 text-indigo-600">
+                            <Activity className="w-4 h-4" />
+                            <span>
+                              Visit: {new Date(linkedEncounter.period.start).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
                             </span>
                           </div>
                         )}
@@ -608,16 +836,39 @@ export function ModernPatientProfile({
                             <span className="font-medium">Notes:</span> {proc.note[0].text}
                           </div>
                         )}
-                        {proc.id && (
-                          <div className="text-xs text-gray-400 mt-2">
-                            ID: {proc.id}
-                          </div>
-                        )}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Show More/Less Button */}
+                    {shouldShowButton && (
+                      <div className="flex justify-center pt-4">
+                        <button
+                          onClick={() => setShowAllProcedures(!showAllProcedures)}
+                          className="flex items-center gap-2 px-6 py-3 bg-purple-50 hover:bg-purple-100 text-purple-700 font-medium rounded-lg transition-colors border-2 border-purple-200 hover:border-purple-300"
+                        >
+                          {showAllProcedures ? (
+                            <>
+                              <ChevronDown className="w-4 h-4 rotate-180" />
+                              Show Less
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="w-4 h-4" />
+                              Show {procedures.length - displayLimit} More Procedures
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
           </SectionCard>
 
           {/* Family History */}
@@ -729,7 +980,12 @@ export function ModernPatientProfile({
                 ))}
               </div>
           </SectionCard>
+        </div>
+          </TabsContent>
 
+          {/* Insurance & Billing Tab */}
+          <TabsContent value="billing" className="mt-0">
+            <div className="space-y-3">
           {/* Insurance Coverage */}
           <SectionCard
             title="Insurance Coverage"
@@ -740,36 +996,208 @@ export function ModernPatientProfile({
             isEmpty={!loading.coverage && coverage.length === 0}
             emptyMessage="No insurance information"
             onRetry={refetchers?.coverage}
+            defaultOpen={true}
             skeletonVariant="card"
           >
-              <div className="space-y-3">
-                {coverage.map((cov, index) => (
-                  <div key={cov.id || index} className="bg-blue-50 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="font-medium text-gray-900">
-                        {cov.type?.text || cov.type?.coding?.[0]?.display || 'Insurance Plan'}
-                      </p>
+              <div className="space-y-4">
+                {coverage.map((cov, index) => {
+                  // Check if coverage is expired
+                  const endDate = cov.period?.end ? new Date(cov.period.end) : null;
+                  const isExpired = endDate && endDate < new Date();
+                  
+                  return (
+                  <div key={cov.id || index} className={`rounded-lg p-4 border-2 ${
+                    isExpired ? 'bg-red-50 border-red-300' : 'bg-blue-50 border-blue-300'
+                  }`}>
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          isExpired ? 'bg-red-200' : 'bg-blue-200'
+                        }`}>
+                          <Shield className={`w-6 h-6 ${isExpired ? 'text-red-700' : 'text-blue-700'}`} />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900 text-base">
+                            {cov.type?.text || cov.type?.coding?.[0]?.display || 'Insurance Plan'}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {cov.policyHolder?.display || 'Insurance Holder'}
+                          </p>
+                        </div>
+                      </div>
                       {cov.status && (
-                        <Badge variant={cov.status === 'active' ? 'success' : 'info'}>
-                          {cov.status}
+                        <Badge variant={
+                          isExpired ? 'danger' : 
+                          cov.status === 'active' ? 'success' : 'info'
+                        } className="text-xs">
+                          {isExpired ? 'Expired' : cov.status}
                         </Badge>
                       )}
                     </div>
-                    {cov.subscriberId && (
-                      <p className="text-sm text-gray-600">
-                        Subscriber ID: {cov.subscriberId}
-                      </p>
-                    )}
-                    {cov.period?.start && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Since: {new Date(cov.period.start).toLocaleDateString()}
-                      </p>
-                    )}
+                    
+                    <div className="space-y-2 text-sm">
+                      {cov.subscriberId && (
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-gray-600" />
+                          <span className="text-gray-700">
+                            Subscriber ID: <span className="font-medium">{cov.subscriberId}</span>
+                          </span>
+                        </div>
+                      )}
+                      {cov.period?.start && (
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-gray-600" />
+                          <span className="text-gray-700">
+                            Coverage Period: <span className="font-medium">
+                              {new Date(cov.period.start).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                              {cov.period.end && ` - ${new Date(cov.period.end).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}`}
+                            </span>
+                          </span>
+                        </div>
+                      )}
+                      {cov.relationship?.coding?.[0]?.display && (
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-gray-600" />
+                          <span className="text-gray-700">
+                            Relationship: <span className="font-medium capitalize">{cov.relationship.coding[0].display}</span>
+                          </span>
+                        </div>
+                      )}
+                      {isExpired && (
+                        <div className="mt-3 p-2 bg-red-100 rounded border border-red-200">
+                          <p className="text-xs text-red-800 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" />
+                            This insurance coverage has expired. Please update your insurance information.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
           </SectionCard>
-        </div>
+
+          {/* Claims History (EOB) */}
+          <SectionCard
+            title="Claims History"
+            count={explanationOfBenefit.length}
+            icon={FileText}
+            isLoading={loading.explanationOfBenefit}
+            error={errors?.explanationOfBenefit}
+            isEmpty={!loading.explanationOfBenefit && explanationOfBenefit.length === 0}
+            emptyMessage="No claims records"
+            onRetry={refetchers?.explanationOfBenefit}
+            defaultOpen={true}
+            skeletonVariant="list"
+          >
+              <div className="space-y-4">
+                {explanationOfBenefit
+                  .sort((a, b) => {
+                    const dateA = new Date(a.created || a.billablePeriod?.start || 0);
+                    const dateB = new Date(b.created || b.billablePeriod?.start || 0);
+                    return dateB.getTime() - dateA.getTime();
+                  })
+                  .map((eob, index) => {
+                    const claimDate = eob.created || eob.billablePeriod?.start;
+                    const paymentAmount = eob.payment?.amount?.value;
+                    const paymentDate = eob.payment?.date;
+                    
+                    return (
+                  <div key={eob.id || index} className="bg-white rounded-lg border-2 border-gray-200 p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <p className="font-semibold text-gray-900">
+                            {eob.type?.coding?.[0]?.display || 'Medical Claim'}
+                          </p>
+                          {eob.outcome && (
+                            <Badge variant={eob.outcome === 'complete' ? 'success' : 'warning'} className="text-xs">
+                              {eob.outcome}
+                            </Badge>
+                          )}
+                        </div>
+                        {claimDate && (
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Calendar className="w-4 h-4" />
+                            <span>Service Date: {new Date(claimDate).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}</span>
+                          </div>
+                        )}
+                      </div>
+                      {paymentAmount !== undefined && (
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-green-600">
+                            ${paymentAmount.toFixed(2)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {eob.payment?.amount?.currency || 'USD'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Service Items */}
+                    {eob.item && eob.item.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <p className="text-xs font-medium text-gray-700 mb-2">Services:</p>
+                        <div className="space-y-1">
+                          {eob.item.slice(0, 3).map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-2 text-xs text-gray-600">
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                              <span>{item.revenue?.coding?.[0]?.display || `Service ${item.sequence}`}</span>
+                            </div>
+                          ))}
+                          {eob.item.length > 3 && (
+                            <p className="text-xs text-gray-500 ml-3.5">
+                              +{eob.item.length - 3} more services
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Payment Info */}
+                    {paymentDate && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <DollarSign className="w-3.5 h-3.5 text-green-600" />
+                          <span>Paid on {new Date(paymentDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Diagnosis Reference */}
+                    {eob.diagnosis && eob.diagnosis.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs text-gray-500">
+                          Diagnosis: {eob.diagnosis.length} condition{eob.diagnosis.length > 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                    );
+                  })}
+              </div>
+          </SectionCard>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );

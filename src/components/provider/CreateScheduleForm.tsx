@@ -26,6 +26,16 @@ import { AlertCircle } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { format } from 'date-fns';
 import type { Schedule } from '@/types/fhir';
+import {
+  SERVICE_CATEGORIES,
+  SERVICE_CATEGORY_LABELS,
+  SERVICE_TYPES_BY_CATEGORY,
+  SPECIALTIES,
+  SPECIALTY_LABELS,
+  getAllSpecialties,
+  type ServiceCategoryCode,
+  type SpecialtyCode,
+} from '@/constants/fhir';
 
 interface CreateScheduleFormProps {
   practitionerId: string;
@@ -34,35 +44,8 @@ interface CreateScheduleFormProps {
   onSuccess: (schedule: Schedule) => void;
 }
 
-// Service Category and Type business rules
-const SERVICE_RULES: Record<string, Array<{value: string, label: string, description?: string}>> = {
-  "outpatient": [
-    { value: "consultation", label: "Consultation", description: "General medical consultation" },
-    { value: "follow-up", label: "Follow-up", description: "Follow-up appointment" },
-    { value: "screening", label: "Screening", description: "Health screening and checkups" },
-    { value: "vaccination", label: "Vaccination", description: "Immunization services" },
-    { value: "minor-procedure", label: "Minor Procedure", description: "Small procedures and treatments" }
-  ],
-
-  "home-health": [
-    { value: "consultation", label: "Home Consultation", description: "Medical consultation at patient's home" },
-    { value: "follow-up", label: "Home Follow-up", description: "Follow-up visit at home" },
-    { value: "vaccination", label: "Home Vaccination", description: "Vaccination service at home" },
-    { value: "wound-care", label: "Wound Care", description: "Home wound care and dressing" }
-  ],
-
-  "telehealth": [
-    { value: "consultation", label: "Virtual Consultation", description: "Online medical consultation" },
-    { value: "follow-up", label: "Virtual Follow-up", description: "Online follow-up appointment" },
-    { value: "mental-health", label: "Mental Health Consultation", description: "Virtual mental health session" }
-  ],
-
-  "wellness": [
-    { value: "screening", label: "Preventive Screening", description: "Preventive health screening" },
-    { value: "consultation", label: "Wellness Consultation", description: "Preventive care consultation" },
-    { value: "vaccination", label: "Preventive Vaccination", description: "Preventive immunization" }
-  ]
-};
+// Use centralized service type rules
+const SERVICE_RULES = SERVICE_TYPES_BY_CATEGORY;
 
 interface ScheduleFormData {
   serviceCategory: string;
@@ -94,11 +77,11 @@ export function CreateScheduleForm({
   // Update available service types when service category changes
   useEffect(() => {
     if (formData.serviceCategory) {
-      const serviceTypes = SERVICE_RULES[formData.serviceCategory] || [];
+      const serviceTypes = SERVICE_RULES[formData.serviceCategory as ServiceCategoryCode] || [];
       setAvailableServiceTypes(serviceTypes);
 
       // Reset service type if current selection is not available in new category
-      if (formData.serviceType && !serviceTypes.find(type => type.value === formData.serviceType)) {
+      if (formData.serviceType && !serviceTypes.find((type: { value: string }) => type.value === formData.serviceType)) {
         setFormData(prev => ({ ...prev, serviceType: '' }));
       }
     } else {
@@ -236,10 +219,18 @@ export function CreateScheduleForm({
                   <SelectValue placeholder="Select service category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="outpatient">Outpatient Consultation (In-clinic visits)</SelectItem>
-                  <SelectItem value="home-health">Home Visit (At patient's home)</SelectItem>
-                  <SelectItem value="telehealth">Telehealth (Virtual appointments)</SelectItem>
-                  <SelectItem value="wellness">Preventive Care/Wellness</SelectItem>
+                  <SelectItem value={SERVICE_CATEGORIES.OUTPATIENT}>
+                    {SERVICE_CATEGORY_LABELS[SERVICE_CATEGORIES.OUTPATIENT]} (In-clinic visits)
+                  </SelectItem>
+                  <SelectItem value={SERVICE_CATEGORIES.HOME_HEALTH}>
+                    {SERVICE_CATEGORY_LABELS[SERVICE_CATEGORIES.HOME_HEALTH]} (At patient's home)
+                  </SelectItem>
+                  <SelectItem value={SERVICE_CATEGORIES.TELEHEALTH}>
+                    {SERVICE_CATEGORY_LABELS[SERVICE_CATEGORIES.TELEHEALTH]} (Virtual appointments)
+                  </SelectItem>
+                  <SelectItem value={SERVICE_CATEGORIES.WELLNESS}>
+                    {SERVICE_CATEGORY_LABELS[SERVICE_CATEGORIES.WELLNESS]} (Preventive care)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -282,14 +273,11 @@ export function CreateScheduleForm({
                   <SelectValue placeholder="Select specialty" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="general-practice">General Practice</SelectItem>
-                  <SelectItem value="cardiology">Cardiology</SelectItem>
-                  <SelectItem value="dermatology">Dermatology</SelectItem>
-                  <SelectItem value="endocrinology">Endocrinology</SelectItem>
-                  <SelectItem value="family-medicine">Family Medicine</SelectItem>
-                  <SelectItem value="internal-medicine">Internal Medicine</SelectItem>
-                  <SelectItem value="neurology">Neurology</SelectItem>
-                  <SelectItem value="pediatrics">Pediatrics</SelectItem>
+                  {getAllSpecialties().map((specialty) => (
+                    <SelectItem key={specialty.value} value={specialty.value}>
+                      {specialty.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
