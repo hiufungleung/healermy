@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
@@ -122,7 +122,7 @@ function getSpecialtyLabel(code: string): string {
   return SPECIALTY_LABELS[code as SpecialtyCode] || code;
 }
 
-export default function NewBookingFlow() {
+function NewBookingFlow() {
   const router = useRouter();
   const { session } = useAuth();
   const { toast } = useToast();
@@ -2345,5 +2345,20 @@ export default function NewBookingFlow() {
         onStartNew={startNewBooking}
       />
     </Layout>
+  );
+}
+
+// Wrap in Suspense to handle useSearchParams() for Next.js 15 static generation
+export default function BookingPage() {
+  return (
+    <Suspense fallback={
+      <Layout patientName="">
+        <div className="flex items-center justify-center min-h-screen">
+          <LoadingSpinner size="lg" />
+        </div>
+      </Layout>
+    }>
+      <NewBookingFlow />
+    </Suspense>
   );
 }
