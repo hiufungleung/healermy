@@ -1,11 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
-import { useBookingState } from '@/hooks/useBookingState';
-import { ResumeBookingDialog } from '@/components/patient/ResumeBookingDialog';
 import { Layout } from '@/components/common/Layout';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
@@ -14,62 +12,18 @@ import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { SlotSelectionGrid } from '@/components/common/SlotDisplay';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { FilterSheet } from '@/components/patient/FilterSheet';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination';
-import { formatTimeForDisplay, formatDateForDisplay, formatDateTimeForDisplay, APP_TIMEZONE } from '@/library/timezone';
+import { formatTimeForDisplay, formatDateForDisplay } from '@/library/timezone';
 import type { Practitioner, Slot, Schedule } from '@/types/fhir';
-import { X } from 'lucide-react';
-import {
-  SERVICE_CATEGORIES as FHIR_SERVICE_CATEGORIES,
-  SERVICE_CATEGORY_LABELS,
-  SERVICE_CATEGORY_DESCRIPTIONS,
-  SPECIALTIES as FHIR_SPECIALTIES,
-  SPECIALTY_LABELS,
-  getAllSpecialties,
-  VISIT_REASONS,
-  getAllVisitReasons,
-  type ServiceCategoryCode,
-  type SpecialtyCode,
-} from '@/constants/fhir';
 
-// Service Category Images/Icons with FHIR codes
+// Service Category Images/Icons (Replace with actual images)
 const SERVICE_CATEGORIES = [
   {
-    id: FHIR_SERVICE_CATEGORIES.OUTPATIENT, // 'outpatient'
-    name: SERVICE_CATEGORY_LABELS[FHIR_SERVICE_CATEGORIES.OUTPATIENT], // 'Outpatient'
-    description: SERVICE_CATEGORY_DESCRIPTIONS[FHIR_SERVICE_CATEGORIES.OUTPATIENT],
+    id: 'outpatient',
+    name: 'In-clinic visit (Outpatient)',
     icon: (
       <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -77,9 +31,8 @@ const SERVICE_CATEGORIES = [
     )
   },
   {
-    id: FHIR_SERVICE_CATEGORIES.HOME_HEALTH, // 'home-health'
-    name: SERVICE_CATEGORY_LABELS[FHIR_SERVICE_CATEGORIES.HOME_HEALTH], // 'Home Visit'
-    description: SERVICE_CATEGORY_DESCRIPTIONS[FHIR_SERVICE_CATEGORIES.HOME_HEALTH],
+    id: 'home-health',
+    name: 'Home visit',
     icon: (
       <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -87,9 +40,8 @@ const SERVICE_CATEGORIES = [
     )
   },
   {
-    id: FHIR_SERVICE_CATEGORIES.TELEHEALTH, // 'telehealth'
-    name: SERVICE_CATEGORY_LABELS[FHIR_SERVICE_CATEGORIES.TELEHEALTH], // 'Telehealth'
-    description: SERVICE_CATEGORY_DESCRIPTIONS[FHIR_SERVICE_CATEGORIES.TELEHEALTH],
+    id: 'telehealth',
+    name: 'Virtual appointment (Telehealth)',
     icon: (
       <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -97,9 +49,8 @@ const SERVICE_CATEGORIES = [
     )
   },
   {
-    id: FHIR_SERVICE_CATEGORIES.WELLNESS, // 'wellness'
-    name: SERVICE_CATEGORY_LABELS[FHIR_SERVICE_CATEGORIES.WELLNESS], // 'Wellness'
-    description: SERVICE_CATEGORY_DESCRIPTIONS[FHIR_SERVICE_CATEGORIES.WELLNESS],
+    id: 'wellness',
+    name: 'Preventive care',
     icon: (
       <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -108,375 +59,77 @@ const SERVICE_CATEGORIES = [
   }
 ];
 
-// Specialties - use centralized labels
-const SPECIALTIES_LIST = getAllSpecialties();
+const SPECIALTIES = [
+  'General Practice',
+  'Internal Medicine',
+  'Family Medicine',
+  'Pediatrics',
+  'Cardiology',
+  'Dermatology',
+  'Orthopedics',
+  'Psychiatry',
+  'Neurology',
+  'Oncology'
+];
 
-// Helper function: convert specialty label to FHIR code
-function getSpecialtyCode(label: string): string | undefined {
-  const entry = Object.entries(SPECIALTY_LABELS).find(([_, lbl]) => lbl === label);
-  return entry?.[0];
-}
-
-// Helper function: convert specialty code to label
-function getSpecialtyLabel(code: string): string {
-  return SPECIALTY_LABELS[code as SpecialtyCode] || code;
-}
+const SERVICE_TYPES: Record<string, string[]> = {
+  outpatient: ['Consultation', 'Follow-up', 'Screening', 'Vaccination', 'Minor Procedure'],
+  'home-health': ['Home Consultation', 'Home Follow-up', 'Home Vaccination', 'Wound Care'],
+  telehealth: ['Virtual Consultation', 'Virtual Follow-up', 'Mental Health Consultation'],
+  wellness: ['Preventive Screening', 'Wellness Consultation', 'Preventive Vaccination']
+};
 
 export default function NewBookingFlow() {
   const router = useRouter();
   const { session } = useAuth();
   const { toast } = useToast();
+  const [currentStep, setCurrentStep] = useState(1);
 
-  // Use the booking state hook for URL and localStorage management
-  const {
-    bookingDraft,
-    showResumeDialog,
-    setShowResumeDialog,
-    updateDraft,
-    clearDraft,
-    navigateToStep,
-    resumeFromDraft,
-    startNewBooking,
-    isInitialized
-  } = useBookingState();
-
-  const [currentStep, setCurrentStep] = useState(bookingDraft.step || 1);
-
-  // Step 1: Service Details - Initialize from bookingDraft
-  const [selectedSpecialty, setSelectedSpecialty] = useState<string>(bookingDraft.specialty || '');
-  const [selectedServiceCategory, setSelectedServiceCategory] = useState<string>(bookingDraft.serviceCategory || '');
+  // Step 1: Service Details
+  const [selectedSpecialty, setSelectedSpecialty] = useState<string>('');
+  const [selectedServiceCategory, setSelectedServiceCategory] = useState<string>('');
+  const [selectedServiceType, setSelectedServiceType] = useState<string>('');
 
   // Step 1: Doctor Selection (after service filters)
   const [searchTerm, setSearchTerm] = useState('');
   const [practitioners, setPractitioners] = useState<Practitioner[]>([]);
-  const [allPractitioners, setAllPractitioners] = useState<any[]>([]); // All fetched practitioners
+  const [filteredPractitioners, setFilteredPractitioners] = useState<any[]>([]);
   const [selectedPractitioner, setSelectedPractitioner] = useState<Practitioner | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10; // Frontend pagination: 10 items per page
+  const ITEMS_PER_PAGE = 5;
+  const [hasNextPage, setHasNextPage] = useState<boolean>(false); // Whether next page exists
 
   // Cache for optimization: store all practitioners with their schedules
   const [cachedPractitionersWithSchedules, setCachedPractitionersWithSchedules] = useState<any[]>([]);
 
-  // Step 2: Date & Time - Initialize from bookingDraft
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    if (bookingDraft.date) return bookingDraft.date;
-    // Use timezone-aware formatting for today
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: APP_TIMEZONE,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).format(new Date());
-  });
-  const [calendarDate, setCalendarDate] = useState<Date | undefined>(() => {
-    if (bookingDraft.date) {
-      // Parse YYYY-MM-DD in local timezone (not UTC)
-      const [year, month, day] = bookingDraft.date.split('-').map(Number);
-      return new Date(year, month - 1, day);
-    }
-    return new Date();
-  });
-  const [selectedTime, setSelectedTime] = useState<string>(bookingDraft.time || '');
-  const [selectedSlotId, setSelectedSlotId] = useState<string>(bookingDraft.slotId || '');
-  const [selectedServiceType, setSelectedServiceType] = useState<string>(bookingDraft.serviceType || '');
+  // Step 2: Date & Time
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedTime, setSelectedTime] = useState<string>('');
+  const [selectedSlotId, setSelectedSlotId] = useState<string>('');
   const [availableSlots, setAvailableSlots] = useState<Slot[]>([]);
-  const [monthSlots, setMonthSlots] = useState<Slot[]>([]); // Store full month of slots
-  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
-  const [datesWithSlots, setDatesWithSlots] = useState<Set<string>>(new Set());
-  const [practitionerSchedules, setPractitionerSchedules] = useState<Schedule[]>([]); // Cache schedules for service-type lookup
 
-  // Step 3: Visit Information - Initialize from bookingDraft
-  const [reasonForVisit, setReasonForVisit] = useState<string>(bookingDraft.reasonForVisit || '');
-  const [symptoms, setSymptoms] = useState<string>(bookingDraft.symptoms || '');
-  const [requestLonger, setRequestLonger] = useState(bookingDraft.requestLonger || false);
+  // Step 3: Visit Information
+  const [reasonForVisit, setReasonForVisit] = useState<string>('');
+  const [symptoms, setSymptoms] = useState<string>('');
+  const [requestLonger, setRequestLonger] = useState(false);
 
   // Step 4: Confirmation
   const [submitting, setSubmitting] = useState(false);
 
-  // Selection dialog state
-  const [showSelectionDialog, setShowSelectionDialog] = useState(false);
-  const [pendingPractitioner, setPendingPractitioner] = useState<Practitioner | null>(null);
-  const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
-  const [availableSpecialties, setAvailableSpecialties] = useState<string[]>([]);
-  const [availableServiceCategories, setAvailableServiceCategories] = useState<any[]>([]);
+  // Filter sheet state (mobile)
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
-  // Dialog-only selections (independent from main page)
-  const [dialogSpecialty, setDialogSpecialty] = useState<string>('');
-  const [dialogServiceCategory, setDialogServiceCategory] = useState<string>('');
-  const [accordionValue, setAccordionValue] = useState<string | undefined>(undefined);
-
-  // Search debounce timer
-  const searchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
-
-  // Validation errors
-  const [specialtyError, setSpecialtyError] = useState(false);
-  const [categoryError, setCategoryError] = useState(false);
-
-  // Real-time slot update interval
-  const slotUpdateInterval = useRef<NodeJS.Timeout | null>(null);
-
-  // Month slot cache
-  const monthSlotCache = useRef<Map<string, Slot[]>>(new Map());
-
-  // Auto-proceed when both dialog selections are made
+  // Set default date to today
   useEffect(() => {
-    if (dialogSpecialty && dialogServiceCategory && pendingPractitioner && showSelectionDialog) {
-      console.log('[DIALOG] Both selections made in useEffect, auto-proceeding...');
-      const timer = setTimeout(() => {
-        console.log('[DIALOG] Timer fired, checking conditions again');
-        // Verify conditions still met before proceeding
-        if (dialogSpecialty && dialogServiceCategory && pendingPractitioner && showSelectionDialog) {
-          // Apply dialog selections to main state
-          setSelectedSpecialty(dialogSpecialty);
-          setSelectedServiceCategory(dialogServiceCategory);
-          setSelectedPractitioner(pendingPractitioner);
-
-          // Close dialog first
-          setShowSelectionDialog(false);
-
-          // Update draft and navigate to step 2
-          const practitionerName = pendingPractitioner.name?.[0]?.text ||
-            `${pendingPractitioner.name?.[0]?.given?.join(' ') || ''} ${pendingPractitioner.name?.[0]?.family || ''}`.trim();
-
-          console.log('[DIALOG] Updating draft and navigating to step 2');
-
-          // updateDraft now handles URL update automatically when step changes
-          updateDraft({
-            step: 2,
-            specialty: dialogSpecialty,
-            serviceCategory: dialogServiceCategory,
-            practitionerId: pendingPractitioner.id,
-            practitionerName
-          });
-
-          // Reset dialog state after navigation
-          setPendingPractitioner(null);
-          setDialogSpecialty('');
-          setDialogServiceCategory('');
-          setAccordionValue(undefined);
-        }
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [dialogSpecialty, dialogServiceCategory, pendingPractitioner, showSelectionDialog, updateDraft, navigateToStep]);
-
-  // Sync state with bookingDraft when it changes (from URL or localStorage)
-  useEffect(() => {
-    if (!isInitialized) return;
-
-    console.log('[SYNC] Syncing with bookingDraft:', bookingDraft);
-
-    setCurrentStep(bookingDraft.step || 1);
-    setSelectedSpecialty(bookingDraft.specialty || '');
-    setSelectedServiceCategory(bookingDraft.serviceCategory || '');
-    setSelectedServiceType(bookingDraft.serviceType || '');
-
-    // Handle date with timezone awareness
-    if (bookingDraft.date) {
-      setSelectedDate(bookingDraft.date);
-      // Create Date object from YYYY-MM-DD string in local timezone (not UTC)
-      // Parse components to avoid UTC interpretation
-      const [year, month, day] = bookingDraft.date.split('-').map(Number);
-      setCalendarDate(new Date(year, month - 1, day));
-    } else {
-      const today = new Intl.DateTimeFormat('en-CA', {
-        timeZone: APP_TIMEZONE,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      }).format(new Date());
-      setSelectedDate(today);
-      setCalendarDate(new Date());
-    }
-    setSelectedTime(bookingDraft.time || '');
-    setSelectedSlotId(bookingDraft.slotId || '');
-    setReasonForVisit(bookingDraft.reasonForVisit || '');
-    setSymptoms(bookingDraft.symptoms || '');
-    setRequestLonger(bookingDraft.requestLonger || false);
-
-    // Handle practitioner data
-    if (bookingDraft.practitionerId && (!selectedPractitioner || selectedPractitioner.id !== bookingDraft.practitionerId)) {
-      console.log('[SYNC] Need to fetch practitioner:', bookingDraft.practitionerId);
-
-      // Create a temporary practitioner object with the name from localStorage
-      // This prevents the "Selected Doctor" section from being empty during fetch
-      if (bookingDraft.practitionerName) {
-        const tempPractitioner: Practitioner = {
-          resourceType: 'Practitioner',
-          id: bookingDraft.practitionerId,
-          name: [{
-            text: bookingDraft.practitionerName,
-            family: '',
-            given: [bookingDraft.practitionerName]
-          }],
-          active: true
-        };
-        setSelectedPractitioner(tempPractitioner);
-        console.log('[SYNC] Set temp practitioner:', tempPractitioner);
-      }
-
-      // Fetch full practitioner details (will overwrite temp object)
-      fetchPractitionerById(bookingDraft.practitionerId);
-    }
-  }, [bookingDraft, isInitialized]);
-
-  // Set default date to today if not set
-  useEffect(() => {
-    if (!selectedDate) {
-      const today = new Date();
-      setSelectedDate(today.toISOString().split('T')[0]);
-    }
+    const today = new Date();
+    setSelectedDate(today.toISOString().split('T')[0]);
   }, []);
 
-  // Fetch month slots when entering Step 2 or month changes or practitioner is set
+  // Load first page of practitioners on mount
   useEffect(() => {
-    if (currentStep === 2 && selectedPractitioner) {
-      console.log('[MONTH FETCH] Triggering month fetch:', {
-        currentStep,
-        practitionerId: selectedPractitioner.id,
-        currentMonth: currentMonth.toISOString(),
-        specialty: selectedSpecialty,
-        serviceCategory: selectedServiceCategory
-      });
-      fetchMonthSlots(currentMonth);
-    }
-  }, [currentStep, selectedPractitioner, currentMonth]);
-
-  // Filter slots when selected date changes
-  useEffect(() => {
-    if (currentStep === 2 && monthSlots.length > 0) {
-      filterSlotsForSelectedDate(monthSlots);
-    }
-  }, [selectedDate, monthSlots, currentStep]);
-
-  // Real-time slot refresh every 5 seconds (seamless)
-  useEffect(() => {
-    if (currentStep !== 2 || !selectedPractitioner) {
-      // Clear interval if not on Step 2
-      if (slotUpdateInterval.current) {
-        clearInterval(slotUpdateInterval.current);
-        slotUpdateInterval.current = null;
-      }
-      return;
-    }
-
-    // Set up interval for seamless refresh
-    slotUpdateInterval.current = setInterval(() => {
-      // Silently refetch without showing loader, bypass cache to get fresh data
-      fetchMonthSlots(currentMonth, true); // true = skip cache
-    }, 5000); // 5 seconds
-
-    return () => {
-      if (slotUpdateInterval.current) {
-        clearInterval(slotUpdateInterval.current);
-        slotUpdateInterval.current = null;
-      }
-    };
-  }, [currentStep, selectedPractitioner, currentMonth]);
-
-  // Validate slot availability and date/time when entering Step 3 or 4
-  useEffect(() => {
-    const validateSlotAndDateTime = async () => {
-      // Only validate on Step 3 or 4, and only if we have required data
-      if ((currentStep !== 3 && currentStep !== 4) || !selectedSlotId || !selectedDate || !selectedTime) {
-        return;
-      }
-
-      console.log(`[VALIDATION] Validating slot ${selectedSlotId}, date ${selectedDate}, time ${selectedTime} on Step ${currentStep}`);
-
-      try {
-        const response = await fetch(`/api/fhir/slots/${selectedSlotId}`, {
-          method: 'GET',
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          console.error('[VALIDATION] Failed to fetch slot:', response.status);
-          toast({
-            title: 'Error',
-            description: 'Unable to verify slot availability. Please try again.',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        const data = await response.json();
-        const slot = data.slot || data; // Handle both {slot: {...}} and {...} responses
-
-        // Check if slot exists and has required properties
-        if (!slot || !slot.status) {
-          console.error('[VALIDATION] Invalid slot response:', data);
-          toast({
-            title: 'Error',
-            description: 'Unable to verify slot availability. Please try again.',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        // Validate 1: Check if slot is still free
-        if (slot.status !== 'free') {
-          console.warn('[VALIDATION] Slot is no longer available:', slot.status);
-
-          // Clear slot selection
-          setSelectedSlotId('');
-          setSelectedTime('');
-          setSelectedServiceType('');
-          setSelectedDate('');
-
-          // Show alert
-          toast({
-            title: 'Time Slot No Longer Available',
-            description: 'This time slot has been booked by someone else. Please select another time.',
-            variant: 'destructive',
-          });
-
-          // Navigate back to Step 2
-          setTimeout(() => {
-            navigateToStep(2);
-          }, 1500);
-          return;
-        }
-
-        // Validate 2: Check if date/time match the slot
-        const slotStart = new Date(slot.start);
-        const slotDate = slotStart.toISOString().split('T')[0]; // YYYY-MM-DD
-        const slotTime = formatTimeForDisplay(slotStart); // HH:MM in 24-hour format
-
-        if (slotDate !== selectedDate || slotTime !== selectedTime) {
-          console.warn('[VALIDATION] Date/time mismatch:', {
-            stored: { date: selectedDate, time: selectedTime },
-            actual: { date: slotDate, time: slotTime }
-          });
-
-          // Update to actual slot time
-          setSelectedDate(slotDate);
-          setSelectedTime(slotTime);
-
-          // toast({
-          //   title: 'Time Updated',
-          //   description: 'The appointment time has been updated to match the selected slot.',
-          //   variant: 'default',
-          // });
-        } else {
-          console.log('[VALIDATION] Slot is available and date/time match');
-        }
-      } catch (error) {
-        console.error('[VALIDATION] Error validating slot:', error);
-        toast({
-          title: 'Error',
-          description: 'Unable to verify slot availability. Please try again.',
-          variant: 'destructive',
-        });
-      }
-    };
-
-    validateSlotAndDateTime();
-  }, [currentStep, selectedSlotId, selectedDate, selectedTime]);
-
-  // Note: Initial practitioner loading is handled by the filter useEffect below
-  // (when no filters are active on mount, it calls fetchAllPractitioners)
+    fetchPractitionersPage(1);
+  }, []);
 
   // Client-side filter function to filter cached results
   const filterCachedResults = () => {
@@ -490,8 +143,19 @@ export default function NewBookingFlow() {
       serviceType: selectedServiceType
     });
 
-    // Convert UI labels to FHIR codes using centralized helper
-    const specialtyCode = selectedSpecialty ? getSpecialtyCode(selectedSpecialty) : undefined;
+    // Map UI values to FHIR codes
+    const specialtyCodeMap: Record<string, string> = {
+      'General Practice': 'general-practice',
+      'Internal Medicine': 'internal-medicine',
+      'Family Medicine': 'family-medicine',
+      'Pediatrics': 'pediatrics',
+      'Cardiology': 'cardiology',
+      'Dermatology': 'dermatology',
+      'Orthopedics': 'orthopedics',
+      'Psychiatry': 'psychiatry',
+      'Neurology': 'neurology',
+      'Oncology': 'oncology'
+    };
 
     const serviceTypeCodeMap: Record<string, string> = {
       'Consultation': 'consultation',
@@ -511,6 +175,7 @@ export default function NewBookingFlow() {
       'Preventive Vaccination': 'vaccination'
     };
 
+    const specialtyCode = selectedSpecialty ? specialtyCodeMap[selectedSpecialty] : null;
     const serviceTypeCode = selectedServiceType ? serviceTypeCodeMap[selectedServiceType] : null;
 
     // Filter practitioners based on their schedules
@@ -565,14 +230,8 @@ export default function NewBookingFlow() {
   // Track previous filter count to detect if filters were added or removed
   const previousFilterCount = React.useRef(0);
 
-  // Apply filters progressively when any filter changes (STEP 1 ONLY)
+  // Apply filters progressively when any filter changes
   useEffect(() => {
-    // Only apply filters in Step 1
-    if (currentStep !== 1) {
-      console.log('🔍 [SKIP] Not in Step 1, skipping filter application');
-      return;
-    }
-
     const currentFilterCount = countActiveFilters();
     const hasFilters = selectedSpecialty || selectedServiceCategory || selectedServiceType;
 
@@ -585,7 +244,7 @@ export default function NewBookingFlow() {
         console.log('🔍 [OPTIMIZATION] Filter added, using cached results for client-side filtering');
         setLoading(true);
         const filtered = filterCachedResults();
-        setAllPractitioners(filtered);
+        setFilteredPractitioners(filtered);
         setCurrentPage(1);
         setLoading(false);
       } else {
@@ -595,66 +254,52 @@ export default function NewBookingFlow() {
         applyServiceFilters();
       }
     } else {
-      // No filters active, clear cache and fetch all practitioners
+      // No filters active, clear cache and fetch first page
       console.log('🔍 [RESET] No filters active, clearing cache');
       setCachedPractitionersWithSchedules([]);
       setCurrentPage(1);
-      fetchAllPractitioners();
+      fetchPractitionersPage(1);
     }
 
     previousFilterCount.current = currentFilterCount;
-  }, [currentStep, selectedSpecialty, selectedServiceCategory, selectedServiceType]);
+  }, [selectedSpecialty, selectedServiceCategory, selectedServiceType]);
 
-  // Fetch practitioner by ID (for page refresh with URL params)
-  const fetchPractitionerById = async (practitionerId: string) => {
-    try {
-      console.log('[PRACTITIONER] Fetching by ID:', practitionerId);
-      const response = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        console.error('[PRACTITIONER] Failed to fetch:', response.status);
-        return;
-      }
-
-      const data = await response.json();
-      if (data.practitioner) {
-        console.log('[PRACTITIONER] Fetched:', data.practitioner.name);
-        setSelectedPractitioner(data.practitioner);
-      }
-    } catch (error) {
-      console.error('[PRACTITIONER] Error fetching by ID:', error);
-    }
-  };
-
-  // Fetch all practitioners (no server-side pagination)
-  const fetchAllPractitioners = async () => {
+  // Fetch practitioners by page (5 per page)
+  const fetchPractitionersPage = async (page: number) => {
     setLoading(true);
     try {
-      // Fetch all practitioners without pagination parameters
-      const response = await fetch(`/api/fhir/practitioners`, {
+      const params = new URLSearchParams();
+      params.append('count', ITEMS_PER_PAGE.toString());
+      if (page > 1) {
+        params.append('page', page.toString());
+      }
+
+      const response = await fetch(`/api/fhir/practitioners?${params.toString()}`, {
         credentials: 'include'
       });
 
       if (!response.ok) throw new Error('Failed to fetch practitioners');
 
       const result = await response.json();
-      const fetchedPractitioners = result.practitioners || [];
-      setPractitioners(fetchedPractitioners);
-      setAllPractitioners(fetchedPractitioners);
-      setCurrentPage(1); // Reset to first page
+      setPractitioners(result.practitioners || []);
+      setFilteredPractitioners(result.practitioners || []);
+      setHasNextPage(!!result.nextUrl);
+      setCurrentPage(page);
     } catch (error) {
       console.error('Error fetching practitioners:', error);
       setPractitioners([]);
-      setAllPractitioners([]);
+      setFilteredPractitioners([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // NOTE: Old fetchAvailableSlots removed - now using fetchMonthSlots which is more efficient
-  // (fetches entire month at once, no need to fetch schedules separately)
+  // Fetch available slots when practitioner and date are selected (only on Step 2)
+  useEffect(() => {
+    if (currentStep === 2 && selectedPractitioner && selectedDate) {
+      fetchAvailableSlots();
+    }
+  }, [currentStep, selectedPractitioner, selectedDate]);
 
   const applyServiceFilters = async () => {
     setLoading(true);
@@ -667,8 +312,19 @@ export default function NewBookingFlow() {
         serviceType: selectedServiceType
       });
 
-      // Convert UI labels to FHIR codes using centralized helper
-      const specialtyCodeForFilter = selectedSpecialty ? getSpecialtyCode(selectedSpecialty) : undefined;
+      // Map UI values to FHIR codes (matching CreateScheduleForm format)
+      const specialtyCodeMap: Record<string, string> = {
+        'General Practice': 'general-practice',
+        'Internal Medicine': 'internal-medicine',
+        'Family Medicine': 'family-medicine',
+        'Pediatrics': 'pediatrics',
+        'Cardiology': 'cardiology',
+        'Dermatology': 'dermatology',
+        'Orthopedics': 'orthopedics',
+        'Psychiatry': 'psychiatry',
+        'Neurology': 'neurology',
+        'Oncology': 'oncology'
+      };
 
       const serviceTypeCodeMap: Record<string, string> = {
         'Consultation': 'consultation',
@@ -693,8 +349,11 @@ export default function NewBookingFlow() {
       // Removed _count parameter - use FHIR server's default pagination
 
       // Add specialty filter (using FHIR code)
-      if (specialtyCodeForFilter) {
-        params.append('specialty', specialtyCodeForFilter);
+      if (selectedSpecialty) {
+        const specialtyCode = specialtyCodeMap[selectedSpecialty];
+        if (specialtyCode) {
+          params.append('specialty', specialtyCode);
+        }
       }
 
       // Add service category filter (using category ID directly)
@@ -717,7 +376,7 @@ export default function NewBookingFlow() {
 
       if (!schedulesResponse.ok) {
         console.error('🔍 [FILTER] Failed to fetch schedules:', schedulesResponse.status);
-        setAllPractitioners([]);
+        setFilteredPractitioners([]);
         return;
       }
 
@@ -728,7 +387,7 @@ export default function NewBookingFlow() {
 
       if (matchingSchedules.length === 0) {
         console.log('🔍 [FILTER] No schedules match the selected filters');
-        setAllPractitioners([]);
+        setFilteredPractitioners([]);
         return;
       }
 
@@ -765,7 +424,7 @@ export default function NewBookingFlow() {
 
         if (!response.ok) {
           console.error(`🔍 [FILTER] Failed to batch fetch practitioners: ${response.status}`);
-          setAllPractitioners([]);
+          setFilteredPractitioners([]);
           return;
         }
 
@@ -782,582 +441,171 @@ export default function NewBookingFlow() {
 
         // Cache the full results for future client-side filtering
         setCachedPractitionersWithSchedules(practitionersWithSchedules);
-        setAllPractitioners(practitionersWithSchedules);
-        setCurrentPage(1); // Reset to first page
+        setFilteredPractitioners(practitionersWithSchedules);
       } catch (error) {
         console.error('🔍 [FILTER] Error batch fetching practitioners:', error);
-        setAllPractitioners([]);
+        setFilteredPractitioners([]);
       }
     } catch (error) {
       console.error('Error applying filters:', error);
-      setAllPractitioners([]);
+      setFilteredPractitioners([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // REMOVED: Old fetchAvailableSlots function
-  // Now using fetchMonthSlots which:
-  // 1. Fetches entire month at once (more efficient)
-  // 2. No need to fetch schedules separately
-  // 3. Direct slot query with specialty and service-category filters
+  const fetchAvailableSlots = async () => {
+    if (!selectedPractitioner) return;
 
-  // Fetch slots for entire month with caching
-  const fetchMonthSlots = async (month: Date, skipCache: boolean = false) => {
-    if (!selectedPractitioner || currentStep !== 2) return;
-
-    // Include specialty and service category in cache key for proper filtering
-    const monthKey = `${month.getFullYear()}-${month.getMonth()}-${selectedSpecialty || 'any'}-${selectedServiceCategory || 'any'}`;
-
-    // Check cache first (unless skipCache is true for auto-updates)
-    if (!skipCache && monthSlotCache.current.has(monthKey)) {
-      const cachedSlots = monthSlotCache.current.get(monthKey)!;
-      console.log(`[MONTH SLOTS] Using cached ${cachedSlots.length} slots for ${monthKey}`);
-      setMonthSlots(cachedSlots);
-      updateDatesWithSlots(cachedSlots);
-      filterSlotsForSelectedDate(cachedSlots);
-      return;
-    }
-
-    console.log(`[MONTH SLOTS] ${skipCache ? 'Auto-update:' : 'Initial fetch:'} Fetching fresh data for ${monthKey}`);
-
+    console.log(`[SLOT FETCH] Starting for practitioner ${selectedPractitioner.id} on date ${selectedDate}`);
+    setLoading(true);
     try {
-      // Calculate month boundaries in local timezone, then convert to UTC for FHIR query
-      const year = month.getFullYear();
-      const monthIndex = month.getMonth();
+      const schedulesResponse = await fetch(
+        `/api/fhir/schedules?actor=Practitioner/${selectedPractitioner.id}`,
+        { credentials: 'include' }
+      );
 
-      // First day of month at 00:00:00 local time
-      const monthStartLocal = `${year}-${String(monthIndex + 1).padStart(2, '0')}-01T00:00:00`;
-      const monthStart = new Date(monthStartLocal);
+      if (!schedulesResponse.ok) throw new Error('Failed to fetch schedules');
 
-      // First day of next month at 00:00:00 local time
-      const nextMonthIndex = monthIndex + 1;
-      const nextYear = nextMonthIndex > 11 ? year + 1 : year;
-      const nextMonthNum = nextMonthIndex > 11 ? 1 : nextMonthIndex + 1;
-      const nextMonthLocal = `${nextYear}-${String(nextMonthNum).padStart(2, '0')}-01T00:00:00`;
-      const nextMonthStart = new Date(nextMonthLocal);
+      const schedulesData = await schedulesResponse.json();
+      console.log('[SLOT FETCH] Schedules API response:', schedulesData);
+      const schedules = schedulesData.schedules || [];
+      console.log(`[SLOT FETCH] Found ${schedules.length} schedules for practitioner`);
 
-      const startParam = monthStart.toISOString();
-      const endParam = nextMonthStart.toISOString();
+      // Get schedule IDs
+      const scheduleIds = schedules.map((s: Schedule) => s.id);
+      console.log(`[SLOT FETCH] Schedule IDs:`, scheduleIds);
 
-      console.log(`[MONTH SLOTS] Fetching for ${monthKey}:`);
-      console.log(`[MONTH SLOTS]   Local month: ${year}-${monthIndex + 1}`);
-      console.log(`[MONTH SLOTS]   UTC range: ${startParam} to ${endParam}`);
-
-      // STEP 1: Fetch schedules on initial load (not during auto-updates)
-      // This is needed to get service-type info that is not in slot results
-      if (!skipCache && practitionerSchedules.length === 0) {
-        console.log('[MONTH SLOTS] Fetching practitioner schedules for service-type lookup');
-
-        const scheduleParams = new URLSearchParams({
-          'actor': `Practitioner/${selectedPractitioner.id}`,
-          'active': 'true',
-          '_count': '50'
-        });
-
-        if (selectedSpecialty) {
-          const specialtyCode = getSpecialtyCode(selectedSpecialty);
-          if (specialtyCode) {
-            scheduleParams.append('specialty', specialtyCode);
-          }
-        }
-
-        if (selectedServiceCategory) {
-          scheduleParams.append('service-category', selectedServiceCategory);
-        }
-
-        try {
-          const scheduleResponse = await fetch(`/api/fhir/schedules?${scheduleParams.toString()}`, {
-            credentials: 'include'
-          });
-
-          if (scheduleResponse.ok) {
-            const scheduleData = await scheduleResponse.json();
-            const schedules = scheduleData.schedules || [];
-            console.log(`[MONTH SLOTS] Fetched ${schedules.length} schedules`);
-            setPractitionerSchedules(schedules);
-          }
-        } catch (error) {
-          console.error('[MONTH SLOTS] Failed to fetch schedules:', error);
-        }
-      }
-
-      // STEP 2: Fetch slots (always - both initial and auto-update)
-      const params = new URLSearchParams({
-        'schedule.actor': `Practitioner/${selectedPractitioner.id}`,
-        'status': 'free',
-        '_count': '200'
-      });
-
-      // Add specialty filter if selected
-      if (selectedSpecialty) {
-        const specialtyCodeForMonth = getSpecialtyCode(selectedSpecialty);
-        if (specialtyCodeForMonth) {
-          params.append('schedule.specialty', specialtyCodeForMonth);
-        }
-      }
-
-      // Add service category filter if selected
-      if (selectedServiceCategory) {
-        params.append('schedule.service-category', selectedServiceCategory);
-      }
-
-      // Add date range
-      params.append('start', `ge${startParam}`);
-      params.append('start', `lt${endParam}`);
-
-      const response = await fetch(`/api/fhir/slots?${params.toString()}`, {
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        console.error('[MONTH SLOTS] Failed to fetch:', response.status);
-        // Don't clear slots on error - keep existing slots displayed
+      if (scheduleIds.length === 0) {
+        console.log('[SLOT FETCH] No schedules found, returning empty slots');
+        setAvailableSlots([]);
         return;
       }
 
-      const data = await response.json();
-      const slots = data.slots || [];
+      // Fetch slots for each schedule separately (FHIR doesn't support multiple schedule parameters well)
+      const startOfDay = new Date(`${selectedDate}T00:00:00`);
+      const endOfDay = new Date(`${selectedDate}T23:59:59`);
+      const now = new Date();
 
-      console.log(`[MONTH SLOTS] Fetched ${slots.length} slots for ${monthKey}`);
-      console.log(`[MONTH SLOTS] First slot sample:`, slots[0]);
+      console.log(`[SLOT FETCH] Fetching slots for ${scheduleIds.length} schedules on ${selectedDate}`);
+      console.log(`[SLOT FETCH] Date range: ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
 
-      // Cache the results
-      monthSlotCache.current.set(monthKey, slots);
-
-      // Preserve scroll position during auto-updates
-      let scrollY = 0;
-      if (skipCache && typeof window !== 'undefined') {
-        scrollY = window.scrollY;
-      }
-
-      console.log(`[MONTH SLOTS] Setting monthSlots state to ${slots.length} slots`);
-      setMonthSlots(slots);
-      console.log(`[MONTH SLOTS] Calling updateDatesWithSlots`);
-      updateDatesWithSlots(slots);
-      console.log(`[MONTH SLOTS] Calling filterSlotsForSelectedDate for date:`, selectedDate);
-      filterSlotsForSelectedDate(slots);
-
-      // Restore scroll position after state update (on next tick)
-      if (skipCache && typeof window !== 'undefined') {
-        requestAnimationFrame(() => {
-          window.scrollTo(0, scrollY);
+      // Fetch slots for each schedule in parallel
+      const slotPromises = scheduleIds.map(async (scheduleId: string) => {
+        const params = new URLSearchParams({
+          schedule: `Schedule/${scheduleId}`,
+          status: 'free',
+          _count: '100'
         });
-      }
+
+        // Add date range filters
+        params.append('start', `ge${startOfDay.toISOString()}`);
+        params.append('start', `lt${endOfDay.toISOString()}`);
+
+        const slotUrl = `/api/fhir/slots?${params.toString()}`;
+        console.log(`[SLOT FETCH] Fetching from: ${slotUrl}`);
+
+        const response = await fetch(slotUrl, { credentials: 'include' });
+
+        if (!response.ok) {
+          console.error(`[SLOT FETCH] Failed for schedule ${scheduleId}:`, response.status);
+          return [];
+        }
+
+        const data = await response.json();
+        const slots = data.slots || [];
+        console.log(`[SLOT FETCH] Schedule ${scheduleId}: ${slots.length} slots`);
+        return slots;
+      });
+
+      // Wait for all requests and merge results
+      const slotArrays = await Promise.all(slotPromises);
+      const allSlots = slotArrays.flat();
+      console.log(`[SLOT FETCH] Total slots from all schedules: ${allSlots.length}`);
+
+      // Filter by date and time (slots must be free, in the future, and on selected date)
+      const filteredSlots = allSlots.filter((slot: Slot) => {
+        const slotStart = new Date(slot.start);
+        const slotDate = slotStart.toISOString().split('T')[0];
+
+        // Must be on selected date and in the future
+        return slotDate === selectedDate && slotStart > now && slot.status === 'free';
+      });
+
+      console.log(`[SLOT FETCH] After filtering: ${filteredSlots.length} available slots for ${selectedDate}`);
+      setAvailableSlots(filteredSlots);
     } catch (error) {
-      console.error('[MONTH SLOTS] Error:', error);
-      // Don't clear slots on error - keep existing slots displayed
-    }
-  };
-
-  // Update which dates have available slots
-  const updateDatesWithSlots = (slots: Slot[]) => {
-    const dates = new Set<string>();
-    slots.forEach(slot => {
-      if (slot.start) {
-        // Use timezone utility to properly extract date in app timezone
-        const slotDate = new Date(slot.start);
-        const dateStr = new Intl.DateTimeFormat('en-CA', {
-          timeZone: APP_TIMEZONE,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        }).format(slotDate);
-        dates.add(dateStr);
-      }
-    });
-    console.log('[UPDATE DATES] Found slots on', dates.size, 'unique dates:', Array.from(dates).sort());
-    setDatesWithSlots(dates);
-  };
-
-  // Filter month slots to selected date and extract unique service types
-  const filterSlotsForSelectedDate = (slots: Slot[]) => {
-    console.log('[FILTER SLOTS] Filtering for date:', selectedDate, 'from', slots.length, 'slots');
-
-    if (!selectedDate) {
-      console.log('[FILTER SLOTS] No date selected, clearing slots');
+      console.error('Error fetching slots:', error);
       setAvailableSlots([]);
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    const filtered = slots.filter(slot => {
-      if (!slot.start) return false;
-
-      // Use timezone utility to properly extract date in app timezone
-      const slotDate = new Date(slot.start);
-      const slotDateStr = new Intl.DateTimeFormat('en-CA', {
-        timeZone: APP_TIMEZONE,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      }).format(slotDate);
-
-      const matches = slotDateStr === selectedDate;
-
-      if (slots.indexOf(slot) < 3) {
-        // Log first 3 slots for debugging
-        console.log('[FILTER SLOTS] Sample slot:', slot.id, 'start:', slot.start, 'extracted date:', slotDateStr, 'matches:', matches);
-      }
-
-      return matches;
-    });
-
-    // Sort filtered slots chronologically by start time
-    const sorted = filtered.sort((a, b) => {
-      if (!a.start || !b.start) return 0;
-      return new Date(a.start).getTime() - new Date(b.start).getTime();
-    });
-
-    console.log('[FILTER SLOTS] Filtered to', sorted.length, 'slots for', selectedDate);
-    console.log('[FILTER SLOTS] Setting availableSlots to', sorted.length, 'sorted slots');
-    setAvailableSlots(sorted);
   };
 
-  // Handle direct doctor search with FHIR :contains and filters
+  // Handle direct doctor search (bypass service filters)
   const handleDoctorSearch = async (term: string) => {
     setSearchTerm(term);
     setCurrentPage(1); // Reset to first page on search
 
-    // Clear any existing timer
-    if (searchDebounceTimer.current) {
-      clearTimeout(searchDebounceTimer.current);
-    }
-
     if (!term) {
-      // If search cleared, show all practitioners with current filters
-      if (selectedSpecialty || selectedServiceCategory) {
-        // Re-apply service filters
-        applyServiceFilters();
+      // If search cleared and no service filters active, fetch first page
+      if (!selectedSpecialty && !selectedServiceCategory && !selectedServiceType) {
+        await fetchPractitionersPage(1);
       } else {
-        setAllPractitioners(practitioners);
+        // Otherwise show service-filtered results
+        setFilteredPractitioners(practitioners);
       }
       return;
     }
 
-    // Debounce the search
-    searchDebounceTimer.current = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const trimmedTerm = term.trim();
-        const words = trimmedTerm.split(/\s+/).filter(word => word.length > 0);
+    // Clear service filters when searching directly
+    setSelectedSpecialty('');
+    setSelectedServiceCategory('');
+    setSelectedServiceType('');
 
-        if (words.length === 0) {
-          setAllPractitioners(practitioners);
-          return;
-        }
-
-        // Build name search params
-        let nameParams = '';
-        if (words.length === 1) {
-          nameParams = `actor.name:contains=${encodeURIComponent(words[0])}`;
-        } else if (words.length === 2) {
-          nameParams = `actor.family:contains=${encodeURIComponent(words[0])},${encodeURIComponent(words[1])}&actor.given:contains=${encodeURIComponent(words[0])},${encodeURIComponent(words[1])}`;
-        } else {
-          const firstWord = words[0];
-          const restWords = words.slice(1).join(' ');
-          nameParams = `actor.family:contains=${encodeURIComponent(firstWord)},${encodeURIComponent(restWords)}&actor.given:contains=${encodeURIComponent(firstWord)},${encodeURIComponent(restWords)}`;
-        }
-
-        // If filters are selected, search via schedules to respect them
-        if (selectedSpecialty || selectedServiceCategory) {
-          // Convert UI label to FHIR code using centralized helper
-          const specialtyCodeForSearch = selectedSpecialty ? getSpecialtyCode(selectedSpecialty) : undefined;
-
-          // Build schedule query with filters and name search
-          const scheduleParams = new URLSearchParams();
-
-          // Add specialty filter
-          if (specialtyCodeForSearch) {
-            scheduleParams.append('specialty', specialtyCodeForSearch);
-          }
-
-          // Add service category filter
-          if (selectedServiceCategory) {
-            scheduleParams.append('serviceCategory', selectedServiceCategory);
-          }
-
-          // Add the name search params to schedule query
-          const scheduleUrl = `/api/fhir/schedules?${scheduleParams.toString()}&${nameParams}`;
-          console.log('[SEARCH] Searching schedules with filters:', scheduleUrl);
-
-          const schedulesResponse = await fetch(scheduleUrl, { credentials: 'include' });
-
-          if (!schedulesResponse.ok) {
-            console.error('Failed to fetch schedules');
-            setAllPractitioners([]);
-            return;
-          }
-
-          const schedulesData = await schedulesResponse.json();
-          const matchingSchedules = schedulesData.schedules || [];
-
-          // Extract unique practitioner IDs from schedules
-          const practitionerIds = new Set<string>();
-          matchingSchedules.forEach((schedule: any) => {
-            if (schedule.actor) {
-              schedule.actor.forEach((actor: any) => {
-                if (actor.reference?.startsWith('Practitioner/')) {
-                  const id = actor.reference.replace('Practitioner/', '');
-                  practitionerIds.add(id);
-                }
-              });
-            }
-          });
-
-          if (practitionerIds.size > 0) {
-            // Fetch practitioner details using _id parameter
-            const idsParam = Array.from(practitionerIds).join(',');
-            const practitionersUrl = `/api/fhir/practitioners?_id=${idsParam}`;
-            console.log('[SEARCH] Fetching practitioners by IDs:', practitionersUrl);
-
-            const practitionersResponse = await fetch(practitionersUrl, { credentials: 'include' });
-            if (practitionersResponse.ok) {
-              const practitionersData = await practitionersResponse.json();
-              setAllPractitioners(practitionersData.practitioners || []);
-            } else {
-              setAllPractitioners([]);
-            }
-          } else {
-            setAllPractitioners([]);
-          }
-        } else {
-          // No filters selected, search practitioners directly
-          let queryParams = '';
-          if (words.length === 1) {
-            queryParams = `name:contains=${encodeURIComponent(words[0])}`;
-          } else if (words.length === 2) {
-            queryParams = `family:contains=${encodeURIComponent(words[0])},${encodeURIComponent(words[1])}&given:contains=${encodeURIComponent(words[0])},${encodeURIComponent(words[1])}`;
-          } else {
-            const firstWord = words[0];
-            const restWords = words.slice(1).join(' ');
-            queryParams = `family:contains=${encodeURIComponent(firstWord)},${encodeURIComponent(restWords)}&given:contains=${encodeURIComponent(firstWord)},${encodeURIComponent(restWords)}`;
-          }
-
-          const response = await fetch(`/api/fhir/practitioners?${queryParams}`, { credentials: 'include' });
-
-          if (!response.ok) throw new Error('Failed to fetch practitioners');
-
-          const result = await response.json();
-          setAllPractitioners(result.practitioners || []);
-        }
-      } catch (error) {
-        console.error('Error searching practitioners:', error);
-        setAllPractitioners([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 500); // 500ms debounce delay
-  };
-
-  // Handle doctor selection - show dialog if specialty/category missing
-  const handleDoctorSelection = (practitioner: Practitioner) => {
-    const missingSpecialty = !selectedSpecialty;
-    const missingCategory = !selectedServiceCategory;
-
-    if (missingSpecialty || missingCategory) {
-      // Store the practitioner and show dialog immediately
-      setPendingPractitioner(practitioner);
-      setIsLoadingSchedules(true);
-
-      // Clear available options initially
-      setAvailableSpecialties([]);
-      setAvailableServiceCategories([]);
-
-      // Reset dialog selections
-      setDialogSpecialty('');
-      setDialogServiceCategory('');
-
-      // Set initial accordion state - open specialty first if not selected
-      setAccordionValue('specialty');
-
-      // Show the selection dialog immediately
-      setShowSelectionDialog(true);
-
-      // Fetch available schedules for this practitioner asynchronously
-      (async () => {
-        try {
-          const response = await fetch(`/api/fhir/schedules?actor=Practitioner/${practitioner.id}`, {
-            credentials: 'include'
-          });
-
-          if (!response.ok) {
-            console.error('Failed to fetch schedules');
-            setIsLoadingSchedules(false);
-            return;
-          }
-
-          const data = await response.json();
-          const schedules = data.schedules || [];
-
-          console.log('[DIALOG] Fetched schedules for practitioner:', schedules);
-
-          // Extract unique specialties and service categories
-          const specialties = new Set<string>();
-          const categories = new Map<string, any>();
-
-          // Use centralized specialty labels
-          const specialtyLabels = Object.values(SPECIALTY_LABELS);
-
-          schedules.forEach((schedule: Schedule) => {
-            // Extract specialty
-            if (schedule.specialty) {
-              schedule.specialty.forEach((spec: any) => {
-                const code = spec.coding?.[0]?.code as SpecialtyCode;
-                const display = spec.coding?.[0]?.display;
-
-                // Try to map the code to our UI display value using centralized constants
-                const mappedSpecialty = SPECIALTY_LABELS[code];
-                if (mappedSpecialty && specialtyLabels.includes(mappedSpecialty)) {
-                  specialties.add(mappedSpecialty);
-                } else if (display && specialtyLabels.includes(display)) {
-                  // Fallback to display if it matches directly
-                  specialties.add(display);
-                }
-              });
-            }
-
-            // Extract service category
-            if (schedule.serviceCategory) {
-              schedule.serviceCategory.forEach((cat: any) => {
-                const code = cat.coding?.[0]?.code;
-
-                // Find matching category by ID (code)
-                const matchingCategory = SERVICE_CATEGORIES.find(c => c.id === code);
-                if (matchingCategory) {
-                  categories.set(code, matchingCategory);
-                }
-              });
-            }
-          });
-
-          const availableSpecs = Array.from(specialties);
-          const availableCats = Array.from(categories.values());
-
-          console.log('[DIALOG] Extracted specialties:', availableSpecs);
-          console.log('[DIALOG] Extracted categories:', availableCats);
-
-          setAvailableSpecialties(availableSpecs);
-          setAvailableServiceCategories(availableCats);
-          setIsLoadingSchedules(false);
-        } catch (error) {
-          console.error('Error fetching schedules:', error);
-          setIsLoadingSchedules(false);
-        }
-      })();
-    } else {
-      // Both are selected, proceed directly
-      setSelectedPractitioner(practitioner);
-
-      // Update draft and navigate to step 2
-      // updateDraft now handles URL update automatically when step changes
-      updateDraft({
-        step: 2,
-        specialty: selectedSpecialty,
-        serviceCategory: selectedServiceCategory,
-        practitionerId: practitioner.id,
-        practitionerName: practitioner.name?.[0]?.text ||
-          `${practitioner.name?.[0]?.given?.join(' ') || ''} ${practitioner.name?.[0]?.family || ''}`.trim()
+    // If user is searching directly, fetch more practitioners and filter by name
+    setLoading(true);
+    try {
+      const response = await fetch('/api/fhir/practitioners?count=100', {
+        credentials: 'include'
       });
+
+      if (!response.ok) throw new Error('Failed to fetch practitioners');
+
+      const result = await response.json();
+      const allPractitioners = result.practitioners || [];
+
+      // Filter by search term
+      const filtered = allPractitioners.filter((p: any) => {
+        const name = p.name?.[0];
+        const displayName = name?.text ||
+          `${name?.given?.join(' ') || ''} ${name?.family || ''}`.trim();
+        return displayName.toLowerCase().includes(term.toLowerCase());
+      });
+
+      setPractitioners(allPractitioners);
+      setFilteredPractitioners(filtered);
+      setHasNextPage(false); // Search results show all at once
+    } catch (error) {
+      console.error('Error searching practitioners:', error);
+    } finally {
+      setLoading(false);
     }
   };
-
 
   // Can proceed if practitioner selected (service details are optional)
   const canProceedStep1 = selectedPractitioner !== null;
-  const canProceedStep2 = selectedDate && selectedTime && selectedSlotId && selectedServiceType;
+  const canProceedStep2 = selectedDate && selectedTime && selectedSlotId;
   const canProceedStep3 = reasonForVisit;
 
-  // Debug logging for Step 2 validation
-  if (currentStep === 2) {
-    console.log('[VALIDATION] Step 2 can proceed:', canProceedStep2, {
-      selectedDate: selectedDate || 'MISSING',
-      selectedTime: selectedTime || 'MISSING',
-      selectedSlotId: selectedSlotId || 'MISSING',
-      selectedServiceType: selectedServiceType || 'MISSING'
-    });
-  }
-
   const handleNext = () => {
-    // Step 1 to 2
-    if (currentStep === 1) {
-      // Validate required fields
-      if (!selectedSpecialty) {
-        setSpecialtyError(true);
-        toast({
-          title: "Specialty Required",
-          description: "Please select a specialty to continue",
-          variant: "destructive"
-        });
-        return;
-      }
-      if (!selectedServiceCategory) {
-        setCategoryError(true);
-        toast({
-          title: "Service Category Required",
-          description: "Please select a service category to continue",
-          variant: "destructive"
-        });
-        return;
-      }
-      if (!selectedPractitioner) {
-        toast({
-          title: "Doctor Selection Required",
-          description: "Please select a doctor to continue",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Update draft and navigate - updateDraft now handles URL update automatically
-      updateDraft({
-        step: 2,
-        specialty: selectedSpecialty,
-        serviceCategory: selectedServiceCategory,
-        practitionerId: selectedPractitioner.id,
-        practitionerName: selectedPractitioner.name?.[0]?.text ||
-          `${selectedPractitioner.name?.[0]?.given?.join(' ') || ''} ${selectedPractitioner.name?.[0]?.family || ''}`.trim()
-      });
-    }
-    // Step 2 to 3
-    else if (currentStep === 2 && canProceedStep2) {
-      updateDraft({
-        step: 3,
-        serviceType: selectedServiceType,
-        date: selectedDate,
-        time: selectedTime,
-        slotId: selectedSlotId
-      });
-    }
-    // Step 3 to 4
-    else if (currentStep === 3 && canProceedStep3) {
-      updateDraft({
-        step: 4,
-        reasonForVisit,
-        symptoms,
-        requestLonger
-      });
-    }
+    if (currentStep === 1 && canProceedStep1) setCurrentStep(2);
+    else if (currentStep === 2 && canProceedStep2) setCurrentStep(3);
+    else if (currentStep === 3 && canProceedStep3) setCurrentStep(4);
   };
 
   const handleBack = () => {
-    if (currentStep > 1) {
-      const newStep = currentStep - 1;
-
-      // When going back to Step 1, clear Step 1 selections from draft
-      // This prevents old URL params from overwriting user's new selections
-      // updateDraft now handles URL update automatically when step changes
-      if (newStep === 1) {
-        updateDraft({
-          step: newStep,
-          specialty: undefined,
-          serviceCategory: undefined,
-          practitionerId: undefined,
-          practitionerName: undefined
-        });
-      } else {
-        updateDraft({ step: newStep });
-      }
-    }
+    if (currentStep > 1) setCurrentStep(currentStep - 1);
   };
 
   const handleSubmit = async () => {
@@ -1433,6 +681,9 @@ export default function NewBookingFlow() {
       const response = await fetch('/api/fhir/appointments', {
         method: 'POST',
         credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(appointmentRequestData),
       });
 
@@ -1454,9 +705,6 @@ export default function NewBookingFlow() {
         duration: 5000,
       });
 
-      // Clear booking draft from localStorage on success
-      clearDraft();
-
       // Navigate to dashboard after a short delay to show the toast
       setTimeout(() => {
         router.push('/patient/dashboard');
@@ -1469,22 +717,20 @@ export default function NewBookingFlow() {
     }
   };
 
+  // Generate available dates (next 7 days)
+  const availableDates = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() + i);
+    return date;
+  });
+
   return (
     <Layout>
       <ContentContainer size="xl">
-        {/* Header with Return Button */}
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-text-primary">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-text-primary">
             Book New Appointment
           </h1>
-          {currentStep === 1 && (
-            <Button
-              variant="outline"
-              onClick={() => router.push('/patient/appointments')}
-            >
-              ← Return to Appointments
-            </Button>
-          )}
         </div>
 
         {/* Progress Steps */}
@@ -1507,85 +753,109 @@ export default function NewBookingFlow() {
             {/* LEFT COLUMN: Service Details Filters - Desktop Only */}
             <div className="hidden lg:block lg:col-span-1">
               <Card>
-                <h2 className="text-lg font-semibold text-gray-900 mb-6">Required Fields</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-6">Filter by Service</h2>
 
                 {/* Specialty */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Specialty <span className="text-red-500">*</span>
+                    Specialty
                   </label>
-                  <RadioGroup
-                    value={selectedSpecialty}
-                    onValueChange={(value) => {
-                      setSelectedSpecialty(value);
-                      setSpecialtyError(false);
-                      setSearchTerm('');
-                    }}
-                    className={specialtyError ? 'ring-2 ring-red-500 rounded-md p-1' : ''}
-                  >
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {SPECIALTIES_LIST.map((specialty) => (
-                        <div key={specialty.value} className="flex items-center space-x-2">
-                          <RadioGroupItem
-                            value={specialty.label}
-                            id={`specialty-${specialty.value}`}
-                          />
-                          <Label
-                            htmlFor={`specialty-${specialty.value}`}
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            {specialty.label}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </RadioGroup>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {SPECIALTIES.map((specialty) => (
+                      <div key={specialty} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`specialty-${specialty}`}
+                          checked={selectedSpecialty === specialty}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedSpecialty(specialty);
+                              setSearchTerm('');
+                            } else {
+                              setSelectedSpecialty('');
+                            }
+                          }}
+                        />
+                        <Label
+                          htmlFor={`specialty-${specialty}`}
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {specialty}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Service Category */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Service Category <span className="text-red-500">*</span>
+                    Service Category
                   </label>
-                  <RadioGroup
-                    value={selectedServiceCategory}
-                    onValueChange={(value) => {
-                      setSelectedServiceCategory(value);
-                      setCategoryError(false);
-                    }}
-                    className={categoryError ? 'ring-2 ring-red-500 rounded-md p-1' : ''}
-                  >
-                    <div className="space-y-2">
-                      {SERVICE_CATEGORIES.map((category) => (
-                        <div key={category.id} className="flex items-center space-x-2">
-                          <RadioGroupItem
-                            value={category.id}
-                            id={`category-${category.id}`}
+                  <div className="space-y-2">
+                    {SERVICE_CATEGORIES.map((category) => (
+                      <div key={category.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`category-${category.id}`}
+                          checked={selectedServiceCategory === category.id}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedServiceCategory(category.id);
+                            } else {
+                              setSelectedServiceCategory('');
+                            }
+                          }}
+                        />
+                        <Label
+                          htmlFor={`category-${category.id}`}
+                          className="text-sm font-normal cursor-pointer leading-tight"
+                        >
+                          {category.name}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Service Type */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Service Type
+                  </label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {/* Show all service types from all categories */}
+                    {Object.entries(SERVICE_TYPES).flatMap(([categoryId, types]) =>
+                      types.map((type) => (
+                        <div key={type} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`type-${type}`}
+                            checked={selectedServiceType === type}
+                            onCheckedChange={(checked) => {
+                              setSelectedServiceType(checked ? type : '');
+                            }}
                           />
                           <Label
-                            htmlFor={`category-${category.id}`}
-                            className="text-sm font-normal cursor-pointer leading-tight"
+                            htmlFor={`type-${type}`}
+                            className="text-sm font-normal cursor-pointer"
                           >
-                            {category.name}
+                            {type}
                           </Label>
                         </div>
-                      ))}
-                    </div>
-                  </RadioGroup>
+                      ))
+                    )}
+                  </div>
                 </div>
 
                 {/* Clear Filters Button */}
-                {(selectedSpecialty || selectedServiceCategory) && (
+                {(selectedSpecialty || selectedServiceCategory || selectedServiceType) && (
                   <button
                     onClick={() => {
                       setSelectedSpecialty('');
                       setSelectedServiceCategory('');
-                      setSpecialtyError(false);
-                      setCategoryError(false);
+                      setSelectedServiceType('');
                     }}
                     className="w-full px-3 py-2 text-sm font-medium text-primary hover:bg-blue-50 border border-primary rounded-lg transition-colors"
                   >
-                    Clear all selections
+                    Clear all filters
                   </button>
                 )}
               </Card>
@@ -1593,76 +863,42 @@ export default function NewBookingFlow() {
 
             {/* RIGHT COLUMN: Doctor Search & Results */}
             <div className="lg:col-span-3">
-              {/* Mobile Dropdowns - Shows on mobile only */}
+              {/* Mobile Filter Sheet - Single button that opens full-screen filter */}
               <div className="lg:hidden mb-4">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Select
-                      value={selectedSpecialty}
-                      onValueChange={(value) => {
-                        setSelectedSpecialty(value);
-                        setSpecialtyError(false);
-                        setSearchTerm('');
-                      }}
-                    >
-                      <SelectTrigger className={specialtyError ? 'border-red-500' : ''}>
-                        <SelectValue placeholder="Specialty *" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SPECIALTIES_LIST.map((specialty) => (
-                          <SelectItem key={specialty.value} value={specialty.label}>
-                            {specialty.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Select
-                      value={selectedServiceCategory}
-                      onValueChange={(value) => {
-                        setSelectedServiceCategory(value);
-                        setCategoryError(false);
-                      }}
-                    >
-                      <SelectTrigger className={categoryError ? 'border-red-500' : ''}>
-                        <SelectValue placeholder="Service *" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SERVICE_CATEGORIES.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                <FilterSheet
+                  specialties={SPECIALTIES}
+                  serviceCategories={SERVICE_CATEGORIES}
+                  serviceTypes={SERVICE_TYPES}
+                  selectedSpecialty={selectedSpecialty}
+                  selectedServiceCategory={selectedServiceCategory}
+                  selectedServiceType={selectedServiceType}
+                  onSpecialtyChange={(value) => {
+                    setSelectedSpecialty(value);
+                    setSearchTerm('');
+                  }}
+                  onServiceCategoryChange={setSelectedServiceCategory}
+                  onServiceTypeChange={setSelectedServiceType}
+                  onClearAll={() => {
+                    setSelectedSpecialty('');
+                    setSelectedServiceCategory('');
+                    setSelectedServiceType('');
+                  }}
+                  open={filterSheetOpen}
+                  onOpenChange={setFilterSheetOpen}
+                />
               </div>
               <Card>
                 <h2 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Select Doctor</h2>
 
                 {/* Search Bar */}
-                <div className="mb-6 relative">
+                <div className="mb-6">
                   <Input
                     type="text"
                     placeholder="Search doctor by name..."
                     value={searchTerm}
                     onChange={(e) => handleDoctorSearch(e.target.value)}
-                    className="px-4 py-3 pr-10"
+                    className="px-4 py-3"
                   />
-                  {searchTerm && (
-                    <button
-                      onClick={() => {
-                        setSearchTerm('');
-                        handleDoctorSearch('');
-                      }}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full transition-colors"
-                      aria-label="Clear search"
-                    >
-                      <X className="h-4 w-4 text-gray-500" />
-                    </button>
-                  )}
                 </div>
 
                 {/* Doctor List */}
@@ -1671,16 +907,10 @@ export default function NewBookingFlow() {
                     <LoadingSpinner size="md" />
                     <p className="mt-2 text-gray-600">Loading doctors...</p>
                   </div>
-                ) : allPractitioners.length > 0 ? (
+                ) : filteredPractitioners.length > 0 ? (
                   <>
                     <div className="space-y-3">
-                      {(() => {
-                        // Frontend pagination: slice the array
-                        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-                        const endIndex = startIndex + ITEMS_PER_PAGE;
-                        const paginatedPractitioners = allPractitioners.slice(startIndex, endIndex);
-
-                        return paginatedPractitioners.map((practitioner: any) => {
+                      {filteredPractitioners.map((practitioner: any) => {
                         const name = practitioner.name?.[0];
                         const displayName = name?.text ||
                           `${name?.given?.join(' ') || ''} ${name?.family || ''}`.trim();
@@ -1691,12 +921,17 @@ export default function NewBookingFlow() {
                               .join(', ')
                           : null;
                         const phone = practitioner.telecom?.find((t: any) => t.system === 'phone')?.value;
+                        const isSelected = selectedPractitioner?.id === practitioner.id;
 
                         return (
                           <button
                             key={practitioner.id}
-                            onClick={() => handleDoctorSelection(practitioner)}
-                            className="w-full p-4 rounded-lg border-2 border-gray-200 bg-white hover:border-primary transition-all text-left"
+                            onClick={() => setSelectedPractitioner(practitioner)}
+                            className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
+                              isSelected
+                                ? 'border-primary bg-blue-50'
+                                : 'border-gray-200 bg-white hover:border-primary'
+                            }`}
                           >
                             <div>
                               <h3 className="font-semibold text-lg text-gray-900">{displayName}</h3>
@@ -1719,65 +954,31 @@ export default function NewBookingFlow() {
                             </div>
                           </button>
                         );
-                        });
-                      })()}
+                      })}
                     </div>
 
                     {/* Pagination */}
-                    {(() => {
-                      const totalPages = Math.ceil(allPractitioners.length / ITEMS_PER_PAGE);
-                      if (totalPages <= 1) return null;
-
-                      return (
-                        <div className="mt-6 border-t pt-4">
-                          <Pagination>
-                            <PaginationContent>
-                              <PaginationItem>
-                                <PaginationPrevious
-                                  onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
-                                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                                />
-                              </PaginationItem>
-
-                              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                                // Show first page, last page, current page, and pages around current
-                                const showPage = page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1;
-                                const showEllipsis = (page === 2 && currentPage > 3) || (page === totalPages - 1 && currentPage < totalPages - 2);
-
-                                if (showEllipsis) {
-                                  return (
-                                    <PaginationItem key={page}>
-                                      <PaginationEllipsis />
-                                    </PaginationItem>
-                                  );
-                                }
-
-                                if (!showPage) return null;
-
-                                return (
-                                  <PaginationItem key={page}>
-                                    <PaginationLink
-                                      onClick={() => setCurrentPage(page)}
-                                      isActive={currentPage === page}
-                                      className="cursor-pointer"
-                                    >
-                                      {page}
-                                    </PaginationLink>
-                                  </PaginationItem>
-                                );
-                              })}
-
-                              <PaginationItem>
-                                <PaginationNext
-                                  onClick={() => currentPage < totalPages && setCurrentPage(currentPage + 1)}
-                                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                                />
-                              </PaginationItem>
-                            </PaginationContent>
-                          </Pagination>
+                    {(currentPage > 1 || hasNextPage) && (
+                      <div className="mt-6 flex items-center justify-center gap-4 border-t pt-4">
+                        <button
+                          onClick={() => fetchPractitionersPage(currentPage - 1)}
+                          disabled={currentPage === 1 || loading}
+                          className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        >
+                          Previous
+                        </button>
+                        <div className="text-sm font-medium text-gray-700">
+                          Page {currentPage}
                         </div>
-                      );
-                    })()}
+                        <button
+                          onClick={() => fetchPractitionersPage(currentPage + 1)}
+                          disabled={!hasNextPage || loading}
+                          className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="text-center py-12">
@@ -1788,6 +989,15 @@ export default function NewBookingFlow() {
                   </div>
                 )}
               </Card>
+
+              {/* Navigation */}
+              {selectedPractitioner && (
+                <div className="flex justify-end mt-6">
+                  <Button variant="primary" onClick={handleNext}>
+                    Next: Date & Time →
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1798,129 +1008,50 @@ export default function NewBookingFlow() {
             <Card>
               <h2 className="text-base sm:text-lg md:text-xl font-semibold mb-6">Select Date & Time</h2>
 
-              {/* Selected Doctor Info - Compact One Row */}
+              {/* Selected Doctor Info */}
               {selectedPractitioner && (
-                <div className="mb-6 px-4 py-3 bg-blue-50 rounded-lg flex items-center gap-2">
-                  <span className="text-sm text-gray-600 whitespace-nowrap">Selected Doctor:</span>
-                  <span className="font-semibold text-base truncate">
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-1">Selected Doctor</p>
+                  <p className="font-semibold text-lg">
                     {selectedPractitioner.name?.[0]?.text ||
                       `${selectedPractitioner.name?.[0]?.given?.join(' ')} ${selectedPractitioner.name?.[0]?.family}`}
-                  </span>
+                  </p>
                 </div>
               )}
 
-              {/* Date Selection with Calendar */}
+              {/* Date Selection */}
               <div className="mb-6">
                 <h3 className="font-semibold mb-3">Select Date</h3>
-                <div className="flex justify-center">
-                  <Calendar
-                    mode="single"
-                    selected={calendarDate}
-                    onSelect={(date) => {
-                      if (date) {
-                        // Use timezone-aware date formatting to avoid UTC conversion issues
-                        const dateStr = new Intl.DateTimeFormat('en-CA', {
-                          timeZone: APP_TIMEZONE,
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit'
-                        }).format(date);
-                        setSelectedDate(dateStr);
-                        setCalendarDate(date);
-                      }
-                    }}
-                    onMonthChange={(month) => {
-                      setCurrentMonth(month);
-                    }}
-                    disabled={(date) => {
-                      // Disable past dates
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      return date < today;
-                    }}
-                    modifiers={{
-                      available: (date) => {
-                        // Only highlight dates with slots that are NOT in the past
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        const isPast = date < today;
-                        const dateStr = date.toISOString().split('T')[0];
-                        return !isPast && datesWithSlots.has(dateStr);
-                      }
-                    }}
-                    modifiersClassNames={{
-                      available: '!bg-green-100 hover:!bg-green-200 font-semibold [&>button]:!bg-transparent [&>button]:hover:!bg-transparent [&[data-selected=true]]:!bg-transparent [&[data-selected=true]>button]:!bg-primary [&[data-selected=true]>button]:!text-white'
-                    }}
-                    className="rounded-md border"
-                  />
+                <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
+                  {availableDates.map((date) => {
+                    const dateStr = date.toISOString().split('T')[0];
+                    const isSelected = selectedDate === dateStr;
+                    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                    const dayNum = date.getDate();
+                    const month = date.toLocaleDateString('en-US', { month: 'short' });
+
+                    return (
+                      <button
+                        key={dateStr}
+                        onClick={() => setSelectedDate(dateStr)}
+                        className={`p-3 rounded-lg border text-center transition-colors ${
+                          isSelected
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-white hover:bg-gray-50 border-gray-200'
+                        }`}
+                      >
+                        <div className="text-xs">{dayName}</div>
+                        <div className="font-semibold">{dayNum}</div>
+                        <div className="text-xs">{month}</div>
+                      </button>
+                    );
+                  })}
                 </div>
-                {selectedDate && (
-                  <div className="mt-3 text-center text-sm text-gray-600">
-                    Selected: {new Date(selectedDate).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </div>
-                )}
               </div>
 
               {/* Time Selection */}
               <div className="mb-6">
-                <h3 className="font-semibold mb-2">Available Times</h3>
-
-                {/* Service Type Color Legend - Compact */}
-                {availableSlots.length > 0 && practitionerSchedules.length > 0 && (
-                  <div className="mb-3 flex flex-wrap gap-3 text-xs text-gray-600">
-                    {(() => {
-                      const serviceTypesMap = new Map<string, string>();
-
-                      // Get schedule IDs from current slots
-                      const scheduleIdsInSlots = new Set(
-                        availableSlots
-                          .map(slot => slot.schedule?.reference?.replace('Schedule/', ''))
-                          .filter(Boolean)
-                      );
-
-                      // Find matching schedules and extract service types
-                      practitionerSchedules.forEach(schedule => {
-                        if (scheduleIdsInSlots.has(schedule.id)) {
-                          const code = schedule.serviceType?.[0]?.coding?.[0]?.code;
-                          const display = schedule.serviceType?.[0]?.coding?.[0]?.display;
-                          if (code && display) {
-                            serviceTypesMap.set(code, display);
-                          }
-                        }
-                      });
-
-                      // Dynamic color palette - assigns colors based on order
-                      const colorPalette = [
-                        'bg-blue-500',
-                        'bg-green-500',
-                        'bg-red-500',
-                        'bg-purple-500',
-                        'bg-indigo-500',
-                        'bg-yellow-500',
-                        'bg-pink-500',
-                        'bg-teal-500',
-                        'bg-orange-500',
-                        'bg-cyan-500',
-                      ];
-
-                      return Array.from(serviceTypesMap.entries()).map(([code, display], index) => {
-                        const color = colorPalette[index % colorPalette.length];
-                        return (
-                          <div key={code} className="flex items-center gap-1.5">
-                            <div className={`w-4 h-0.5 ${color}`}></div>
-                            <span>{display}</span>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                )}
-
+                <h3 className="font-semibold mb-3">Available Times</h3>
                 {loading ? (
                   <div className="text-center py-8">
                     <LoadingSpinner size="sm" />
@@ -1930,64 +1061,9 @@ export default function NewBookingFlow() {
                   <SlotSelectionGrid
                     slots={availableSlots}
                     selectedSlotId={selectedSlotId}
-                    schedules={practitionerSchedules}
                     onSlotSelect={(slot) => {
-                      const time = formatTimeForDisplay(slot.start);
-                      const slotId = slot.id;
-
-                      // Use the currently selected date from calendar
-                      // Don't extract from slot to avoid timezone issues causing date jumps
-                      // Slots are already filtered for selectedDate, so they match
-                      const slotDate = selectedDate;
-
-                      // Get service type from schedule reference (not from slot directly)
-                      let serviceType = 'general'; // Default fallback
-
-                      // Extract schedule ID from slot.schedule.reference (e.g., "Schedule/133109")
-                      const scheduleRef = slot.schedule?.reference;
-                      if (scheduleRef && practitionerSchedules.length > 0) {
-                        const scheduleId = scheduleRef.replace('Schedule/', '');
-
-                        // Find the matching schedule in cached schedules
-                        const matchingSchedule = practitionerSchedules.find(s => s.id === scheduleId);
-
-                        if (matchingSchedule) {
-                          // Extract service type from schedule
-                          serviceType = matchingSchedule.serviceType?.[0]?.coding?.[0]?.code ||
-                                      matchingSchedule.serviceType?.[0]?.coding?.[0]?.display ||
-                                      'general';
-
-                          console.log('[SLOT SELECT] Found schedule:', {
-                            scheduleId,
-                            serviceType,
-                            scheduleData: matchingSchedule.serviceType
-                          });
-                        } else {
-                          console.warn('[SLOT SELECT] Schedule not found in cache:', scheduleId);
-                        }
-                      }
-
-                      console.log('[SLOT SELECT]', {
-                        time,
-                        slotId,
-                        date: slotDate,
-                        serviceType,
-                        scheduleRef
-                      });
-
-                      // Update state
-                      setSelectedTime(time);
-                      setSelectedSlotId(slotId);
-                      setSelectedDate(slotDate);
-                      setSelectedServiceType(serviceType);
-
-                      // Save to localStorage and URL params via updateDraft
-                      updateDraft({
-                        date: slotDate,
-                        time: time,
-                        slotId: slotId,
-                        serviceType: serviceType
-                      });
+                      setSelectedTime(formatTimeForDisplay(slot.start));
+                      setSelectedSlotId(slot.id);
                     }}
                   />
                 ) : (
@@ -1995,7 +1071,6 @@ export default function NewBookingFlow() {
                     <p className="text-gray-600">No available time slots for this date</p>
                   </div>
                 )}
-
               </div>
             </Card>
 
@@ -2021,25 +1096,31 @@ export default function NewBookingFlow() {
 
               {/* Reason for Visit */}
               <div className="mb-6">
-                <label htmlFor="reasonForVisit" className="block text-sm font-medium text-gray-900 mb-3">
+                <label className="block text-sm font-medium text-gray-900 mb-3">
                   Reason for Visit <span className="text-red-500">*</span>
                 </label>
-                <Select
-                  value={reasonForVisit}
-                  onValueChange={(value) => setReasonForVisit(value)}
-                >
-                  <SelectTrigger id="reasonForVisit" className="w-full">
-                    <SelectValue placeholder="Select a reason for your visit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Annual Physical Exam">Annual Physical Exam</SelectItem>
-                    <SelectItem value="Follow-up Visit">Follow-up Visit</SelectItem>
-                    <SelectItem value="Sick Visit">Sick Visit</SelectItem>
-                    <SelectItem value="Preventive Care">Preventive Care</SelectItem>
-                    <SelectItem value="Chronic Disease Management">Chronic Disease Management</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[
+                    'Annual Physical Exam',
+                    'Follow-up Visit',
+                    'Sick Visit',
+                    'Preventive Care',
+                    'Chronic Disease Management',
+                    'Other'
+                  ].map((reason) => (
+                    <button
+                      key={reason}
+                      onClick={() => setReasonForVisit(reason)}
+                      className={`px-4 py-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                        reasonForVisit === reason
+                          ? 'border-primary bg-primary text-white'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-primary'
+                      }`}
+                    >
+                      {reason}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Symptoms */}
@@ -2098,51 +1179,53 @@ export default function NewBookingFlow() {
 
         {/* Step 4: Confirmation */}
         {currentStep === 4 && (
-          <div className="space-y-6">
+          <div className="space-y-8">
             <Card>
-              <div className="bg-blue-50 px-6 py-4 -mx-6 -mt-6 mb-4">
-                <h2 className="text-sm sm:text-base font-semibold text-gray-900">Review & Confirm</h2>
+              <div className="bg-blue-50 px-6 py-4 -mx-6 -mt-6 mb-6">
+                <h2 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">Review & Confirm</h2>
               </div>
 
-              {/* Consolidated Appointment Summary */}
-              <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-sm">
-                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
-                  <span className="text-gray-600">Doctor:</span>
-                  <span className="font-medium text-gray-900">
-                    {selectedPractitioner?.name?.[0]?.text ||
-                      `${selectedPractitioner?.name?.[0]?.given?.join(' ')} ${selectedPractitioner?.name?.[0]?.family}`}
-                  </span>
+              {/* Appointment Details */}
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Service Details</h3>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                    <p><span className="font-medium">Specialty:</span> {selectedSpecialty}</p>
+                    <p><span className="font-medium">Service Category:</span> {SERVICE_CATEGORIES.find(c => c.id === selectedServiceCategory)?.name}</p>
+                    <p><span className="font-medium">Service Type:</span> {selectedServiceType}</p>
+                  </div>
+                </div>
 
-                  <span className="text-gray-600">Time:</span>
-                  <span className="font-medium text-gray-900">{formatDateTimeForDisplay(selectedDate, selectedTime)}</span>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Doctor Information</h3>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="font-medium text-lg">
+                      {selectedPractitioner?.name?.[0]?.text ||
+                        `${selectedPractitioner?.name?.[0]?.given?.join(' ')} ${selectedPractitioner?.name?.[0]?.family}`}
+                    </p>
+                  </div>
+                </div>
 
-                  <span className="text-gray-600">Specialty:</span>
-                  <span className="text-gray-900">{selectedSpecialty}</span>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Date & Time</h3>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p><span className="font-medium">Date:</span> {formatDateForDisplay(selectedDate)}</p>
+                    <p><span className="font-medium">Time:</span> {selectedTime}</p>
+                  </div>
+                </div>
 
-                  <span className="text-gray-600">Service:</span>
-                  <span className="text-gray-900">{SERVICE_CATEGORIES.find(c => c.id === selectedServiceCategory)?.name} - {selectedServiceType}</span>
-
-                  <span className="text-gray-600">Reason:</span>
-                  <span className="text-gray-900">{reasonForVisit}</span>
-
-                  {symptoms && (
-                    <>
-                      <span className="text-gray-600">Symptoms:</span>
-                      <span className="text-gray-900">{symptoms}</span>
-                    </>
-                  )}
-
-                  {requestLonger && (
-                    <>
-                      <span className="text-gray-600">Duration:</span>
-                      <span className="text-gray-900">✓ Requested longer appointment</span>
-                    </>
-                  )}
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Visit Information</h3>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                    <p><span className="font-medium">Reason:</span> {reasonForVisit}</p>
+                    {symptoms && <p><span className="font-medium">Symptoms:</span> {symptoms}</p>}
+                    {requestLonger && <p className="text-sm text-gray-600">✓ Requested longer appointment</p>}
+                  </div>
                 </div>
               </div>
 
               {/* Important Information */}
-              <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
                 <h3 className="font-semibold text-green-900 mb-2">Important Information</h3>
                 <ul className="text-sm text-green-900 space-y-1 list-disc list-inside">
                   <li>Please arrive 15 minutes early</li>
@@ -2170,180 +1253,6 @@ export default function NewBookingFlow() {
           </div>
         )}
       </ContentContainer>
-
-      {/* Selection Dialog for missing specialty/category */}
-      <Dialog
-        open={showSelectionDialog}
-        onOpenChange={(open) => {
-          setShowSelectionDialog(open);
-          // Reset dialog state when closing
-          if (!open) {
-            setDialogSpecialty('');
-            setDialogServiceCategory('');
-            setPendingPractitioner(null);
-            setAccordionValue(undefined);
-          }
-        }}>
-        <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Complete Your Selection</DialogTitle>
-            <DialogDescription>
-              Please select the specialty and service category to continue with your booking.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-4">
-            {isLoadingSchedules ? (
-              <div className="flex items-center justify-center py-8">
-                <LoadingSpinner size="sm" />
-                <span className="ml-2">Loading available options...</span>
-              </div>
-            ) : (
-              <Accordion
-                type="single"
-                value={accordionValue}
-                onValueChange={setAccordionValue}
-                collapsible
-                className="w-full"
-              >
-                {/* Specialty Selection - Show if not selected */}
-                {availableSpecialties.length > 0 && (
-                  <AccordionItem value="specialty">
-                    <AccordionTrigger>
-                      <span className="text-sm font-medium">
-                        {dialogSpecialty ? (
-                          <>
-                            Specialty: <span className="text-primary">{dialogSpecialty}</span> ✓
-                          </>
-                        ) : (
-                          <>
-                            Select Specialty <span className="text-red-500">*</span>
-                          </>
-                        )}
-                      </span>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      {!dialogSpecialty ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2">
-                        {availableSpecialties.map((specialty) => (
-                          <button
-                            key={specialty}
-                            onClick={() => {
-                              console.log('[DIALOG] Specialty clicked:', specialty);
-                              setDialogSpecialty(specialty);
-                              // Auto-expand service category section if not selected
-                              if (!dialogServiceCategory) {
-                                setAccordionValue('service-category');
-                              }
-                              // Auto-proceed is handled by useEffect
-                            }}
-                            className="p-3 text-sm rounded-lg border-2 transition-all border-gray-200 hover:border-primary hover:bg-blue-50 bg-white text-center"
-                          >
-                            {specialty}
-                          </button>
-                        ))}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between py-2">
-                          <span className="text-sm text-gray-600">
-                            Selected: <span className="font-medium">{dialogSpecialty}</span>
-                          </span>
-                          <button
-                            onClick={() => setDialogSpecialty('')}
-                            className="text-sm text-primary hover:underline"
-                          >
-                            Change
-                          </button>
-                        </div>
-                      )}
-                    </AccordionContent>
-                  </AccordionItem>
-                )}
-
-                {/* Service Category Selection - Show if not selected */}
-                {availableServiceCategories.length > 0 && (
-                  <AccordionItem value="service-category">
-                    <AccordionTrigger>
-                      <span className="text-sm font-medium">
-                        {dialogServiceCategory ? (
-                          <>
-                            Service Category: <span className="text-primary">
-                              {SERVICE_CATEGORIES.find(c => c.id === dialogServiceCategory)?.name}
-                            </span> ✓
-                          </>
-                        ) : (
-                          <>
-                            Select Service Category <span className="text-red-500">*</span>
-                          </>
-                        )}
-                      </span>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      {!dialogServiceCategory ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-                        {availableServiceCategories.map((category) => (
-                          <button
-                            key={category.id}
-                            onClick={() => {
-                              console.log('[DIALOG] Service category clicked:', category.id);
-                              setDialogServiceCategory(category.id);
-                              // Auto-expand specialty section if not selected
-                              if (!dialogSpecialty) {
-                                setAccordionValue('specialty');
-                              }
-                              // Auto-proceed is handled by useEffect
-                            }}
-                            className="p-3 text-sm rounded-lg border-2 transition-all border-gray-200 hover:border-primary hover:bg-blue-50 bg-white text-left"
-                          >
-                            {category.name}
-                          </button>
-                        ))}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between py-2">
-                          <span className="text-sm text-gray-600">
-                            Selected: <span className="font-medium">
-                              {SERVICE_CATEGORIES.find(c => c.id === dialogServiceCategory)?.name}
-                            </span>
-                          </span>
-                          <button
-                            onClick={() => setDialogServiceCategory('')}
-                            className="text-sm text-primary hover:underline"
-                          >
-                            Change
-                          </button>
-                        </div>
-                      )}
-                    </AccordionContent>
-                  </AccordionItem>
-                )}
-              </Accordion>
-            )}
-
-            {/* Visual feedback when both are selected */}
-            {dialogSpecialty && dialogServiceCategory && (
-              <div className="mt-4 pt-4 border-t">
-                <div className="flex items-center justify-center text-sm text-green-600">
-                  <svg className="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Proceeding to Select Time
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Resume Booking Dialog */}
-      <ResumeBookingDialog
-        open={showResumeDialog}
-        onOpenChange={setShowResumeDialog}
-        draft={bookingDraft}
-        onResume={resumeFromDraft}
-        onStartNew={startNewBooking}
-      />
     </Layout>
   );
 }

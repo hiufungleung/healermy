@@ -87,8 +87,6 @@ const config: Config = {
   			'spin-once': 'spin-once 0.5s ease-in-out',
   			'spin-reverse': 'spin 1s linear infinite reverse',
   			'color-pulse': 'color-pulse 1s infinite alternate',
-  			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out',
   			'gentle-bounce': 'gentle-bounce 0.8s infinite ease-in-out',
   			'gentle-shake': 'gentle-shake 0.6s infinite ease-in-out',
   			'swing-once': 'swing-once 0.8s ease-in-out'
@@ -156,22 +154,6 @@ const config: Config = {
   				'100%': {
   					transform: 'rotate(0deg)'
   				}
-  			},
-  			'accordion-down': {
-  				from: {
-  					height: '0'
-  				},
-  				to: {
-  					height: 'var(--radix-accordion-content-height)'
-  				}
-  			},
-  			'accordion-up': {
-  				from: {
-  					height: 'var(--radix-accordion-content-height)'
-  				},
-  				to: {
-  					height: '0'
-  				}
   			}
   		},
   		borderRadius: {
@@ -180,76 +162,17 @@ const config: Config = {
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		typography: {
-  			'display-lg': [
-  				'2.5rem',
-  				{
-  					lineHeight: '1.2',
-  					fontWeight: '700'
-  				}
-  			],
-  			display: [
-  				'2rem',
-  				{
-  					lineHeight: '1.25',
-  					fontWeight: '700'
-  				}
-  			],
-  			h1: [
-  				'1.875rem',
-  				{
-  					lineHeight: '1.3',
-  					fontWeight: '700'
-  				}
-  			],
-  			h2: [
-  				'1.5rem',
-  				{
-  					lineHeight: '1.35',
-  					fontWeight: '600'
-  				}
-  			],
-  			h3: [
-  				'1.25rem',
-  				{
-  					lineHeight: '1.4',
-  					fontWeight: '600'
-  				}
-  			],
-  			h4: [
-  				'1.125rem',
-  				{
-  					lineHeight: '1.45',
-  					fontWeight: '600'
-  				}
-  			],
-  			'body-lg': [
-  				'1rem',
-  				{
-  					lineHeight: '1.6',
-  					fontWeight: '400'
-  				}
-  			],
-  			body: [
-  				'0.875rem',
-  				{
-  					lineHeight: '1.6',
-  					fontWeight: '400'
-  				}
-  			],
-  			'body-sm': [
-  				'0.4125rem',
-  				{
-  					lineHeight: '1.5',
-  					fontWeight: '400'
-  				}
-  			],
-  			caption: [
-  				'0.75rem',
-  				{
-  					lineHeight: '1.5',
-  					fontWeight: '400'
-  				}
-  			]
+  			// Custom typography scale for consistent font sizes
+  			'display-lg': ['2.5rem', { lineHeight: '1.2', fontWeight: '700' }],  // 40px
+  			'display': ['2rem', { lineHeight: '1.25', fontWeight: '700' }],      // 32px
+  			'h1': ['1.875rem', { lineHeight: '1.3', fontWeight: '700' }],        // 30px
+  			'h2': ['1.5rem', { lineHeight: '1.35', fontWeight: '600' }],         // 24px
+  			'h3': ['1.25rem', { lineHeight: '1.4', fontWeight: '600' }],         // 20px
+  			'h4': ['1.125rem', { lineHeight: '1.45', fontWeight: '600' }],       // 18px
+  			'body-lg': ['1rem', { lineHeight: '1.6', fontWeight: '400' }],       // 16px
+  			'body': ['0.875rem', { lineHeight: '1.6', fontWeight: '400' }],      // 14px
+  			'body-sm': ['0.8125rem', { lineHeight: '1.5', fontWeight: '400' }],  // 13px
+  			'caption': ['0.75rem', { lineHeight: '1.5', fontWeight: '400' }],    // 12px
   		}
   	}
   },
