@@ -223,6 +223,46 @@ export default function PractitionerWorkstationClient({
     }
   };
 
+  /**
+   * Handle "Will be finished in 10 minutes" button click
+   * Creates an encounter for the next arrived patient with status 'planned'
+   */
+  const handleWillBeFinishedSoon = async () => {
+    if (upcomingQueue.length === 0) return;
+    if (!currentEncounter) return; // Must have a current encounter to use this button
+
+    const nextAppointment = upcomingQueue[0];
+
+    // Only create encounter if patient has arrived and no encounter exists
+    if (nextAppointment.status !== 'arrived' || nextAppointment.encounter) {
+      alert('Next patient must have arrived and not have an encounter yet');
+      return;
+    }
+
+    try {
+      // Create encounter with status 'planned'
+      const response = await fetch('/api/fhir/encounters/create-for-appointment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          appointmentId: nextAppointment.id,
+          initialStatus: 'planned'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create encounter');
+      }
+
+      await fetchWorkstationData();
+    } catch (error) {
+      console.error('Error creating encounter for next patient:', error);
+      alert(`Failed to create encounter: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   const handleMarkStartingSoon = async () => {
     if (upcomingQueue.length === 0) return;
 
@@ -358,7 +398,19 @@ export default function PractitionerWorkstationClient({
                 </div>
               )}
 
-              <div className="pt-4 border-t">
+              <div className="pt-4 border-t space-y-2">
+                {/* Show "Will be finished in 10 min" button only if next patient has arrived but no encounter */}
+                {upcomingQueue.length > 0 &&
+                  upcomingQueue[0].status === 'arrived' &&
+                  !upcomingQueue[0].encounter && (
+                  <Button
+                    variant="warning"
+                    onClick={handleWillBeFinishedSoon}
+                    className="w-full"
+                  >
+                    Will be Finished in 10 Minutes
+                  </Button>
+                )}
                 <Button
                   variant="success"
                   onClick={handleCompleteCurrentEncounter}

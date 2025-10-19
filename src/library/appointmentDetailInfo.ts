@@ -34,32 +34,32 @@ export async function enhanceAppointmentsWithPractitionerDetails(
       }
     });
 
-    // Fetch all practitioner details simultaneously
-    const practitionerPromises = Array.from(practitionerIds).map(async (practitionerId) => {
+    // Fetch all practitioners in a single batch request using FHIR _id parameter
+    const practitionersMap = new Map();
+
+    if (practitionerIds.size > 0) {
       try {
-        const practitionerResponse = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
+        // Use FHIR standard _id parameter with comma-separated IDs
+        const idsParam = Array.from(practitionerIds).join(',');
+        const practitionersResponse = await fetch(`/api/fhir/practitioners?_id=${idsParam}`, {
           credentials: 'include'
         });
-        if (practitionerResponse.ok) {
-          const practitionerData = await practitionerResponse.json();
-          return { id: practitionerId, data: practitionerData };
+
+        if (practitionersResponse.ok) {
+          const practitionersData = await practitionersResponse.json();
+          const practitioners = practitionersData.practitioners || [];
+
+          // Create map with practitioner ID as key
+          practitioners.forEach((practitioner: any) => {
+            if (practitioner.id) {
+              practitionersMap.set(practitioner.id, practitioner);
+            }
+          });
         }
       } catch (error) {
-        console.warn(`Failed to fetch practitioner ${practitionerId}:`, error);
+        console.warn('Failed to fetch practitioners in batch:', error);
       }
-      return null;
-    });
-
-    // Wait for all practitioner API calls to complete
-    const practitionerResults = await Promise.all(practitionerPromises);
-
-    // Create a map of practitioner data for quick lookup
-    const practitionersMap = new Map();
-    practitionerResults.forEach((result) => {
-      if (result) {
-        practitionersMap.set(result.id, result.data);
-      }
-    });
+    }
 
     // Add practitioner details to appointments
     const enhancedAppointments = appointments.map((appointment): AppointmentWithPractitionerDetails => {

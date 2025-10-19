@@ -124,6 +124,59 @@ export function createFHIRDateTime(localDate: string, localTime: string): string
 }
 
 /**
+ * Check if two dates are on the same day (ignoring time)
+ */
+export function isSameDay(date1: Date, date2: Date): boolean {
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate()
+  );
+}
+
+/**
+ * Check if a date is tomorrow relative to another date
+ */
+export function isTomorrow(checkDate: Date, referenceDate: Date): boolean {
+  const tomorrow = new Date(referenceDate);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return isSameDay(checkDate, tomorrow);
+}
+
+/**
+ * Format appointment date/time with smart labels (Today/Tomorrow/Date)
+ * - Today: "Today, 14:30"
+ * - Tomorrow: "Tomorrow, 10:00"
+ * - Future: "14:30, 25/12/2024" (time first, then dd/mm/yyyy)
+ * All times in 24-hour format
+ */
+export function formatAppointmentDateTime(dateString: string): string {
+  const appointmentDate = new Date(dateString);
+  const now = getNowInAppTimezone();
+
+  // Check if today
+  if (isSameDay(appointmentDate, now)) {
+    const time = formatTimeForDisplay(appointmentDate);
+    return `Today, ${time}`;
+  }
+
+  // Check if tomorrow
+  if (isTomorrow(appointmentDate, now)) {
+    const time = formatTimeForDisplay(appointmentDate);
+    return `Tomorrow, ${time}`;
+  }
+
+  // Future date: "14:30, 25/12/2024" (time first, then date)
+  const time = formatTimeForDisplay(appointmentDate);
+  const dateObj = new Date(dateString);
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const year = dateObj.getFullYear();
+
+  return `${time}, ${day}/${month}/${year}`;
+}
+
+/**
  * Get current time in local timezone as Date object
  * Uses proper timezone conversion method
  */
