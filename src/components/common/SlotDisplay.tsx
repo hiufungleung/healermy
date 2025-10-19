@@ -180,7 +180,7 @@ export function SlotDisplay({
     // Grid mode: For patient booking time selection with service type colors
     // Mobile: 4 columns, Tablet: 5 columns, Desktop: 6 columns for more compact display
     return (
-      <div className={`grid grid-cols-4 md:grid-cols-6 lg:grid-cols-10 gap-2 ${className}`}>
+      <div className={`grid grid-cols-4 md:grid-cols-4 lg:grid-cols-8 gap-2 ${className}`}>
         {slots.map(slot => {
           const isSelected = selectedSlotId === slot.id;
           const isAvailable = slot.status === 'free';

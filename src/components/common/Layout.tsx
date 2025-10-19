@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { User, LogOut, Home, Calendar, Users } from 'lucide-react';
 import { Toaster } from '@/components/ui/toaster';
+import { MOBILE_BREAKPOINT } from '@/lib/breakpoints';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -43,7 +44,7 @@ export function Layout({ children, patientName, providerName, practitionerName }
   // Close mobile menu when viewport changes to desktop size
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 768) { // md breakpoint
+      if (window.innerWidth >= MOBILE_BREAKPOINT) {
         setMobileMenuOpen(false);
       }
     };
@@ -281,18 +282,18 @@ export function Layout({ children, patientName, providerName, practitionerName }
       {/* Mobile Menu Overlay with Backdrop */}
       <div
         className={clsx(
-          "fixed inset-0 z-40 md:hidden transition-opacity duration-300",
+          "fixed inset-0 z-40 md:hidden transition-opacity duration-150",
           mobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         )}
       >
-        {/* Backdrop - Click to close */}
+        {/* Backdrop - Click to close - Instant dark overlay (no blur) */}
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 bg-black/60"
           onClick={() => setMobileMenuOpen(false)}
           aria-hidden="true"
         />
 
-        {/* Mobile Menu Panel - Slides down from top */}
+        {/* Mobile Menu Panel - Slides down simultaneously */}
         <div
           className={clsx(
             "fixed top-16 left-0 right-0 bg-white shadow-lg transition-all duration-300 ease-out",

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useBookingState } from '@/hooks/useBookingState';
 import { ResumeBookingDialog } from '@/components/patient/ResumeBookingDialog';
 import { Layout } from '@/components/common/Layout';
@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
   DialogContent,
@@ -125,7 +126,6 @@ function getSpecialtyLabel(code: string): string {
 function NewBookingFlow() {
   const router = useRouter();
   const { session } = useAuth();
-  const { toast } = useToast();
 
   // Use the booking state hook for URL and localStorage management
   const {
@@ -393,10 +393,8 @@ function NewBookingFlow() {
 
         if (!response.ok) {
           console.error('[VALIDATION] Failed to fetch slot:', response.status);
-          toast({
-            title: 'Error',
+          toast.error('Error', {
             description: 'Unable to verify slot availability. Please try again.',
-            variant: 'destructive',
           });
           return;
         }
@@ -407,10 +405,8 @@ function NewBookingFlow() {
         // Check if slot exists and has required properties
         if (!slot || !slot.status) {
           console.error('[VALIDATION] Invalid slot response:', data);
-          toast({
-            title: 'Error',
+          toast.error('Error', {
             description: 'Unable to verify slot availability. Please try again.',
-            variant: 'destructive',
           });
           return;
         }
@@ -426,10 +422,8 @@ function NewBookingFlow() {
           setSelectedDate('');
 
           // Show alert
-          toast({
-            title: 'Time Slot No Longer Available',
+          toast.error('Time Slot No Longer Available', {
             description: 'This time slot has been booked by someone else. Please select another time.',
-            variant: 'destructive',
           });
 
           // Navigate back to Step 2
@@ -464,10 +458,8 @@ function NewBookingFlow() {
         }
       } catch (error) {
         console.error('[VALIDATION] Error validating slot:', error);
-        toast({
-          title: 'Error',
+        toast.error('Error', {
           description: 'Unable to verify slot availability. Please try again.',
-          variant: 'destructive',
         });
       }
     };
@@ -1163,12 +1155,16 @@ function NewBookingFlow() {
       setAvailableSpecialties([]);
       setAvailableServiceCategories([]);
 
-      // Reset dialog selections
-      setDialogSpecialty('');
-      setDialogServiceCategory('');
+      // Initialize dialog selections with page selections
+      setDialogSpecialty(selectedSpecialty || '');
+      setDialogServiceCategory(selectedServiceCategory || '');
 
-      // Set initial accordion state - open specialty first if not selected
-      setAccordionValue('specialty');
+      // Set initial accordion state - open first missing field
+      if (missingSpecialty) {
+        setAccordionValue('specialty');
+      } else if (missingCategory) {
+        setAccordionValue('service-category');
+      }
 
       // Show the selection dialog immediately
       setShowSelectionDialog(true);
@@ -1283,27 +1279,21 @@ function NewBookingFlow() {
       // Validate required fields
       if (!selectedSpecialty) {
         setSpecialtyError(true);
-        toast({
-          title: "Specialty Required",
+        toast.error("Specialty Required", {
           description: "Please select a specialty to continue",
-          variant: "destructive"
         });
         return;
       }
       if (!selectedServiceCategory) {
         setCategoryError(true);
-        toast({
-          title: "Service Category Required",
+        toast.error("Service Category Required", {
           description: "Please select a service category to continue",
-          variant: "destructive"
         });
         return;
       }
       if (!selectedPractitioner) {
-        toast({
-          title: "Doctor Selection Required",
+        toast.error("Doctor Selection Required", {
           description: "Please select a doctor to continue",
-          variant: "destructive"
         });
         return;
       }
@@ -1448,8 +1438,7 @@ function NewBookingFlow() {
       console.log('Appointment created successfully:', result);
 
       // Show success toast
-      toast({
-        title: "✅ Appointment Booked Successfully!",
+      toast.success("✅ Appointment Booked Successfully!", {
         description: `Your appointment with ${selectedPractitioner?.name?.[0]?.text || selectedPractitioner?.name?.[0]?.family} on ${formatDateForDisplay(selectedDate)} at ${selectedTime} has been submitted for review. You will receive a notification once it's confirmed.`,
         duration: 5000,
       });
@@ -1698,24 +1687,29 @@ function NewBookingFlow() {
                             onClick={() => handleDoctorSelection(practitioner)}
                             className="w-full p-4 rounded-lg border-2 border-gray-200 bg-white hover:border-primary transition-all text-left"
                           >
-                            <div>
+                            <div className="flex flex-col gap-2">
+                              {/* Doctor Name - Always takes first row */}
                               <h3 className="font-semibold text-lg text-gray-900">{displayName}</h3>
-                              {addressString && (
-                                <div className="flex items-center mt-1">
-                                  <svg className="w-4 h-4 text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                  </svg>
-                                  <span className="text-sm text-gray-600">{addressString}</span>
-                                </div>
-                              )}
-                              {phone && (
-                                <div className="flex items-center mt-1">
-                                  <svg className="w-4 h-4 text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                  </svg>
-                                  <span className="text-sm text-gray-600">{phone}</span>
-                                </div>
-                              )}
+
+                              {/* Address and Phone - Wrap to new lines if needed, no text breaking */}
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                {addressString && (
+                                  <div className="flex items-center whitespace-nowrap">
+                                    <svg className="w-4 h-4 text-gray-400 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                    </svg>
+                                    <span className="text-sm text-gray-600">{addressString}</span>
+                                  </div>
+                                )}
+                                {phone && (
+                                  <div className="flex items-center whitespace-nowrap">
+                                    <svg className="w-4 h-4 text-gray-400 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                    </svg>
+                                    <span className="text-sm text-gray-600">{phone}</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </button>
                         );
@@ -1809,65 +1803,82 @@ function NewBookingFlow() {
                 </div>
               )}
 
-              {/* Date Selection with Calendar */}
-              <div className="mb-6">
-                <h3 className="font-semibold mb-3">Select Date</h3>
-                <div className="flex justify-center">
-                  <Calendar
-                    mode="single"
-                    selected={calendarDate}
-                    onSelect={(date) => {
-                      if (date) {
-                        // Use timezone-aware date formatting to avoid UTC conversion issues
-                        const dateStr = new Intl.DateTimeFormat('en-CA', {
-                          timeZone: APP_TIMEZONE,
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit'
-                        }).format(date);
-                        setSelectedDate(dateStr);
-                        setCalendarDate(date);
-                      }
-                    }}
-                    onMonthChange={(month) => {
-                      setCurrentMonth(month);
-                    }}
-                    disabled={(date) => {
-                      // Disable past dates
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      return date < today;
-                    }}
-                    modifiers={{
-                      available: (date) => {
-                        // Only highlight dates with slots that are NOT in the past
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        const isPast = date < today;
-                        const dateStr = date.toISOString().split('T')[0];
-                        return !isPast && datesWithSlots.has(dateStr);
-                      }
-                    }}
-                    modifiersClassNames={{
-                      available: '!bg-green-100 hover:!bg-green-200 font-semibold [&>button]:!bg-transparent [&>button]:hover:!bg-transparent [&[data-selected=true]]:!bg-transparent [&[data-selected=true]>button]:!bg-primary [&[data-selected=true]>button]:!text-white'
-                    }}
-                    className="rounded-md border"
-                  />
-                </div>
-                {selectedDate && (
-                  <div className="mt-3 text-center text-sm text-gray-600">
-                    Selected: {new Date(selectedDate).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </div>
-                )}
-              </div>
+              {/* Responsive Grid: Two columns on tablet/desktop (md), stacked on mobile */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+                {/* LEFT COLUMN: Date Selection */}
+                <div className='md:col-span-2'>
+                  <h3 className="font-semibold mb-3">Select Date</h3>
 
-              {/* Time Selection */}
-              <div className="mb-6">
+                  {/* Mobile: Use shadcn DatePicker with dropdown */}
+                  <div className="md:hidden">
+                    <DatePicker
+                      date={calendarDate}
+                      onDateChange={(date) => {
+                        if (date) {
+                          const dateStr = new Intl.DateTimeFormat('en-CA', {
+                            timeZone: APP_TIMEZONE,
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                          }).format(date);
+                          setSelectedDate(dateStr);
+                          setCalendarDate(date);
+                        }
+                      }}
+                      minDate={new Date()}
+                      placeholder="Pick a date"
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Desktop/Tablet: Show always-visible Calendar */}
+                  <div className="hidden md:block">
+                    <div className="flex justify-center">
+                      <Calendar
+                        mode="single"
+                        selected={calendarDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            const dateStr = new Intl.DateTimeFormat('en-CA', {
+                              timeZone: APP_TIMEZONE,
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit'
+                            }).format(date);
+                            setSelectedDate(dateStr);
+                            setCalendarDate(date);
+                          }
+                        }}
+                        onMonthChange={(month) => {
+                          setCurrentMonth(month);
+                        }}
+                        disabled={(date) => {
+                          // Disable past dates
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          return date < today;
+                        }}
+                        modifiers={{
+                          available: (date) => {
+                            // Only highlight dates with slots that are NOT in the past
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            const isPast = date < today;
+                            const dateStr = date.toISOString().split('T')[0];
+                            return !isPast && datesWithSlots.has(dateStr);
+                          }
+                        }}
+                        modifiersClassNames={{
+                          available: '!bg-green-100 hover:!bg-green-200 font-semibold [&>button]:!bg-transparent [&>button]:hover:!bg-transparent [&[data-selected=true]]:!bg-transparent [&[data-selected=true]>button]:!bg-primary [&[data-selected=true]>button]:!text-white'
+                        }}
+                        className="rounded-md border"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN: Time Selection */}
+                <div className='md:col-span-3'>
                 <h3 className="font-semibold mb-2">Available Times</h3>
 
                 {/* Service Type Color Legend - Compact */}
@@ -1995,8 +2006,10 @@ function NewBookingFlow() {
                     <p className="text-gray-600">No available time slots for this date</p>
                   </div>
                 )}
-
+                </div>
+                {/* END RIGHT COLUMN */}
               </div>
+              {/* END RESPONSIVE GRID */}
             </Card>
 
             {/* Navigation */}
@@ -2188,7 +2201,11 @@ function NewBookingFlow() {
           <DialogHeader>
             <DialogTitle>Complete Your Selection</DialogTitle>
             <DialogDescription>
-              Please select the specialty and service category to continue with your booking.
+              {!selectedSpecialty && !selectedServiceCategory
+                ? 'Please select the specialty and service category to continue with your booking.'
+                : !selectedSpecialty
+                ? 'Please select a specialty to continue with your booking.'
+                : 'Please select a service category to continue with your booking.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -2206,8 +2223,8 @@ function NewBookingFlow() {
                 collapsible
                 className="w-full"
               >
-                {/* Specialty Selection - Show if not selected */}
-                {availableSpecialties.length > 0 && (
+                {/* Specialty Selection - Show if not already selected on page */}
+                {!selectedSpecialty && availableSpecialties.length > 0 && (
                   <AccordionItem value="specialty">
                     <AccordionTrigger>
                       <span className="text-sm font-medium">
@@ -2224,7 +2241,7 @@ function NewBookingFlow() {
                     </AccordionTrigger>
                     <AccordionContent>
                       {!dialogSpecialty ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2">
+                        <div className="grid grid-cols-2 gap-2 pt-2">
                         {availableSpecialties.map((specialty) => (
                           <button
                             key={specialty}
@@ -2237,7 +2254,7 @@ function NewBookingFlow() {
                               }
                               // Auto-proceed is handled by useEffect
                             }}
-                            className="p-3 text-sm rounded-lg border-2 transition-all border-gray-200 hover:border-primary hover:bg-blue-50 bg-white text-center"
+                            className="p-3 text-sm rounded-lg border-2 transition-all border-gray-200 hover:border-primary hover:bg-blue-50 bg-white text-left"
                           >
                             {specialty}
                           </button>
@@ -2260,8 +2277,8 @@ function NewBookingFlow() {
                   </AccordionItem>
                 )}
 
-                {/* Service Category Selection - Show if not selected */}
-                {availableServiceCategories.length > 0 && (
+                {/* Service Category Selection - Show if not already selected on page */}
+                {!selectedServiceCategory && availableServiceCategories.length > 0 && (
                   <AccordionItem value="service-category">
                     <AccordionTrigger>
                       <span className="text-sm font-medium">
@@ -2280,7 +2297,7 @@ function NewBookingFlow() {
                     </AccordionTrigger>
                     <AccordionContent>
                       {!dialogServiceCategory ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                        <div className="grid grid-cols-2 gap-2 pt-2">
                         {availableServiceCategories.map((category) => (
                           <button
                             key={category.id}

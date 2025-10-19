@@ -1,26 +1,37 @@
-import type { Encounter } from '@/types/fhir';
+import type { Encounter, Appointment } from '@/types/fhir';
+
+/**
+ * CENTRALIZED CONSTANTS
+ */
+export const ENCOUNTER_PLANNED_WAIT_TIME_MINUTES = 10; // Time shown when encounter status is 'planned'
+export const AVERAGE_ENCOUNTER_MINUTES = 30; // Fallback duration when actual appointment duration not available
 
 /**
  * Calculate queue position for a patient based on encounters before their appointment
+ * Now uses actual appointment durations for more accurate wait time estimation
  *
  * @param patientAppointmentStart - ISO date string of patient's appointment start time
  * @param encounters - List of all encounters for the practitioner/location
+ * @param appointments - List of appointments corresponding to encounters (for duration calculation)
  * @param patientEncounter - Optional: Patient's own encounter to check status
  * @returns Object with queue position, estimated wait time, and special status flags
  */
 export function calculateQueuePosition(
   patientAppointmentStart: string,
   encounters: Encounter[],
+  appointments?: Appointment[],
   patientEncounter?: Encounter
 ): {
   position: number;
   encountersAhead: number;
   estimatedWaitMinutes: number;
   isOnHold: boolean;
+  isPlanned: boolean;
   hasInProgressAhead: boolean;
 } {
-  // Check if patient's own encounter is on-hold
+  // Check if patient's own encounter is on-hold or planned
   const isOnHold = patientEncounter?.status === 'on-hold';
+  const isPlanned = patientEncounter?.status === 'planned';
 
   // Filter encounters that are in-progress, on-hold, or planned, and before patient's appointment
   const encountersAhead = encounters.filter(encounter => {
@@ -54,16 +65,41 @@ export function calculateQueuePosition(
   // Check if there's an in-progress encounter ahead
   const hasInProgressAhead = encountersAhead.some(enc => enc.status === 'in-progress');
 
-  // Estimate wait time based on average encounter duration
-  // Default to 15 minutes per encounter if no duration data available
-  const averageEncounterMinutes = 15;
-  const estimatedWaitMinutes = count * averageEncounterMinutes;
+  // Calculate wait time using actual appointment durations if available
+  let totalWaitMinutes = 0;
+  const averageEncounterMinutes = 15; // Fallback default
+
+  encountersAhead.forEach(encounter => {
+    // Try to find corresponding appointment for duration
+    if (appointments && encounter.appointment?.[0]) {
+      const appointmentRef = encounter.appointment[0].reference;
+      const appointmentId = appointmentRef?.replace('Appointment/', '');
+
+      const appointment = appointments.find(apt => apt.id === appointmentId);
+
+      if (appointment && appointment.start && appointment.end) {
+        // Use actual appointment duration
+        const duration = (new Date(appointment.end).getTime() - new Date(appointment.start).getTime()) / (1000 * 60);
+        totalWaitMinutes += duration;
+      } else {
+        // Fallback to average
+        totalWaitMinutes += averageEncounterMinutes;
+      }
+    } else {
+      // No appointments provided, use average
+      totalWaitMinutes += averageEncounterMinutes;
+    }
+  });
+
+  // If patient has planned encounter, wait time is < 10 minutes
+  const estimatedWaitMinutes = isPlanned ? 10 : Math.round(totalWaitMinutes);
 
   return {
     position,
     encountersAhead: count,
     estimatedWaitMinutes,
     isOnHold,
+    isPlanned,
     hasInProgressAhead,
   };
 }
@@ -99,16 +135,23 @@ export function formatWaitTime(minutes: number): string {
  *
  * @param position - Queue position (1 = next, 2 = second, etc.)
  * @param isOnHold - Whether patient's encounter is on-hold (starting soon)
+ * @param isPlanned - Whether patient's encounter is planned (< 10 min wait)
  * @param hasInProgressAhead - Whether there's an in-progress encounter ahead
  * @returns Human-readable status message
  */
 export function getQueueStatusMessage(
   position: number,
   isOnHold: boolean = false,
+  isPlanned: boolean = false,
   hasInProgressAhead: boolean = false
 ): string {
   // Special message if patient's encounter is on-hold
   if (isOnHold) {
+    return "Your appointment will begin within 10 minutes";
+  }
+
+  // Special message if patient's encounter is planned (created by "Will be finished in 10 min")
+  if (isPlanned) {
     return "Your appointment will begin within 10 minutes";
   }
 

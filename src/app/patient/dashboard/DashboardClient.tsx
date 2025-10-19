@@ -4,12 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
+import { PatientAppointmentCard } from '@/components/patient/PatientAppointmentCard';
 import {
   PatientInfoSkeleton,
-  AppointmentSkeleton,
-  LoadingSpinner
+  AppointmentSkeleton
 } from '@/components/common/LoadingSpinner';
-import { formatDateForDisplay, getNowInAppTimezone } from '@/library/timezone';
+import { getNowInAppTimezone, formatAppointmentDateTime } from '@/library/timezone';
 import type { Patient } from '@/types/fhir';
 import type { AuthSession } from '@/types/auth';
 import type { AppointmentWithPractitionerDetails } from '@/library/appointmentDetailInfo';
@@ -42,10 +42,10 @@ export default function DashboardClient({
   const [loadingAppointments, setLoadingAppointments] = useState(true);
   const [patientError, setPatientError] = useState<string | null>(null);
   const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
-  const [cancellingAppointments, setCancellingAppointments] = useState<Set<string>>(new Set());
-  const [reschedulingAppointments, setReschedulingAppointments] = useState<Set<string>>(new Set());
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
-  const [loadingQueue, setLoadingQueue] = useState(false);
+  const [estimatedWaitTime, setEstimatedWaitTime] = useState<number | null>(null);
+  const [isPatientArrived, setIsPatientArrived] = useState(false);
+  const [isEncounterPlanned, setIsEncounterPlanned] = useState(false);
 
   // Client-side data fetching
   useEffect(() => {
@@ -91,7 +91,9 @@ export default function DashboardClient({
     const fetchAppointments = async () => {
       try {
         setAppointmentsError(null); // Clear previous errors
-        const response = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
+        const now = getNowInAppTimezone();
+        // Only fetch future appointments, sorted by date (ascending = earliest first)
+        const response = await fetch(`/api/fhir/appointments?patient=${session.patient}&start=gt${now.toISOString()}&_sort=date`, {
           credentials: 'include'
         });
 
@@ -120,40 +122,9 @@ export default function DashboardClient({
     fetchAppointments();
   }, [session.patient]);
 
-  // Cancel appointment functionality
-  const handleCancelAppointment = async (appointmentId: string) => {
-    if (!appointmentId) return;
-    
-    const confirmCancel = window.confirm('Are you sure you want to cancel this appointment?');
-    if (!confirmCancel) return;
-    
-    setCancellingAppointments(prev => new Set([...prev, appointmentId]));
-    
+  // Refresh appointments after update
+  const refreshAppointments = async () => {
     try {
-      const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json-patch+json',
-        },
-        credentials: 'include',
-        body: JSON.stringify([
-          {
-            op: 'replace',
-            path: '/status',
-            value: 'cancelled'
-          }
-        ]),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to cancel appointment');
-      }
-      
-      // Show success message and refresh appointments
-      alert('Appointment cancelled successfully. The provider has been notified.');
-
-      // Refresh appointments with proper name resolution using reusable utility
       const refreshResponse = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
         credentials: 'include'
       });
@@ -166,75 +137,8 @@ export default function DashboardClient({
         const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
         setAppointments(enhancedAppointments);
       }
-      
     } catch (error) {
-      console.error('Error cancelling appointment:', error);
-      alert(error instanceof Error ? error.message : 'Failed to cancel appointment. Please try again.');
-    } finally {
-      setCancellingAppointments(prev => {
-        const updated = new Set(prev);
-        updated.delete(appointmentId);
-        return updated;
-      });
-    }
-  };
-
-  // Reschedule appointment functionality
-  const handleRescheduleAppointment = async (appointmentId: string) => {
-    if (!appointmentId) return;
-    
-    const confirmReschedule = window.confirm('Do you want to request a reschedule for this appointment? The provider will review your request.');
-    if (!confirmReschedule) return;
-    
-    setReschedulingAppointments(prev => new Set([...prev, appointmentId]));
-    
-    try {
-      const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify([
-          {
-            op: 'replace',
-            path: '/status',
-            value: 'proposed'
-          }
-        ]),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to request reschedule');
-      }
-      
-      // Show success message and refresh appointments
-      alert('Reschedule request sent successfully. The provider will review and contact you with available times.');
-
-      // Refresh appointments with proper name resolution using reusable utility
-      const refreshResponse = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
-        credentials: 'include'
-      });
-      if (refreshResponse.ok) {
-        const data = await refreshResponse.json();
-        const appointments = data.appointments || [];
-
-        // Use the reusable appointment enhancement utility
-        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');
-        const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
-        setAppointments(enhancedAppointments);
-      }
-      
-    } catch (error) {
-      console.error('Error requesting reschedule:', error);
-      alert(error instanceof Error ? error.message : 'Failed to request reschedule. Please try again.');
-    } finally {
-      setReschedulingAppointments(prev => {
-        const updated = new Set(prev);
-        updated.delete(appointmentId);
-        return updated;
-      });
+      console.error('Error refreshing appointments:', error);
     }
   };
 
@@ -288,24 +192,51 @@ export default function DashboardClient({
 
   const todayStatus = {
     nextAppointment: nextTodayAppointment ?
-      new Date(nextTodayAppointment.start!).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      }) : null,
+      formatAppointmentDateTime(nextTodayAppointment.start!) : null,
     queuePosition: queuePosition,
     waitTime: null
   };
 
   // Calculate queue position based on encounters for next appointment
+  // Polls every 10 seconds, but ONLY if appointment is TODAY and patient has arrived
   useEffect(() => {
     const calculateQueuePosition = async () => {
       if (!nextTodayAppointment || !nextTodayAppointment.start) {
         setQueuePosition(null);
+        setEstimatedWaitTime(null);
+        setIsPatientArrived(false);
+        setIsEncounterPlanned(false);
         return;
       }
 
-      setLoadingQueue(true);
+      // Check if appointment is TODAY
+      const appointmentDate = new Date(nextTodayAppointment.start);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const isToday = appointmentDate >= today && appointmentDate < tomorrow;
+
+      // Check if patient has arrived
+      const arrived = nextTodayAppointment.status === 'arrived';
+      setIsPatientArrived(arrived);
+
+      // If appointment is NOT today, don't poll at all
+      if (!isToday) {
+        setQueuePosition(null);
+        setEstimatedWaitTime(null);
+        setIsEncounterPlanned(false);
+        return;
+      }
+
+      // If patient hasn't arrived, don't fetch encounters/appointments
+      if (!arrived) {
+        setQueuePosition(null);
+        setEstimatedWaitTime(null);
+        setIsEncounterPlanned(false);
+        return;
+      }
       try {
         // Extract practitioner from the appointment
         const practitionerParticipant = nextTodayAppointment.participant?.find(
@@ -314,51 +245,141 @@ export default function DashboardClient({
 
         if (!practitionerParticipant || !practitionerParticipant.actor?.reference) {
           setQueuePosition(null);
+          setEstimatedWaitTime(null);
+          setIsEncounterPlanned(false);
           return;
         }
 
         const practitionerReference = practitionerParticipant.actor.reference;
         const practitionerId = practitionerReference.replace('Practitioner/', '');
 
-        // Get the date of MY appointment
+        // Get the start and end of the appointment day
         const appointmentDate = new Date(nextTodayAppointment.start);
         const startOfDay = new Date(appointmentDate);
         startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(appointmentDate);
-        endOfDay.setHours(23, 59, 59, 999);
+        const startOfNextDay = new Date(appointmentDate);
+        startOfNextDay.setDate(startOfNextDay.getDate() + 1);
+        startOfNextDay.setHours(0, 0, 0, 0);
 
-        // Fetch all encounters for this practitioner on the same day
-        const response = await fetch(
-          `/api/fhir/encounters?practitioner=${practitionerId}&date=ge${startOfDay.toISOString()}&date=le${endOfDay.toISOString()}&_count=100`,
-          {
-            credentials: 'include'
-          }
-        );
+        // Fetch encounters and appointments in PARALLEL (not sequentially)
+        // Only fetch in-progress and planned encounters (optimized query)
+        const [encountersResponse, appointmentsResponse] = await Promise.all([
+          fetch(
+            `/api/fhir/encounters?practitioner=${practitionerId}&date=ge${startOfDay.toISOString()}&date=lt${startOfNextDay.toISOString()}&status=in-progress,planned&_sort=-date`,
+            { credentials: 'include' }
+          ),
+          fetch(
+            `/api/fhir/appointments?practitioner=${practitionerId}&date=ge${startOfDay.toISOString()}&date=lt${startOfNextDay.toISOString()}&status:not=fulfilled&_sort=date`,
+            { credentials: 'include' }
+          )
+        ]);
 
-        if (!response.ok) {
-          console.error('Failed to fetch encounters for queue calculation');
+        if (!encountersResponse.ok || !appointmentsResponse.ok) {
+          console.error('Failed to fetch encounters or appointments for queue calculation');
           setQueuePosition(null);
+          setEstimatedWaitTime(null);
+          setIsEncounterPlanned(false);
           return;
         }
 
-        const data = await response.json();
-        const encounters = data.encounters || [];
+        const encountersData = await encountersResponse.json();
+        const appointmentsData = await appointmentsResponse.json();
+        const encounters = encountersData.encounters || [];
+        const allAppointments = appointmentsData.appointments || [];
 
-        // Use the reusable queue calculation utility
-        const { calculateQueuePosition: calcQueue } = await import('@/lib/queueCalculation');
-        const queueData = calcQueue(nextTodayAppointment.start, encounters);
+        // Find the encounter for THIS patient's appointment
+        const myEncounter = encounters.find((enc: any) =>
+          enc.appointment?.[0]?.reference === `Appointment/${nextTodayAppointment.id}`
+        );
 
-        setQueuePosition(queueData.position);
+        // Update encounter planned status
+        const encounterPlanned = myEncounter?.status === 'planned';
+        setIsEncounterPlanned(encounterPlanned);
+
+        // Calculate wait time based on encounter status combinations
+        const { ENCOUNTER_PLANNED_WAIT_TIME_MINUTES } = await import('@/lib/queueCalculation');
+
+        let waitTimeMinutes = 0;
+        let patientsAhead = 0;
+
+        // Check if there's an in-progress encounter
+        const hasInProgress = encounters.some((enc: any) => enc.status === 'in-progress');
+        const hasPlanned = encounters.some((enc: any) => enc.status === 'planned');
+
+        if (hasInProgress && hasPlanned) {
+          // Case 1: Both in-progress and planned exist
+          // Wait time = all not-started appointments + 10 mins (will be finished)
+          const notStartedAppointments = allAppointments.filter((apt: any) => {
+            const aptTime = new Date(apt.start).getTime();
+            const myTime = new Date(nextTodayAppointment.start).getTime();
+            return aptTime < myTime && apt.status !== 'arrived' && apt.id !== nextTodayAppointment.id;
+          });
+
+          patientsAhead = notStartedAppointments.length + 1; // +1 for the planned encounter
+          waitTimeMinutes = notStartedAppointments.reduce((total: number, apt: any) => {
+            if (apt.start && apt.end) {
+              const duration = (new Date(apt.end).getTime() - new Date(apt.start).getTime()) / (1000 * 60);
+              return total + duration;
+            }
+            return total + 15; // fallback
+          }, 0) + ENCOUNTER_PLANNED_WAIT_TIME_MINUTES;
+
+        } else if (hasInProgress && !hasPlanned) {
+          // Case 2: Only in-progress exists
+          // Wait time = all not-started appointments + in-progress appointment
+          const inProgressEncounter = encounters.find((enc: any) => enc.status === 'in-progress');
+          const inProgressAppointment = allAppointments.find((apt: any) =>
+            inProgressEncounter?.appointment?.[0]?.reference === `Appointment/${apt.id}`
+          );
+
+          const notStartedAppointments = allAppointments.filter((apt: any) => {
+            const aptTime = new Date(apt.start).getTime();
+            const myTime = new Date(nextTodayAppointment.start).getTime();
+            return aptTime < myTime && apt.status !== 'arrived' && apt.id !== nextTodayAppointment.id;
+          });
+
+          patientsAhead = notStartedAppointments.length + 1; // +1 for in-progress
+
+          let inProgressDuration = 15; // fallback
+          if (inProgressAppointment?.start && inProgressAppointment?.end) {
+            inProgressDuration = (new Date(inProgressAppointment.end).getTime() -
+                                 new Date(inProgressAppointment.start).getTime()) / (1000 * 60);
+          }
+
+          waitTimeMinutes = notStartedAppointments.reduce((total: number, apt: any) => {
+            if (apt.start && apt.end) {
+              const duration = (new Date(apt.end).getTime() - new Date(apt.start).getTime()) / (1000 * 60);
+              return total + duration;
+            }
+            return total + 15;
+          }, 0) + inProgressDuration;
+        }
+
+        // If MY encounter is planned, override wait time to < 10 mins
+        if (encounterPlanned) {
+          waitTimeMinutes = ENCOUNTER_PLANNED_WAIT_TIME_MINUTES;
+          patientsAhead = 0; // I'm about to be called
+        }
+
+        setQueuePosition(patientsAhead);
+        setEstimatedWaitTime(Math.round(waitTimeMinutes));
       } catch (error) {
         console.error('Error calculating queue position:', error);
         setQueuePosition(null);
-      } finally {
-        setLoadingQueue(false);
+        setEstimatedWaitTime(null);
+        setIsEncounterPlanned(false);
       }
     };
 
+    // Initial calculation
     calculateQueuePosition();
-  }, [nextTodayAppointment?.id, nextTodayAppointment?.start]);
+
+    // Set up polling every 10 seconds
+    const intervalId = setInterval(calculateQueuePosition, 10000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(intervalId);
+  }, [nextTodayAppointment?.id, nextTodayAppointment?.start, nextTodayAppointment?.status]);
 
   return (
     <>
@@ -369,22 +390,22 @@ export default function DashboardClient({
         </h1>
       </div>
 
-      {/* Quick Actions - Hidden on mobile */}
-      <div className="hidden sm:block bg-white rounded-xl border border-gray-200 p-4 sm:p-6 mb-6 sm:mb-8">
-        <h2 className="text-base sm:text-lg md:text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid md:grid-cols-3 gap-4">
+      {/* Quick Actions - Visible on all devices */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 mb-6 sm:mb-8">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-3 gap-4">
           <button
             onClick={() => router.push('/patient/book-appointment')}
             className="group bg-white rounded-lg border-2 border-blue-200 p-4 hover:border-blue-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
           >
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                <svg className="w-6 h-6 text-blue-600 group-hover:animate-spin-once" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                <svg className="w-5 h-5 text-blue-600 group-hover:animate-spin-once" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
               </div>
               <div className="text-left">
-                <p className="font-semibold text-gray-900 group-hover:text-blue-700">Book Appointment</p>
+                <p className="font-semibold text-sm text-gray-900 group-hover:text-blue-700">Book Appointment</p>
               </div>
             </div>
           </button>
@@ -394,13 +415,13 @@ export default function DashboardClient({
             className="group bg-white rounded-lg border-2 border-amber-200 p-4 hover:border-amber-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
           >
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center group-hover:bg-amber-200 transition-colors">
-                <svg className="w-6 h-6 text-amber-600 group-hover:animate-swing-once" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-9 h-9bg-amber-100 rounded-lg flex items-center justify-center group-hover:bg-amber-200 transition-colors">
+                <svg className="w-5 h-5 text-amber-600 group-hover:animate-swing-once" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
               </div>
               <div className="text-left">
-                <p className="font-semibold text-gray-900 group-hover:text-amber-700">Check Messages</p>
+                <p className="font-semibold text-sm text-gray-900 group-hover:text-amber-700">Check Messages</p>
               </div>
             </div>
           </button>
@@ -410,13 +431,13 @@ export default function DashboardClient({
             className="group bg-white rounded-lg border-2 border-green-200 p-4 hover:border-green-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
           >
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
-                <svg className="w-6 h-6 text-green-600 group-hover:animate-gentle-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
+                <svg className="w-5 h-5 text-green-600 group-hover:animate-gentle-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
               <div className="text-left">
-                <p className="font-semibold text-gray-900 group-hover:text-green-700">Edit Profile</p>
+                <p className="font-semibold text-sm text-gray-900 group-hover:text-green-700">Edit Profile</p>
               </div>
             </div>
           </button>
@@ -424,11 +445,11 @@ export default function DashboardClient({
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
-        {/* Upcoming Appointments */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg border border-border p-4 sm:p-6">
-            <div className="flex justify-between items-center mb-4 sm:mb-6">
-              <h2 className="text-base sm:text-lg md:text-base sm:text-lg md:text-xl font-semibold">Upcoming Appointments</h2>
+        {/* Upcoming Appointments - Second on mobile/tablet, left column on desktop */}
+        <div className="lg:col-span-2 lg:order-1 order-2">
+          <div className="bg-white rounded-lg border border-border p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-base sm:text-lg md:text-xl font-semibold">Upcoming Appointments</h2>
               <Button
                 variant="outline"
                 size="sm"
@@ -457,85 +478,13 @@ export default function DashboardClient({
                     Try Again
                   </button>
                 </div>
-              ) : displayAppointments.map((appointment) => {
-                // Extract FHIR appointment data with practitioner details
-                const appointmentStatus = appointment.status;
-                const doctorName = appointment.practitionerDetails?.name || 'Provider';
-                const appointmentDate = appointment.start;
-                const appointmentDateDisplay = appointmentDate ? formatDateForDisplay(appointmentDate) : 'TBD';
-                const specialty = appointment.practitionerDetails?.specialty ||
-                               appointment.serviceType?.[0]?.text ||
-                               appointment.serviceType?.[0]?.coding?.[0]?.display || 'General';
-                const location = appointment.practitionerDetails?.address || 'TBD';
-                const phoneNumber = appointment.practitionerDetails?.phone || 'N/A';
-
-                return (
-                  <div
-                    key={appointment.id}
-                    className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h3 className="font-semibold text-lg">{doctorName}</h3>
-                        <p className="text-text-secondary">{specialty}</p>
-                      </div>
-                      <Badge
-                        variant={appointmentStatus === 'booked' || appointmentStatus === 'fulfilled' ? "success" :
-                                appointmentStatus === 'cancelled' ? "danger" :
-                                appointmentStatus === 'pending' ? "warning" : "info"}
-                        size="sm"
-                      >
-                        {appointmentStatus === 'booked' ? 'Confirmed' :
-                         appointmentStatus === 'pending' ? 'Pending Approval' :
-                         appointmentStatus === 'fulfilled' ? 'Completed' :
-                         appointmentStatus === 'cancelled' ? 'Cancelled' :
-                         appointmentStatus}
-                      </Badge>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                      <div className="flex items-center space-x-2">
-                        <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span>{appointmentDateDisplay}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                        </svg>
-                        <span>{phoneNumber}</span>
-                      </div>
-                      <div className="flex items-center space-x-2 col-span-2">
-                        <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <span>{location}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleRescheduleAppointment(appointment.id || '')}
-                        disabled={reschedulingAppointments.has(appointment.id || '') || appointmentStatus === 'cancelled' || appointmentStatus === 'fulfilled'}
-                      >
-                        {reschedulingAppointments.has(appointment.id || '') ? 'Requesting...' : 'Reschedule'}
-                      </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => handleCancelAppointment(appointment.id || '')}
-                        disabled={cancellingAppointments.has(appointment.id || '') || appointmentStatus === 'cancelled' || appointmentStatus === 'fulfilled'}
-                      >
-                        {cancellingAppointments.has(appointment.id || '') ? 'Cancelling...' : 'Cancel'}
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
+              ) : displayAppointments.map((appointment) => (
+                <PatientAppointmentCard
+                  key={appointment.id}
+                  appointment={appointment}
+                  onAppointmentUpdated={refreshAppointments}
+                />
+              ))}
 
               {!loadingAppointments && displayAppointments.length === 0 && (
                 <div className="text-center py-12">
@@ -558,38 +507,50 @@ export default function DashboardClient({
           </div>
         </div>
 
-        {/* Next Appointment Queue Status */}
-        <div>
-          <div className="bg-white rounded-lg border border-border p-6">
-            <h2 className="text-base sm:text-lg md:text-xl font-semibold mb-6">Next Appointment Status</h2>
-            
+        {/* Next Appointment Status - First on mobile/tablet, right column on desktop */}
+        <div className="lg:col-span-1 lg:order-2 order-1">
+          <div className="bg-white rounded-lg border border-border p-4 sm:p-6">
+            <h2 className="text-base font-semibold mb-4 sm:mb-6">Next Appointment Status</h2>
+
             <div className="space-y-4">
               {todayStatus.nextAppointment ? (
                 <>
-                  <div>
-                    <p className="text-sm text-text-secondary mb-1">Next Appointment</p>
-                    <p className="text-xl sm:text-2xl font-bold text-primary">{todayStatus.nextAppointment}</p>
-                  </div>
-
-                  {loadingQueue ? (
-                    <div className="flex items-center space-x-2">
-                      <LoadingSpinner size="sm" />
-                      <p className="text-sm text-text-secondary">Checking queue...</p>
-                    </div>
-                  ) : todayStatus.queuePosition !== null && todayStatus.queuePosition !== undefined ? (
+                  {/* Show "Next Appointment" only if patient has NOT arrived */}
+                  {!isPatientArrived && (
                     <div>
-                      <p className="text-sm text-text-secondary mb-1">Patients Ahead of You</p>
-                      <p className="text-base sm:text-lg md:text-xl font-semibold text-amber-600">
-                        {todayStatus.queuePosition === 0 ? "You're first! 🎉" : todayStatus.queuePosition}
-                      </p>
+                      <p className="text-sm text-text-secondary mb-1">Next Appointment</p>
+                      <p className="text-xl sm:text-2xl font-bold text-primary">{todayStatus.nextAppointment}</p>
                     </div>
-                  ) : null}
+                  )}
 
-                  {todayStatus.waitTime && (
+                  {/* Show "You are checked in" if patient has arrived */}
+                  {isPatientArrived && (
                     <div>
-                      <p className="text-sm text-text-secondary mb-1">Estimated Wait Time</p>
-                      <p className="text-base sm:text-lg md:text-xl font-semibold">{todayStatus.waitTime} mins</p>
+                      <p className="text-xl sm:text-2xl font-bold text-green-600">You are checked in</p>
                     </div>
+                  )}
+
+                  {/* Show queue info only if patient has arrived */}
+                  {isPatientArrived && (
+                    <>
+                      {queuePosition !== null && queuePosition !== undefined ? (
+                        <div>
+                          <p className="text-sm text-text-secondary mb-1">Patients Ahead of You</p>
+                          <p className="text-base sm:text-lg md:text-xl font-semibold text-amber-600">
+                            {queuePosition === 0 ? "You're first! 🎉" : queuePosition}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {estimatedWaitTime !== null && estimatedWaitTime !== undefined && (
+                        <div>
+                          <p className="text-sm text-text-secondary mb-1">Estimated Wait Time</p>
+                          <p className="text-base sm:text-lg md:text-xl font-semibold text-primary">
+                            {isEncounterPlanned ? '< 10 minutes' : `${estimatedWaitTime} mins`}
+                          </p>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               ) : (
@@ -597,7 +558,7 @@ export default function DashboardClient({
                   <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <p className="text-text-secondary">No appointments today</p>
+                  <p className="text-text-secondary">No upcoming appointments</p>
                 </div>
               )}
             </div>

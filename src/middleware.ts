@@ -222,7 +222,6 @@ export const config = {
     '/patient/:path*',
     '/provider/:path*',
     '/practitioner/:path*',
-    '/test/:path*',
     '/api/fhir/:path*'
   ],
 };
