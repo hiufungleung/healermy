@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
-import { Badge } from '@/components/common/Badge';
 
 interface Communication {
   id: string;
@@ -21,21 +20,6 @@ interface Communication {
     url?: string;
     valueDateTime?: string;
   }>;
-}
-
-interface ProviderNotification {
-  id: string;
-  type: 'new_patient' | 'appointment_request' | 'patient_message' | 'system' | 'lab_results';
-  title: string;
-  message: string;
-  timestamp: string;
-  read: boolean;
-  actionRequired?: boolean;
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
-  patientName?: string;
-  appointmentId?: string;
-  appointmentStatus?: string; // Add appointment status for Handle button logic
-  communicationId?: string; // Add this for Communication-based notifications
 }
 
 export default function ProviderNotificationsClient() {
@@ -73,8 +57,7 @@ export default function ProviderNotificationsClient() {
     );
   };
 
-  // Provider-specific notifications data
-  const [providerNotifications, setProviderNotifications] = useState<ProviderNotification[]>([]);
+  // Provider-specific notifications data (removed - not used in current implementation)
 
   // State to cache patient names
   const [patientNames, setPatientNames] = useState<Record<string, string>>({});
@@ -494,71 +477,35 @@ export default function ProviderNotificationsClient() {
     }
   };
 
-  // Function to mark provider notification as read
-  const markProviderNotificationAsRead = (id: string) => {
+  // Function to delete communication for provider (marks as deleted without affecting patient)
+  const deleteNotification = async (id: string) => {
     try {
-      // Update local state immediately
-      setProviderNotifications(prev =>
-        prev.map(n => n.id === id ? { ...n, read: true } : n)
-      );
+      // Mark the communication as deleted by provider using PATCH (adds extension)
+      // This way patient can still see it, but provider won't
+      const response = await fetch(`/api/fhir/communications/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          action: 'mark-deleted-by-provider'
+        }),
+      });
 
-      // Persist read status to localStorage
-      const newReadNotifications = new Set([...readNotifications, id]);
-      setReadNotifications(newReadNotifications);
-      localStorage.setItem('healermy-provider-read-notifications',
-        JSON.stringify(Array.from(newReadNotifications)));
-
-      // Dispatch event to update notification bell
-      window.dispatchEvent(new CustomEvent('messageUpdate'));
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  };
-
-  // Function to delete notification for provider (marks as deleted without affecting patient)
-  const deleteNotification = async (id: string, type: 'communication' | 'provider') => {
-    try {
-      if (type === 'communication') {
-        // Mark the communication as deleted by provider using PATCH (adds extension)
-        // This way patient can still see it, but provider won't
-        const response = await fetch(`/api/fhir/communications/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            action: 'mark-deleted-by-provider'
-          }),
-        });
-
-        if (!response.ok) {
-          console.error('Failed to mark communication as deleted:', response.status);
-          alert('Failed to delete notification. Please try again.');
-          return;
-        }
-
-        // Remove from local state immediately
-        setLocalCommunications(prev => prev.filter(comm => comm.id !== id));
-
-        // Clear selected message if it's the one being deleted
-        if (selectedMessage?.id === id) {
-          setSelectedMessage(null);
-        }
-
-        console.log(`Communication ${id} marked as deleted for provider`);
-      } else {
-        // For provider-specific notifications, add to hidden set
-        const newHiddenNotifications = new Set([...hiddenNotifications, id]);
-        setHiddenNotifications(newHiddenNotifications);
-
-        localStorage.setItem('healermy-provider-hidden-notifications',
-          JSON.stringify(Array.from(newHiddenNotifications)));
-
-        if (selectedMessage?.id === id) {
-          setSelectedMessage(null);
-        }
-
-        console.log(`Provider notification ${id} hidden`);
+      if (!response.ok) {
+        console.error('Failed to mark communication as deleted:', response.status);
+        alert('Failed to delete notification. Please try again.');
+        return;
       }
+
+      // Remove from local state immediately
+      setLocalCommunications(prev => prev.filter(comm => comm.id !== id));
+
+      // Clear selected message if it's the one being deleted
+      if (selectedMessage?.id === id) {
+        setSelectedMessage(null);
+      }
+
+      console.log(`Communication ${id} marked as deleted for provider`);
 
       // Dispatch event to update notification bell
       window.dispatchEvent(new CustomEvent('messageUpdate'));
@@ -591,56 +538,6 @@ export default function ProviderNotificationsClient() {
       );
 
       markAsRead(comm.id);
-    }
-  };
-
-  const getNotificationIcon = (type: ProviderNotification['type']) => {
-    switch (type) {
-      case 'appointment_request':
-        return (
-          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        );
-      case 'patient_message':
-        return (
-          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-          </svg>
-        );
-      case 'lab_results':
-        return (
-          <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-          </svg>
-        );
-      case 'new_patient':
-        return (
-          <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-          </svg>
-        );
-      case 'system':
-        return (
-          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        );
-      default:
-        return (
-          <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-          </svg>
-        );
-    }
-  };
-
-  const getPriorityBadge = (priority?: string) => {
-    switch (priority) {
-      case 'urgent':
-        return <Badge variant="danger" size="sm">Urgent</Badge>;
-      default:
-        return null;
     }
   };
 
@@ -677,27 +574,6 @@ export default function ProviderNotificationsClient() {
       return 'Invalid date';
     }
   };
-
-  // Filter notifications (exclude hidden ones) - memoized to prevent recalculation
-  const filteredProviderNotifications = useMemo(() => {
-    return providerNotifications.filter(notif => {
-      // Skip hidden notifications
-      if (hiddenNotifications.has(notif.id)) {
-        return false;
-      }
-
-      switch (activeFilter) {
-        case 'unread':
-          return !notif.read;
-        case 'action_required':
-          return notif.actionRequired;
-        case 'urgent':
-          return notif.priority === 'urgent';
-        default:
-          return true;
-      }
-    });
-  }, [providerNotifications, hiddenNotifications, activeFilter]);
 
   // Base filtered communications (excluding hidden and patient-facing messages, but not filtered by activeFilter)
   const baseCommunications = useMemo(() => {
@@ -763,16 +639,6 @@ export default function ProviderNotificationsClient() {
     if (appointmentRef?.startsWith('Appointment/')) {
       const appointmentId = appointmentRef.replace('Appointment/', '');
 
-      // Check if we already have a provider notification for this appointment
-      const hasProviderNotification = providerNotifications.some(notif =>
-        notif.appointmentId === appointmentId
-      );
-
-      // If we have a provider notification, skip this communication to avoid duplicates
-      if (hasProviderNotification) {
-        return acc;
-      }
-
       // Keep only the most recent communication for each appointment
       if (!acc[appointmentId] || new Date(comm.sent || 0) > new Date(acc[appointmentId].sent || 0)) {
         acc[appointmentId] = comm;
@@ -785,7 +651,7 @@ export default function ProviderNotificationsClient() {
     }, {} as Record<string, any>);
 
     return Object.values(groupedCommunications);
-  }, [baseCommunications, providerNotifications]);
+  }, [baseCommunications]);
 
   // Group communications by appointment ID to reduce duplicates - memoized (filtered version for display)
   const deduplicatedCommunications = useMemo(() => {
@@ -794,16 +660,6 @@ export default function ProviderNotificationsClient() {
     if (appointmentRef?.startsWith('Appointment/')) {
       const appointmentId = appointmentRef.replace('Appointment/', '');
 
-      // Check if we already have a provider notification for this appointment
-      const hasProviderNotification = filteredProviderNotifications.some(notif =>
-        notif.appointmentId === appointmentId
-      );
-
-      // If we have a provider notification, skip this communication to avoid duplicates
-      if (hasProviderNotification) {
-        return acc;
-      }
-
       // Keep only the most recent communication for each appointment
       if (!acc[appointmentId] || new Date(comm.sent || 0) > new Date(acc[appointmentId].sent || 0)) {
         acc[appointmentId] = comm;
@@ -816,17 +672,16 @@ export default function ProviderNotificationsClient() {
     }, {} as Record<string, any>);
 
     return Object.values(groupedCommunications);
-  }, [filteredCommunications, filteredProviderNotifications]);
+  }, [filteredCommunications]);
 
-  // Combine and sort all notifications by timestamp
-  const allFilteredItems = [
-    ...deduplicatedCommunications.map(comm => ({ type: 'communication' as const, data: comm })),
-    ...filteredProviderNotifications.map(notif => ({ type: 'provider' as const, data: notif }))
-  ].sort((a, b) => {
-    const timeA = a.type === 'communication' ? a.data.sent : a.data.timestamp;
-    const timeB = b.type === 'communication' ? b.data.sent : b.data.timestamp;
-    return new Date(timeB || 0).getTime() - new Date(timeA || 0).getTime();
-  });
+  // Sort communications by timestamp
+  const allFilteredItems = deduplicatedCommunications
+    .map(comm => ({ type: 'communication' as const, data: comm }))
+    .sort((a, b) => {
+      const timeA = a.data.sent;
+      const timeB = b.data.sent;
+      return new Date(timeB || 0).getTime() - new Date(timeA || 0).getTime();
+    });
 
   // Limit displayed items to displayCount
   const displayedItems = allFilteredItems.slice(0, displayCount);
@@ -839,29 +694,27 @@ export default function ProviderNotificationsClient() {
 
   // Calculate counts based on base deduplicated communications (excluding hidden ones) - memoized
   // Use baseDeduplicatedCommunications to ensure total count is not affected by activeFilter
-  const { visibleCommunications, visibleProviderNotifications, unreadCount, actionRequiredCount, urgentCount, totalCount } = useMemo(() => {
+  const { visibleCommunications, unreadCount, actionRequiredCount, urgentCount, totalCount } = useMemo(() => {
     const visibleComms = baseDeduplicatedCommunications.filter(comm => !hiddenNotifications.has(comm.id));
-    const visibleProviderNotifs = providerNotifications.filter(notif => !hiddenNotifications.has(notif.id));
 
     const unreadMessages = visibleComms.filter(comm => !isMessageRead(comm));
-    const unreadCnt = unreadMessages.length + visibleProviderNotifs.filter(notif => !notif.read).length;
+    const unreadCnt = unreadMessages.length;
 
-    // Count communications that need handling + provider notifications that need action
-    const commsNeedingAction = visibleComms.filter(comm => needsHandling(comm)).length;
-    const actionRequiredCnt = visibleProviderNotifs.filter(notif => notif.actionRequired).length + commsNeedingAction;
+    // Count communications that need handling
+    const actionRequiredCnt = visibleComms.filter(comm => needsHandling(comm)).length;
 
-    const urgentCnt = visibleProviderNotifs.filter(notif => notif.priority === 'urgent').length;
-    const totalCnt = visibleComms.length + visibleProviderNotifs.length;
+    // Communications don't have priority field
+    const urgentCnt = 0;
+    const totalCnt = visibleComms.length;
 
     return {
       visibleCommunications: visibleComms,
-      visibleProviderNotifications: visibleProviderNotifs,
       unreadCount: unreadCnt,
       actionRequiredCount: actionRequiredCnt,
       urgentCount: urgentCnt,
       totalCount: totalCnt
     };
-  }, [baseDeduplicatedCommunications, providerNotifications, hiddenNotifications, readNotifications, appointmentStatuses]);
+  }, [baseDeduplicatedCommunications, hiddenNotifications, readNotifications, appointmentStatuses]);
 
   // Debug logging - only when unreadCount changes
   useEffect(() => {
@@ -890,18 +743,15 @@ export default function ProviderNotificationsClient() {
         }))
       );
 
-      // Mark all provider notifications as read and persist to localStorage
-      const unreadProviderNotifications = providerNotifications.filter(n => !n.read);
+      // Persist to localStorage
       const allNotificationIds = new Set([
         ...readNotifications,
-        ...unreadProviderNotifications.map(n => n.id)
+        ...unreadMessages.map(comm => comm.id)
       ]);
 
       setReadNotifications(allNotificationIds);
       localStorage.setItem('healermy-provider-read-notifications',
         JSON.stringify(Array.from(allNotificationIds)));
-
-      setProviderNotifications(prev => prev.map(n => ({ ...n, read: true })));
 
       // Mark all as read on server using existing API
       unreadMessages.forEach(comm => {
@@ -1033,110 +883,8 @@ export default function ProviderNotificationsClient() {
           </Card>
         ) : (
           displayedItems.map((item) => {
-            if (item.type === 'provider') {
-              const notif = item.data;
-
-              return (
-                <Card
-                  key={notif.id}
-                  className={`hover:shadow-md transition-shadow ${
-                    !notif.read ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
-                  } ${notif.priority === 'urgent' ? 'border-l-4 border-l-red-500 bg-red-50/30' : ''}`}
-                >
-                  <div className="flex items-start space-x-4">
-                    {/* Icon */}
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
-                        {getNotificationIcon(notif.type)}
-                      </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="mb-2">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
-                              <div className="flex items-center space-x-2 mb-1 sm:mb-0">
-                                <h3 className={`font-semibold ${!notif.read ? 'text-text-primary' : 'text-text-secondary'}`}>
-                                  {notif.title}
-                                </h3>
-                                {!notif.read && (
-                                  <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
-                                )}
-                              </div>
-                              <div className="flex flex-wrap gap-1">
-                                {getPriorityBadge(notif.priority)}
-                                {notif.actionRequired && (
-                                  <Badge variant="warning" size="sm">Action Required</Badge>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          {notif.patientName && (
-                            <div className="text-sm text-text-secondary mb-2">
-                              Patient: {notif.patientName}
-                            </div>
-                          )}
-                          <p className="text-text-secondary text-sm mb-2">
-                            {notif.message.substring(0, 150)}
-                            {notif.message.length > 150 && '...'}
-                          </p>
-                          <p className="text-xs text-text-secondary">
-                            {formatDate(notif.timestamp)}
-                          </p>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 ml-2 sm:ml-4 flex-shrink-0">
-                          {!notif.read && (
-                            <button
-                              onClick={() => markProviderNotificationAsRead(notif.id)}
-                              className="text-sm text-primary hover:underline"
-                            >
-                              Mark as Read
-                            </button>
-                          )}
-                          <button
-                            onClick={() => deleteNotification(notif.id, 'provider')}
-                            className="text-sm text-text-secondary hover:text-red-600"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Single Action Button - Only show for notifications that need action and are pending */}
-                      {notif.actionRequired && notif.appointmentStatus === 'pending' && (
-                        <div className="pt-3 border-t border-gray-100 mt-3">
-                          <div className="flex justify-center">
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={() => {
-                                // Mark as read when handling
-                                markProviderNotificationAsRead(notif.id);
-                                // Navigate to appointments page with focus on specific appointment
-                                if (notif.appointmentId) {
-                                  window.location.href = `/provider/appointments?highlight=${notif.appointmentId}`;
-                                } else {
-                                  // Fallback to appointments page
-                                  window.location.href = '/provider/appointments';
-                                }
-                              }}
-                            >
-                              Handle Appointment
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              );
-            } else {
-              // Communication item (from FHIR API)
-              const comm = item.data;
+            // Communication item (from FHIR API)
+            const comm = item.data;
               const isExpanded = selectedMessage?.id === comm.id;
 
               return (
@@ -1273,7 +1021,7 @@ export default function ProviderNotificationsClient() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteNotification(comm.id, 'communication');
+                              deleteNotification(comm.id);
                             }}
                             className="text-sm text-text-secondary hover:text-red-600"
                           >
@@ -1356,7 +1104,6 @@ export default function ProviderNotificationsClient() {
                   </div>
                 </Card>
               );
-            }
           })
         )}
       </div>
