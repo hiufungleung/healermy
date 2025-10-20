@@ -1,41 +1,34 @@
 import { cookies } from 'next/headers';
-import type { AuthSession, TokenData, SessionData } from '@/types/auth';
+import type { AuthSession, SessionData } from '@/types/auth';
 import { decrypt } from '@/library/auth/encryption';
-import { SESSION_COOKIE_NAME, TOKEN_COOKIE_NAME } from '@/library/auth/config';
+import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
 
 /**
- * Extract and decrypt session from HTTP-only cookies
+ * Extract and decrypt session from HTTP-only cookie
  * This is the ONLY secure way to access session data in API routes
  * Never expose session data in response headers or client-side code
+ * @returns AuthSession for backward compatibility (only contains SessionData fields, deprecated fields are undefined)
  */
 export async function getSessionFromCookies(): Promise<AuthSession> {
   const cookieStore = await cookies();
   const tokenCookie = cookieStore.get(TOKEN_COOKIE_NAME);
-  const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
 
-  if (!tokenCookie || !sessionCookie) {
+  if (!tokenCookie) {
     throw new Error('No session found - authentication required');
   }
 
   try {
-    // Decrypt both cookie parts (same encryption as middleware)
-    const decryptedTokenString = await decrypt(tokenCookie.value);
-    const decryptedSessionString = await decrypt(sessionCookie.value);
-
-    const tokenData: TokenData = JSON.parse(decryptedTokenString);
-    const sessionMetadata: SessionData = JSON.parse(decryptedSessionString);
-
-    // Combine into single session object for compatibility
-    const session: AuthSession = {
-      ...tokenData,
-      ...sessionMetadata
-    };
+    // Decrypt session cookie
+    const decryptedSessionString = await decrypt(tokenCookie.value);
+    const session: SessionData = JSON.parse(decryptedSessionString);
 
     if (!session.accessToken || !session.fhirBaseUrl) {
       throw new Error('Incomplete session data');
     }
 
-    return session;
+    // Return as AuthSession for backward compatibility
+    // Note: Only SessionData fields are populated, deprecated fields are undefined
+    return session as AuthSession;
   } catch (error) {
     throw new Error('Session decryption failed - invalid or corrupted session');
   }

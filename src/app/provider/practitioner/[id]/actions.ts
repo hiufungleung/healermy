@@ -2,8 +2,8 @@
 
 import { cookies } from 'next/headers';
 import { decrypt } from '@/library/auth/encryption';
-import { SESSION_COOKIE_NAME, TOKEN_COOKIE_NAME } from '@/library/auth/config';
-import type { AuthSession, TokenData, SessionData } from '@/types/auth';
+import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
+import type { AuthSession, SessionData } from '@/types/auth';
 
 // Server action that gets session data immediately - no API calls for fast response
 export async function getBasicSessionData(): Promise<{
@@ -14,39 +14,29 @@ export async function getBasicSessionData(): Promise<{
     // Get session from encrypted HTTP-only cookies
     const cookieStore = await cookies();
     const tokenCookie = cookieStore.get(TOKEN_COOKIE_NAME);
-    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
 
-    if (!tokenCookie || !sessionCookie) {
+    if (!tokenCookie) {
       return {
         session: null,
         error: 'No session found'
       };
     }
 
-    // Decrypt both cookie parts
-    const decryptedTokenString = await decrypt(tokenCookie.value);
-    const decryptedSessionString = await decrypt(sessionCookie.value);
-
-    const tokenData: TokenData = JSON.parse(decryptedTokenString);
-    const sessionMetadata: SessionData = JSON.parse(decryptedSessionString);
-
-    // Combine into single session object
-    const session: AuthSession = {
-      ...tokenData,
-      ...sessionMetadata
-    };
+    // Decrypt cookie
+    const decryptedSessionString = await decrypt(tokenCookie.value);
+    const session: SessionData = JSON.parse(decryptedSessionString);
 
     // Additional validation for required fields
     if (!session.accessToken || !session.fhirBaseUrl) {
       return {
-        session,
+        session: session as AuthSession,
         error: 'Incomplete session data'
       };
     }
 
     // Return session immediately - no API calls for fastest response
     return {
-      session
+      session: session as AuthSession
     };
   } catch (error) {
     console.error('Error getting basic session data:', error);

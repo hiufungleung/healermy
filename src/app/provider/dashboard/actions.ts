@@ -2,8 +2,8 @@
 
 import { cookies } from 'next/headers';
 import { decrypt } from '@/library/auth/encryption';
-import { SESSION_COOKIE_NAME, TOKEN_COOKIE_NAME } from '@/library/auth/config';
-import type { AuthSession, TokenData, SessionData } from '@/types/auth';
+import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
+import type { AuthSession, SessionData } from '@/types/auth';
 import type { Practitioner } from '@/types/fhir';
 
 // Fast session-only function (no FHIR API calls for immediate page render)
@@ -15,38 +15,28 @@ export async function getProviderSessionOnly(): Promise<{
     // Get session from encrypted HTTP-only cookies
     const cookieStore = await cookies();
     const tokenCookie = cookieStore.get(TOKEN_COOKIE_NAME);
-    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
 
-    if (!tokenCookie || !sessionCookie) {
+    if (!tokenCookie) {
       return {
         session: null,
         error: 'No session found'
       };
     }
 
-    // Decrypt both cookie parts
-    const decryptedTokenString = await decrypt(tokenCookie.value);
-    const decryptedSessionString = await decrypt(sessionCookie.value);
-
-    const tokenData: TokenData = JSON.parse(decryptedTokenString);
-    const sessionMetadata: SessionData = JSON.parse(decryptedSessionString);
-
-    // Combine into single session object
-    const session: AuthSession = {
-      ...tokenData,
-      ...sessionMetadata
-    };
+    // Decrypt cookie
+    const decryptedSessionString = await decrypt(tokenCookie.value);
+    const session: SessionData = JSON.parse(decryptedSessionString);
 
     // Additional validation for required fields
     if (!session.accessToken || !session.fhirBaseUrl) {
       return {
-        session,
+        session: session as AuthSession,
         error: 'Incomplete session data'
       };
     }
 
     return {
-      session
+      session: session as AuthSession
     };
   } catch (error) {
     console.error('Error getting provider session data:', error);
@@ -68,9 +58,8 @@ export async function getProviderDashboardData(): Promise<{
     // Get session from encrypted HTTP-only cookies
     const cookieStore = await cookies();
     const tokenCookie = cookieStore.get(TOKEN_COOKIE_NAME);
-    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
 
-    if (!tokenCookie || !sessionCookie) {
+    if (!tokenCookie) {
       return {
         provider: null,
         session: null,
@@ -79,24 +68,15 @@ export async function getProviderDashboardData(): Promise<{
       };
     }
 
-    // Decrypt both cookie parts
-    const decryptedTokenString = await decrypt(tokenCookie.value);
-    const decryptedSessionString = await decrypt(sessionCookie.value);
-
-    const tokenData: TokenData = JSON.parse(decryptedTokenString);
-    const sessionMetadata: SessionData = JSON.parse(decryptedSessionString);
-
-    // Combine into single session object
-    const session: AuthSession = {
-      ...tokenData,
-      ...sessionMetadata
-    };
+    // Decrypt cookie
+    const decryptedSessionString = await decrypt(tokenCookie.value);
+    const session: SessionData = JSON.parse(decryptedSessionString);
 
     // Additional validation for required fields
     if (!session.accessToken || !session.fhirBaseUrl) {
       return {
         provider: null,
-        session,
+        session: session as AuthSession,
         providerName: 'Provider',
         error: 'Incomplete session data'
       };
@@ -107,10 +87,10 @@ export async function getProviderDashboardData(): Promise<{
     let providerName = 'Provider';
 
     // Try to get provider name from fhirUser
-    if (session.fhirUser) {
+    if ((session as AuthSession).fhirUser) {
       try {
         // Extract practitioner ID from fhirUser URL
-        const practitionerMatch = session.fhirUser.match(/\/Practitioner\/(.+)$/);
+        const practitionerMatch = (session as AuthSession).fhirUser?.match(/\/Practitioner\/(.+)$/);
         if (practitionerMatch) {
           const practitionerId = practitionerMatch[1];
 
@@ -141,16 +121,16 @@ export async function getProviderDashboardData(): Promise<{
 
     // If we still don't have a name, try to use session.user or username
     if (providerName === 'Provider') {
-      if (session.username && session.username !== 'portal') {
-        providerName = session.username;
-      } else if (session.user) {
-        providerName = `Provider ${session.user}`;
+      if ((session as AuthSession).username && (session as AuthSession).username !== 'portal') {
+        providerName = (session as AuthSession).username!;
+      } else if ((session as AuthSession).user) {
+        providerName = `Provider ${(session as AuthSession).user}`;
       }
     }
 
     return {
       provider: providerData,
-      session,
+      session: session as AuthSession,
       providerName
     };
   } catch (error) {

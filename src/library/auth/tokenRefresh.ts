@@ -14,7 +14,16 @@ interface TokenResponse {
   fhirUser?: string;
 }
 
-export async function refreshAccessToken(refreshToken: string, tokenUrl: string, clientId: string, clientSecret: string): Promise<TokenResponse> {
+export async function refreshAccessToken(refreshToken: string, tokenUrl: string, role: 'patient' | 'provider' | 'practitioner'): Promise<TokenResponse> {
+  // Retrieve client credentials from environment variables
+  // All roles use the same credentials (single FHIR app in MELD sandbox)
+  const clientId = process.env.CLIENT_ID || '';
+  const clientSecret = process.env.CLIENT_SECRET || '';
+
+  if (!clientId || !clientSecret) {
+    throw new Error(`Missing client credentials (CLIENT_ID or CLIENT_SECRET not set in environment)`);
+  }
+
   const tokenParams = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
