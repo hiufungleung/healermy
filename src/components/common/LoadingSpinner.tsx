@@ -2,7 +2,7 @@
 
 import React from 'react';
 import styled from 'styled-components';
-import { cn } from '@/lib/utils';
+import { cn } from '@/library/shadcn-utils';
 import { Skeleton } from '@/components/common/ContentSkeleton';
 
 interface LoadingSpinnerProps {

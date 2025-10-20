@@ -55,14 +55,14 @@ export default async function ProviderAppointmentsPage() {
 
     // Optimized: Single FHIR query for appointments in the 7-day period
     // This fetches all appointments (regardless of status) within the date range
+    // FHIR date parameter uses 'ge' (>=) and 'le' (<=) prefixes for ranges
     const periodResults = await searchAppointments(
       token,
       session.fhirBaseUrl,
       undefined, // patientId
       undefined, // practitionerId (fetch ALL - clinic perspective)
       {
-        'date-from': periodStart,
-        'date-to': periodEnd,
+        date: [`ge${periodStart}`, `le${periodEnd}`],
         _count: 300 // Higher count to ensure we get all appointments in the period
       }
     );

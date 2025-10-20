@@ -7,6 +7,7 @@ import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { AppointmentSkeleton } from '@/components/common/ContentSkeleton';
 import { ProviderAppointmentDetailModal } from '@/components/provider/ProviderAppointmentDetailModal';
+import { formatAppointmentDateTime } from '@/library/timezone';
 import type { Appointment } from '@/types/fhir';
 
 interface AppointmentStats {
@@ -104,17 +105,6 @@ export default function ProviderAppointmentsClient({
     }
 
     return 'Unknown Practitioner';
-  };
-
-  const formatDateTime = (isoString: string) => {
-    return new Date(isoString).toLocaleString(navigator.language, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
   };
 
   const formatDuration = (start: string, end: string) => {
@@ -549,7 +539,7 @@ export default function ProviderAppointmentsClient({
                 <div className="flex items-center space-x-4">
                   <div className="text-center min-w-[100px]">
                     <div className="font-semibold text-primary">
-                      {appointment.start ? formatDateTime(appointment.start) : 'TBD'}
+                      {appointment.start ? formatAppointmentDateTime(appointment.start) : 'TBD'}
                     </div>
                     <div className="text-xs text-text-secondary">
                       {appointment.start && appointment.end

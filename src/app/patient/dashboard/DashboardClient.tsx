@@ -309,7 +309,7 @@ export default function DashboardClient({
         setIsEncounterPlanned(encounterPlanned);
 
         // Calculate wait time based on encounter status combinations
-        const { ENCOUNTER_PLANNED_WAIT_TIME_MINUTES } = await import('@/lib/queueCalculation');
+        const { ENCOUNTER_PLANNED_WAIT_TIME_MINUTES } = await import('@/library/queueCalculation');
 
         let waitTimeMinutes = 0;
         let patientsAhead = 0;

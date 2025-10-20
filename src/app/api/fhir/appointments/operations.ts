@@ -18,8 +18,7 @@ export async function searchAppointments(
   options?: string | {
     status?: string;
     _count?: number;
-    'date-from'?: string;
-    'date-to'?: string;
+    date?: string | string[]; // FHIR date parameter: single value or array for ranges (e.g., ['ge2025-01-01', 'le2025-12-31'])
     _id?: string; // Comma-separated list of IDs for batch fetch
   },
   dateFrom?: string,
@@ -50,7 +49,12 @@ export async function searchAppointments(
         if (key === 'patient' || key === 'practitioner') {
           return;
         }
-        queryParams.append(key, String(value));
+        // Handle array values (e.g., date: ['ge2025-01-01', 'le2025-12-31'])
+        if (Array.isArray(value)) {
+          value.forEach(v => queryParams.append(key, String(v)));
+        } else {
+          queryParams.append(key, String(value));
+        }
       }
     });
   }

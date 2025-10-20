@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { AppointmentSkeleton } from '@/components/common/ContentSkeleton';
 import { PatientAppointmentCard } from '@/components/patient/PatientAppointmentCard';
-import { calculateQueuePosition, formatWaitTime, getQueueStatusMessage } from '@/lib/queueCalculation';
+import { calculateQueuePosition, formatWaitTime, getQueueStatusMessage } from '@/library/queueCalculation';
 import type { SessionData } from '@/types/auth';
 import type { AppointmentWithPractitionerDetails } from '@/library/appointmentDetailInfo';
 import type { Encounter } from '@/types/fhir';

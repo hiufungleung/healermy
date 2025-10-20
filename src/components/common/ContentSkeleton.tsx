@@ -1,6 +1,6 @@
 import React from 'react';
 import { Skeleton as ShadcnSkeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
+import { cn } from '@/library/shadcn-utils';
 
 /**
  * Basic Skeleton wrapper component

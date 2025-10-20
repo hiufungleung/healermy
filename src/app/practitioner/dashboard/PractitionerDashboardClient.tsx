@@ -61,7 +61,7 @@ export default function PractitionerDashboardClient({
 
       // Fetch appointments for this practitioner only
       const response = await fetch(
-        `/api/fhir/appointments?practitioner=${practitionerId}&date-from=${today}&date-to=${weekEnd}`,
+        `/api/fhir/appointments?practitioner=${practitionerId}&date=ge${today}&date=le${weekEnd}`,
         { credentials: 'include' }
       );
 

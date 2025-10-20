@@ -3,7 +3,7 @@ import { SessionData } from '@/types/auth';
 import { decrypt, encrypt } from '@/library/auth/encryption';
 import { refreshAccessToken } from '@/library/auth/tokenRefresh';
 import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
-import { getPublicBaseUrl } from '@/library/server-utils';
+import { getPublicBaseUrl } from '@/library/request-utils';
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;

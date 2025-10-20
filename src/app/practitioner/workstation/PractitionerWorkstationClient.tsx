@@ -46,7 +46,7 @@ export default function PractitionerWorkstationClient({
 
       // Fetch today's appointments for this practitioner
       const appointmentsResponse = await fetch(
-        `/api/fhir/appointments?practitioner=${practitionerId}&date-from=${today}&date-to=${endOfDayISO}`,
+        `/api/fhir/appointments?practitioner=${practitionerId}&date=ge${today}&date=le${endOfDayISO}`,
         { credentials: 'include' }
       );
 

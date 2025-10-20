@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPublicBaseUrl } from '@/library/server-utils';
+import { getPublicBaseUrl } from '@/library/request-utils';
 
 export async function GET(request: NextRequest) {
   try {

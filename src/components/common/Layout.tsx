@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { User, LogOut, Home, Calendar, Users } from 'lucide-react';
 import { Toaster } from '@/components/ui/toaster';
-import { MOBILE_BREAKPOINT } from '@/lib/breakpoints';
+import { MOBILE_BREAKPOINT } from '@/library/breakpoints';
 
 interface LayoutProps {
   children: React.ReactNode;

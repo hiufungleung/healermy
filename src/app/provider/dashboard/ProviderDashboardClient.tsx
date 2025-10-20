@@ -62,7 +62,7 @@ export default function ProviderDashboardClient({
       const weekEnd = weekFromNow.toISOString().split('T')[0];
 
       const [allAppointmentsResponse, pendingAppointmentsResponse, todayAppointmentsResponse] = await Promise.all([
-        fetch(`/api/fhir/appointments?date-from=${today}&date-to=${weekEnd}`, {
+        fetch(`/api/fhir/appointments?date=ge${today}&date=le${weekEnd}`, {
           credentials: 'include',
         }),
         fetch(`/api/fhir/appointments?status=pending&_count=5`, {

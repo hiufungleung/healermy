@@ -1,5 +1,5 @@
 import * as React from "react"
-import { MOBILE_BREAKPOINT, MEDIA_QUERIES } from "@/lib/breakpoints"
+import { MOBILE_BREAKPOINT, MEDIA_QUERIES } from "@/library/breakpoints"
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
