@@ -5,13 +5,117 @@ import { Layout } from '@/components/common/Layout';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
-import { useAuth } from '@/components/auth/AuthProvider';
 import type { Organization } from '@/types/fhir';
 
+// Static mock data for clinic profile (god perspective - no real API)
+const mockOrganizationData: Organization = {
+  resourceType: 'Organization',
+  id: 'healermy-clinic-1',
+  active: true,
+  name: 'healerMy Health Center',
+  alias: ['healerMy Clinic', 'healerMy Medical Group'],
+  type: [
+    {
+      coding: [
+        {
+          system: 'http://terminology.hl7.org/CodeSystem/organization-type',
+          code: 'prov',
+          display: 'Healthcare Provider'
+        }
+      ],
+      text: 'Primary Care Clinic'
+    }
+  ],
+  telecom: [
+    {
+      system: 'phone',
+      value: '+1 (555) 123-4567',
+      use: 'work'
+    },
+    {
+      system: 'email',
+      value: 'info@healermy.com',
+      use: 'work'
+    },
+    {
+      system: 'url',
+      value: 'https://www.healermy.com',
+      use: 'work'
+    }
+  ],
+  address: [
+    {
+      use: 'work',
+      type: 'both',
+      text: '123 Healthcare Drive, Medical District, Sydney NSW 2000, Australia',
+      line: ['123 Healthcare Drive', 'Suite 100'],
+      city: 'Sydney',
+      state: 'NSW',
+      postalCode: '2000',
+      country: 'Australia'
+    }
+  ],
+  contact: [
+    {
+      purpose: {
+        coding: [
+          {
+            system: 'http://terminology.hl7.org/CodeSystem/contactentity-type',
+            code: 'ADMIN',
+            display: 'Administrative'
+          }
+        ]
+      },
+      name: {
+        text: 'Dr. Sarah Johnson',
+        family: 'Johnson',
+        given: ['Sarah']
+      },
+      telecom: [
+        {
+          system: 'phone',
+          value: '+1 (555) 123-4501',
+          use: 'work'
+        },
+        {
+          system: 'email',
+          value: 'sarah.johnson@healermy.com',
+          use: 'work'
+        }
+      ]
+    },
+    {
+      purpose: {
+        coding: [
+          {
+            system: 'http://terminology.hl7.org/CodeSystem/contactentity-type',
+            code: 'BILL',
+            display: 'Billing'
+          }
+        ]
+      },
+      name: {
+        text: 'Finance Department'
+      },
+      telecom: [
+        {
+          system: 'phone',
+          value: '+1 (555) 123-4502',
+          use: 'work'
+        },
+        {
+          system: 'email',
+          value: 'billing@healermy.com',
+          use: 'work'
+        }
+      ]
+    }
+  ]
+};
+
 export default function ClinicProfile() {
-  const { session } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'contact' | 'settings'>('overview');
-  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [organization] = useState<Organization>(mockOrganizationData);
   const [loading, setLoading] = useState(true);
 
   // Settings state
@@ -20,34 +124,12 @@ export default function ClinicProfile() {
   const [appointmentReminders, setAppointmentReminders] = useState(true);
 
   useEffect(() => {
-    fetchOrganizationData();
-  }, []);
-
-  const fetchOrganizationData = async () => {
-    setLoading(true);
-    try {
-      // Fetch HealerMy Clinic organization by name
-      const response = await fetch(`/api/fhir/organizations?name=HealerMy Clinic&active=true&_count=1`, {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Organization data:', data);
-        if (data.entry && data.entry.length > 0) {
-          setOrganization(data.entry[0].resource);
-        } else {
-          console.warn('No organizations found in FHIR server');
-        }
-      } else {
-        console.error('Failed to fetch organization:', response.status);
-      }
-    } catch (error) {
-      console.error('Error fetching organization data:', error);
-    } finally {
+    // Simulate loading for smoother UX
+    const timer = setTimeout(() => {
       setLoading(false);
-    }
-  };
+    }, 300);
+    return () => clearTimeout(timer);
+  }, []);
 
   const getOrganizationName = () => {
     return organization?.name || 'Healthcare Clinic';
@@ -105,7 +187,7 @@ export default function ClinicProfile() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary mb-2">Clinic Profile</h1>
+          <h1 className="text-xl sm:text-2xl sm:text-2xl font-bold text-text-primary mb-2">Clinic Profile (Demo)</h1>
           <p className="text-text-secondary">Manage your clinic information and settings</p>
         </div>
 

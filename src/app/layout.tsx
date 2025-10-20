@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "HealerMy - Healthcare Appointment Management",
-    template: "%s | HealerMy"
+    default: "healerMy - Healthcare Appointment Management",
+    template: "%s | healerMy"
   },
   description: "FHIR-based healthcare appointment management system for patients and providers",
   icons: {

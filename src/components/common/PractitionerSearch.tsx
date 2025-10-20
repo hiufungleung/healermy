@@ -122,7 +122,7 @@ export function PractitionerSearch({
   return (
     <div className="mb-6">
       {/* Search Tips */}
-      <div className="mb-8 pb-6 border-b border-gray-200">
+      <div className="mb-4 pb-4 border-b border-gray-200">
         <div className="flex items-center mb-2">
           <svg className="w-5 h-5 text-gray-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -131,28 +131,26 @@ export function PractitionerSearch({
         </div>
         {showSubtitle && (
           <p className="text-gray-600 text-sm">
-            Search by doctor&apos;s name, location, or practitioner ID. Use multiple fields to narrow your results.
+            Search by doctor&apos;s fields. Use commas for multiple values (No space between values, e.g., Postcode: &quot;97253,97254&quot;).
           </p>
         )}
       </div>
 
-      {/* FHIR Search Filters */}
+      {/* FHIR Search Filters - Single unified grid that flows horizontally then vertically */}
       {showAdvancedFilters && (
-        <div className="space-y-4 mb-4">
-          {/* Name Fields Row - Always 2 columns on mobile+ */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
             {/* Given Name */}
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
                 Given Name
-                <span className="text-xs text-gray-500 ml-1">(Doctor&apos;s first name)</span>
               </label>
               <Input
                 type="text"
-                placeholder="e.g., John, Sarah, Michael..."
+                placeholder="First Name"
                 value={givenName}
                 onChange={(e) => setGivenName(e.target.value)}
-                className="min-h-[44px]"
+                className="text-sm"
               />
             </div>
 
@@ -160,71 +158,58 @@ export function PractitionerSearch({
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
                 Family Name
-                <span className="text-xs text-gray-500 ml-1">(Doctor&apos;s last name)</span>
               </label>
               <Input
                 type="text"
-                placeholder="e.g., Smith, Johnson, Williams..."
+                placeholder="Last Name"
                 value={familyName}
                 onChange={(e) => setFamilyName(e.target.value)}
-                className="min-h-[44px]"
+                className="text-sm"
               />
             </div>
-          </div>
 
-          {/* Contact Fields Row - 2 columns on mobile, responsive on larger screens */}
-          {(showPhoneField || showOracleIdField) && (
-            <div className="grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4">
-              {/* Phone */}
-              {showPhoneField && (
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">
-                    Phone Number
-                    <span className="text-xs text-gray-500 ml-1">(Clinic contact)</span>
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="e.g., (555) 123-4567 or +1234567890"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="min-h-[44px]"
-                  />
-                </div>
-              )}
+            {/* Phone */}
+            {showPhoneField && (
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Phone Number
+                </label>
+                <Input
+                  type="text"
+                  placeholder="123456789"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="text-sm"
+                />
+              </div>
+            )}
 
-              {/* Practitioner ID */}
-              {showOracleIdField && (
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">
-                    Practitioner ID
-                    <span className="text-xs text-gray-500 ml-1">(Oracle FHIR ID)</span>
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="e.g., 12345 or ABC123-DEF456"
-                    value={practitionerId}
-                    onChange={(e) => setPractitionerId(e.target.value)}
-                    className="min-h-[44px]"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Location Fields Row - Responsive based on screen size */}
-          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            {/* Practitioner ID */}
+            {showOracleIdField && (
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Practitioner ID
+                </label>
+                <Input
+                  type="text"
+                  placeholder="Logical ID"
+                  value={practitionerId}
+                  onChange={(e) => setPractitionerId(e.target.value)}
+                  className="text-sm"
+                />
+              </div>
+            )}
             {/* Address City */}
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
                 City
-                <span className="text-xs text-gray-500 ml-1">(Clinic location)</span>
               </label>
               <Input
                 type="text"
-                placeholder="e.g., Brisbane, Sydney, Melbourne"
+                placeholder="City"
                 value={addressCity}
                 onChange={(e) => setAddressCity(e.target.value)}
-                className="min-h-[44px]"
+                className="text-sm"
               />
             </div>
 
@@ -232,29 +217,27 @@ export function PractitionerSearch({
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
                 State/Province
-                <span className="text-xs text-gray-500 ml-1">(State or region)</span>
               </label>
               <Input
                 type="text"
-                placeholder="e.g., QLD, NSW, VIC"
+                placeholder="State or Province"
                 value={addressState}
                 onChange={(e) => setAddressState(e.target.value)}
-                className="min-h-[44px]"
+                className="text-sm"
               />
             </div>
 
             {/* Address Postal Code */}
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
-                Postal Code
-                <span className="text-xs text-gray-500 ml-1">(ZIP/postal code)</span>
+                Postcode
               </label>
               <Input
                 type="text"
-                placeholder="e.g., 4000, 2000, 3000"
+                placeholder="Zip Code"
                 value={addressPostalCode}
                 onChange={(e) => setAddressPostalCode(e.target.value)}
-                className="min-h-[44px]"
+                className="text-sm"
               />
             </div>
 
@@ -262,14 +245,13 @@ export function PractitionerSearch({
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
                 Country
-                <span className="text-xs text-gray-500 ml-1">(Nation)</span>
               </label>
               <Input
                 type="text"
-                placeholder="e.g., Australia, USA, Canada"
+                placeholder="Country"
                 value={addressCountry}
                 onChange={(e) => setAddressCountry(e.target.value)}
-                className="min-h-[44px]"
+                className="text-sm"
               />
             </div>
           </div>

@@ -106,34 +106,28 @@ export default function PractitionerManagement() {
       
       // Add FHIR-compliant search parameters
       if (searchFilters.givenName && searchFilters.givenName.length >= 2) {
-        params.append('givenName', searchFilters.givenName);
+        params.append('given', searchFilters.givenName);
       }
       if (searchFilters.familyName && searchFilters.familyName.length >= 2) {
-        params.append('familyName', searchFilters.familyName);
+        params.append('family', searchFilters.familyName);
       }
       if (searchFilters.phone) {
         params.append('phone', searchFilters.phone);
       }
       if (searchFilters.addressCity) {
-        params.append('addressCity', searchFilters.addressCity);
+        params.append('address-city', searchFilters.addressCity);
       }
       if (searchFilters.addressState) {
-        params.append('addressState', searchFilters.addressState);
+        params.append('address-state', searchFilters.addressState);
       }
       if (searchFilters.addressPostalCode) {
-        params.append('addressPostalCode', searchFilters.addressPostalCode);
+        params.append('address-postalcode', searchFilters.addressPostalCode);
       }
       if (searchFilters.addressCountry) {
-        params.append('addressCountry', searchFilters.addressCountry);
+        params.append('address-country', searchFilters.addressCountry);
       }
       if (searchFilters.practitionerId) {
-        params.append('practitionerId', searchFilters.practitionerId);
-      }
-      
-      // Add pagination - 10 practitioners per page for faster loading
-      params.append('count', '10');
-      if (page > 1) {
-        params.append('page', page.toString());
+        params.append('_id', searchFilters.practitionerId);
       }
       
       const response = await fetch(`/api/fhir/practitioners?${params.toString()}`, {
@@ -224,13 +218,13 @@ export default function PractitionerManagement() {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="mb-6">
           <div className="flex justify-between items-center">
-            <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary">
+            <h1 className="text-xl sm:text-2xl sm:text-2xl font-bold text-text-primary">
               Practitioner
             </h1>
-            <Button
+            {/* <Button
               variant="primary"
               onClick={handleCreateNew}
               className="flex items-center"
@@ -239,7 +233,7 @@ export default function PractitionerManagement() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
               Create New Practitioner
-            </Button>
+            </Button> */}
           </div>
         </div>
 

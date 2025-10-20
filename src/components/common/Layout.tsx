@@ -97,7 +97,7 @@ export function Layout({ children, patientName, providerName, practitionerName }
     : isProvider
     ? [
         { href: '/provider/dashboard', label: 'Dashboard', icon: Home },
-        { href: '/provider/practitioner', label: 'Manage Practitioners', icon: Users },
+        { href: '/provider/practitioner', label: 'Practitioners', icon: Users },
         { href: '/provider/appointments', label: 'Appointments', icon: Calendar },
       ]
     : isPractitioner
@@ -183,12 +183,12 @@ export function Layout({ children, patientName, providerName, practitionerName }
               {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
                 <Link href="/" className="flex items-center">
-                  <span className="text-xl sm:text-xl font-bold text-brand">HealerMy</span>
+                  <span className="text-xl sm:text-xl font-bold text-brand">healerMy</span>
                 </Link>
               </div>
 
               {/* Desktop Navigation */}
-              <div className="hidden sm:ml-8 sm:flex md:space-x-6">
+              <div className="hidden sm:ml-1 md:ml-6 sm:flex md:space-x-6">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   return (

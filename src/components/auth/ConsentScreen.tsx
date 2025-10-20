@@ -35,7 +35,7 @@ export function ConsentScreen({ onAccept, onDecline }: ConsentScreenProps) {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h2 className="font-semibold text-lg mb-2">Data Usage</h2>
             <p className="text-text-secondary">
-              By using HealerMy, you agree to share your medical information with authorized healthcare providers
+              By using healerMy, you agree to share your medical information with authorized healthcare providers
               for the purpose of scheduling and managing appointments.
             </p>
           </div>
