@@ -3,11 +3,11 @@
 import { cookies } from 'next/headers';
 import { decrypt } from '@/library/auth/encryption';
 import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
-import type { AuthSession, SessionData } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 
 // Server action that gets session data immediately - no API calls for fast response
 export async function getBasicSessionData(): Promise<{
-  session: AuthSession | null;
+  session: SessionData | null;
   error?: string;
 }> {
   try {
@@ -29,14 +29,14 @@ export async function getBasicSessionData(): Promise<{
     // Additional validation for required fields
     if (!session.accessToken || !session.fhirBaseUrl) {
       return {
-        session: session as AuthSession,
+        session: session as SessionData,
         error: 'Incomplete session data'
       };
     }
 
     // Return session immediately - no API calls for fastest response
     return {
-      session: session as AuthSession
+      session: session as SessionData
     };
   } catch (error) {
     console.error('Error getting basic session data:', error);

@@ -6,7 +6,7 @@ import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 import type { Practitioner, Appointment } from '@/types/fhir';
 
 interface AppointmentSummary {
@@ -26,7 +26,7 @@ interface PatientAlert {
 
 interface ProviderDashboardClientProps {
   provider: Practitioner | null;
-  session: AuthSession | null;
+  session: SessionData | null;
   providerName: string;
   greeting: string;
 }

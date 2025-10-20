@@ -1,11 +1,11 @@
 import { headers } from 'next/headers';
-import { AuthSession } from '@/types/auth';
+import { SessionData } from '@/types/auth';
 
 /**
  * Get session data from middleware headers (server-side only)
  * Tokens are already decrypted by middleware
  */
-export async function getSessionFromMiddleware(): Promise<AuthSession | null> {
+export async function getSessionFromMiddleware(): Promise<SessionData | null> {
   try {
     const headersList = await headers();
     const sessionHeader = headersList.get('x-session-data');
@@ -15,7 +15,7 @@ export async function getSessionFromMiddleware(): Promise<AuthSession | null> {
       return null;
     }
 
-    const session: AuthSession = JSON.parse(sessionHeader);
+    const session: SessionData = JSON.parse(sessionHeader);
     return session;
   } catch (error) {
     console.error('Failed to parse session from middleware headers:', error);
@@ -27,7 +27,7 @@ export async function getSessionFromMiddleware(): Promise<AuthSession | null> {
  * Get session data with validation
  */
 export async function getValidatedSession(): Promise<{
-  session: AuthSession | null;
+  session: SessionData | null;
   error?: string;
 }> {
   const session = await getSessionFromMiddleware();

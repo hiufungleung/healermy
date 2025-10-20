@@ -3,10 +3,10 @@
 import React from 'react';
 import { Layout } from '@/components/common/Layout';
 import NotificationsClient from './NotificationsClient';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 
 interface NotificationsWrapperProps {
-  session: AuthSession;
+  session: SessionData;
 }
 
 export default function NotificationsWrapper({

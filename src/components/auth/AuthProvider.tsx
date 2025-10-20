@@ -2,10 +2,10 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { AuthSession } from '@/types/auth';
+import { SessionData } from '@/types/auth';
 
 interface AuthContextType {
-  session: AuthSession | null;
+  session: SessionData | null;
   logout: () => void;
   isLoading: boolean;
   userName: string | null;
@@ -17,7 +17,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<AuthSession | null>(null);
+  const [session, setSession] = useState<SessionData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userName, setUserName] = useState<string | null>(null);
   const [isLoadingUserName, setIsLoadingUserName] = useState(false);
@@ -84,13 +84,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               }
             }
           }
-        } else if (session.role === 'provider' && session.fhirUser) {
-          // Extract practitioner ID from fhirUser URL
-          const practitionerMatch = session.fhirUser.match(/\/Practitioner\/(.+)$/);
-          if (!practitionerMatch) return;
+        } else if (session.role === 'provider' || session.role === 'practitioner') {
+          // For provider/practitioner, fetch name from FHIR API using practitioner ID
+          if (!session.practitioner) return;
 
-          const practitionerId = practitionerMatch[1];
-          const response = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
+          const response = await fetch(`/api/fhir/practitioners/${session.practitioner}`, {
             method: 'GET',
             credentials: 'include',
           });
@@ -104,16 +102,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               const fullName = `${prefix} ${given} ${family}`.trim();
               if (fullName) {
                 setUserName(fullName);
-                console.log('✅ Provider name loaded:', fullName);
+                console.log(`✅ ${session.role} name loaded:`, fullName);
               }
             }
-          }
-        } else if (session.role === 'practitioner') {
-          // For practitioner, use practitionerName from session (stored from ID token)
-          // This is more efficient than fetching from FHIR API
-          if (session.practitionerName) {
-            setUserName(session.practitionerName);
-            console.log('✅ Practitioner name loaded from session:', session.practitionerName);
           }
         }
       } catch (error) {
@@ -302,36 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      // Handle token revocation client-side using session data
-      if (session?.refreshToken && session?.clientId && session?.clientSecret && session?.revokeUrl) {
-        try {
-          const revokeParams = new URLSearchParams({
-            token: session.refreshToken,
-            token_type_hint: 'refresh_token'
-          });
-
-          const credentials = btoa(`${session.clientId}:${session.clientSecret}`);
-
-          const revokeResponse = await fetch(session.revokeUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'Authorization': `Basic ${credentials}`,
-              'Accept': 'application/json',
-            },
-            body: revokeParams.toString(),
-          });
-
-          if (!revokeResponse.ok) {
-            console.warn(`Token revocation failed: ${revokeResponse.status}`);
-          }
-        } catch (revokeError) {
-          console.error('Token revocation error:', revokeError);
-        }
-      }
-
-
-      // Call server logout to clear session cookie
+      // Call server logout endpoint (handles token revocation server-side)
       const response = await fetch('/api/auth/logout', { method: 'POST' });
 
       if (response.ok) {

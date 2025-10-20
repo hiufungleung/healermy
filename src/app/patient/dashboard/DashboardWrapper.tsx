@@ -4,10 +4,10 @@ import React from 'react';
 import { Layout } from '@/components/common/Layout';
 import DashboardClient from './DashboardClient';
 import { useAuth } from '@/components/auth/AuthProvider';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 
 interface DashboardWrapperProps {
-  session: AuthSession;
+  session: SessionData;
 }
 
 export default function DashboardWrapper({

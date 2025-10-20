@@ -6,11 +6,11 @@ import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
 import { getPatient } from '@/app/api/fhir/patients/operations';
 import { searchAppointments } from '@/app/api/fhir/appointments/operations';
 import type { Patient, Appointment } from '@/types/fhir';
-import type { AuthSession, SessionData } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 
 // Server action that gets session data only (no FHIR API calls for fast page render)
 export async function getSessionOnly(): Promise<{
-  session: AuthSession | null;
+  session: SessionData | null;
   error?: string;
 }> {
   try {
@@ -32,13 +32,13 @@ export async function getSessionOnly(): Promise<{
     // Additional validation for required fields
     if (!session.patient || !session.accessToken || !session.fhirBaseUrl) {
       return {
-        session: session as AuthSession,
+        session,
         error: 'Incomplete session data'
       };
     }
 
     return {
-      session: session as AuthSession
+      session
     };
   } catch (error) {
     console.error('Error getting session data:', error);
@@ -53,7 +53,7 @@ export async function getSessionOnly(): Promise<{
 export async function getDashboardData(): Promise<{
   patient: Patient | null;
   appointments: Appointment[];
-  session: AuthSession | null;
+  session: SessionData | null;
   error?: string;
 }> {
   try {
@@ -79,7 +79,7 @@ export async function getDashboardData(): Promise<{
       return {
         patient: null,
         appointments: [],
-        session: session as AuthSession,
+        session,
         error: 'Incomplete session data'
       };
     }
@@ -96,7 +96,7 @@ export async function getDashboardData(): Promise<{
       return {
         patient: null,
         appointments: [],
-        session: session as AuthSession,
+        session,
         error: 'Failed to fetch patient data'
       };
     }
@@ -125,7 +125,7 @@ export async function getDashboardData(): Promise<{
     return {
       patient: patientData,
       appointments: appointmentData,
-      session: session as AuthSession
+      session
     };
   } catch (error) {
     console.error('Error fetching dashboard data:', error);

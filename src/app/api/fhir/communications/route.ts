@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
         }
       } else if (isPractitioner) {
         // For practitioners, get communications where they are recipient
-        const practitionerRef = `Practitioner/${session.practitioner || session.fhirUser}`;
+        const practitionerRef = `Practitioner/${session.practitioner}`;
         unreadCount = await getUnreadCommunicationsCount(
           token,
           session.fhirBaseUrl,
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
       });
     } else if (isPractitioner) {
       // For practitioners, ONLY get communications where practitioner is recipient
-      const practitionerRef = `Practitioner/${session.practitioner || session.fhirUser}`;
+      const practitionerRef = `Practitioner/${session.practitioner}`;
 
       const result = await searchCommunications(token, session.fhirBaseUrl, {
         ...searchOptions,
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
     // Determine sender reference based on role
     const senderRef = session.role === 'patient'
       ? `Patient/${session.patient}`
-      : `Practitioner/${session.practitioner || session.fhirUser || session.patient}`;
+      : `Practitioner/${session.practitioner || session.patient}`;
     
     // Determine subject (usually the patient)
     const subjectRef = session.role === 'patient' 

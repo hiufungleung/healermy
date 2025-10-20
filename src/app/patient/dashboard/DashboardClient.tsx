@@ -11,12 +11,12 @@ import {
 } from '@/components/common/LoadingSpinner';
 import { getNowInAppTimezone, formatAppointmentDateTime } from '@/library/timezone';
 import type { Patient } from '@/types/fhir';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 import type { AppointmentWithPractitionerDetails } from '@/library/appointmentDetailInfo';
 
 interface DashboardClientProps {
   patientName: string | undefined;
-  session: AuthSession;
+  session: SessionData;
   onPatientNameUpdate?: (name: string) => void;
 }
 

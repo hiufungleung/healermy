@@ -6,11 +6,11 @@ import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 import type { Appointment, Schedule, Slot } from '@/types/fhir';
 
 interface PractitionerDashboardClientProps {
-  session: AuthSession;
+  session: SessionData;
   practitionerName: string;
 }
 

@@ -6,12 +6,12 @@ import { Button } from '@/components/common/Button';
 import { AppointmentSkeleton } from '@/components/common/LoadingSpinner';
 import { PatientAppointmentCard } from '@/components/patient/PatientAppointmentCard';
 import { calculateQueuePosition, formatWaitTime, getQueueStatusMessage } from '@/lib/queueCalculation';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 import type { AppointmentWithPractitionerDetails } from '@/library/appointmentDetailInfo';
 import type { Encounter } from '@/types/fhir';
 
 interface AppointmentsClientProps {
-  session: AuthSession;
+  session: SessionData;
 }
 
 type FilterStatus = 'all' | 'pending' | 'booked' | 'completed' | 'cancelled';

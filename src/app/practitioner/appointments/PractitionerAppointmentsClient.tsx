@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 import type { Appointment, Encounter } from '@/types/fhir';
 
 interface PractitionerAppointmentsClientProps {
-  session: AuthSession;
+  session: SessionData;
   practitionerName: string;
 }
 

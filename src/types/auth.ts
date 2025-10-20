@@ -18,6 +18,7 @@ export interface SessionData {
   patient?: string;
   practitioner?: string;
   tokenUrl: string; // Required for token refresh
+  revokeUrl: string; // Required for token revocation on logout
   fhirBaseUrl: string; // Required for FHIR API calls
 }
 
@@ -26,20 +27,6 @@ export interface TokenData {
   accessToken: string;
   refreshToken?: string;
   expiresAt: number;
-}
-
-/** @deprecated Use SessionData instead. Kept for backward compatibility during migration. */
-export interface AuthSession extends SessionData {
-  // Combined interface for backward compatibility
-  // These fields are needed by legacy code but should not be stored in cookie
-  fhirUser?: string;
-  username?: string;
-  user?: string;
-  patientName?: string;
-  practitionerName?: string;
-  clientId?: string;
-  clientSecret?: string;
-  revokeUrl?: string;
 }
 
 export interface LaunchContext {

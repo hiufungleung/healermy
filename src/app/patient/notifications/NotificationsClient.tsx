@@ -6,7 +6,7 @@ import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import type { Patient } from '@/types/fhir';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 
 // Cache for appointment details to avoid refetching
 const appointmentCache = new Map<string, { appointment: any; practitionerName: string }>();
@@ -161,7 +161,7 @@ interface Communication {
 }
 
 interface NotificationsClientProps {
-  session: AuthSession;
+  session: SessionData;
 }
 
 // Function to prefetch appointment details

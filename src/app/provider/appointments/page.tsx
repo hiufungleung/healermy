@@ -120,7 +120,7 @@ export default async function ProviderAppointmentsPage() {
       <ProviderAppointmentsClient
         appointments={allAppointments}
         stats={stats}
-        session={{ role: session.role, userId: session.fhirUser || session.patient || '' }}
+        session={{ role: session.role, userId: session.practitioner || session.patient || '' }}
       />
     </Layout>
   );

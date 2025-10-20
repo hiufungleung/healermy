@@ -40,7 +40,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { formatDateForDisplay } from '@/library/timezone';
 import type { Schedule, Slot, Appointment, Encounter } from '@/types/fhir';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 
 // Custom skeleton component for schedule cards - matches exact layout
 function ScheduleSkeleton() {

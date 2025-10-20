@@ -4,10 +4,10 @@ import React from 'react';
 import { Layout } from '@/components/common/Layout';
 import { useAuth } from '@/components/auth/AuthProvider';
 import ProviderDashboardClient from './ProviderDashboardClient';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 
 interface ProviderDashboardWrapperProps {
-  session: AuthSession;
+  session: SessionData;
 }
 
 export default function ProviderDashboardWrapper({

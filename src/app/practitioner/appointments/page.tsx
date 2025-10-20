@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { decrypt } from '@/library/auth/encryption';
 import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
-import type { AuthSession, SessionData } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 import { Layout } from '@/components/common/Layout';
 import PractitionerAppointmentsClient from './PractitionerAppointmentsClient';
 
@@ -23,13 +23,13 @@ export default async function PractitionerAppointmentsPage() {
     }
 
     // Extract practitioner name for display
-    const practitionerName = (session as AuthSession).practitionerName || (session as AuthSession).username || 'Practitioner';
+    const practitionerName = session.practitioner || 'Practitioner';
 
     return (
       <Layout practitionerName={practitionerName}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <PractitionerAppointmentsClient
-            session={session as AuthSession}
+            session={session}
             practitionerName={practitionerName}
           />
         </div>

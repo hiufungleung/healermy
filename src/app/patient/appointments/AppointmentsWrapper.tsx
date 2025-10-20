@@ -3,10 +3,10 @@
 import React from 'react';
 import { Layout } from '@/components/common/Layout';
 import AppointmentsClient from './AppointmentsClient';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 
 interface AppointmentsWrapperProps {
-  session: AuthSession;
+  session: SessionData;
 }
 
 export default function AppointmentsWrapper({

@@ -8,7 +8,7 @@ import { Badge } from '@/components/common/Badge';
 import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import type { Practitioner, Appointment } from '@/types/fhir';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 
 type ViewMode = 'confirm' | 'view';
 
@@ -26,7 +26,7 @@ interface AppointmentViewProps {
   serviceType?: string;
   specialty?: string;
   practitionerId?: string;
-  session?: Pick<AuthSession, 'patient' | 'role'> | null;
+  session?: Pick<SessionData, 'patient' | 'role'> | null;
 
   // For view mode (existing appointment)
   appointment?: Appointment;

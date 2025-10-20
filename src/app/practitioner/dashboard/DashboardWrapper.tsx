@@ -3,10 +3,10 @@
 import React from 'react';
 import { Layout } from '@/components/common/Layout';
 import PractitionerDashboardClient from './PractitionerDashboardClient';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 
 interface DashboardWrapperProps {
-  session: AuthSession;
+  session: SessionData;
   practitionerName: string;
 }
 

@@ -3,10 +3,10 @@
 import React from 'react';
 import { Layout } from '@/components/common/Layout';
 import MessagesClient from './MessagesClient';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 
 interface MessagesWrapperProps {
-  session: AuthSession;
+  session: SessionData;
 }
 
 export default function MessagesWrapper({

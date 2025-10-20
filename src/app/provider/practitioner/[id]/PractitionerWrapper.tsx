@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Layout } from '@/components/common/Layout';
 import { Button } from '@/components/common/Button';
 import PractitionerDetailClient from './PractitionerDetailClient';
-import type { AuthSession } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 import type { Schedule } from '@/types/fhir';
 
 interface PractitionerWrapperProps {
   practitionerId: string;
-  session: AuthSession;
+  session: SessionData;
 }
 
 export default function PractitionerWrapper({

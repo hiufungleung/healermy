@@ -3,12 +3,12 @@
 import { cookies } from 'next/headers';
 import { decrypt } from '@/library/auth/encryption';
 import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
-import type { AuthSession, SessionData } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 import type { Practitioner } from '@/types/fhir';
 
 // Fast session-only function (no FHIR API calls for immediate page render)
 export async function getProviderSessionOnly(): Promise<{
-  session: AuthSession | null;
+  session: SessionData | null;
   error?: string;
 }> {
   try {
@@ -30,13 +30,13 @@ export async function getProviderSessionOnly(): Promise<{
     // Additional validation for required fields
     if (!session.accessToken || !session.fhirBaseUrl) {
       return {
-        session: session as AuthSession,
+        session: session,
         error: 'Incomplete session data'
       };
     }
 
     return {
-      session: session as AuthSession
+      session: session
     };
   } catch (error) {
     console.error('Error getting provider session data:', error);
@@ -50,7 +50,7 @@ export async function getProviderSessionOnly(): Promise<{
 // Original function kept for backwards compatibility and direct use
 export async function getProviderDashboardData(): Promise<{
   provider: Practitioner | null;
-  session: AuthSession | null;
+  session: SessionData | null;
   providerName: string;
   error?: string;
 }> {
@@ -76,7 +76,7 @@ export async function getProviderDashboardData(): Promise<{
     if (!session.accessToken || !session.fhirBaseUrl) {
       return {
         provider: null,
-        session: session as AuthSession,
+        session: session,
         providerName: 'Provider',
         error: 'Incomplete session data'
       };
@@ -86,32 +86,26 @@ export async function getProviderDashboardData(): Promise<{
     let providerData: Practitioner | null = null;
     let providerName = 'Provider';
 
-    // Try to get provider name from fhirUser
-    if ((session as AuthSession).fhirUser) {
+    // Try to get provider name from practitioner ID
+    if (session.practitioner) {
       try {
-        // Extract practitioner ID from fhirUser URL
-        const practitionerMatch = (session as AuthSession).fhirUser?.match(/\/Practitioner\/(.+)$/);
-        if (practitionerMatch) {
-          const practitionerId = practitionerMatch[1];
+        // Fetch practitioner details from FHIR
+        const response = await fetch(`${session.fhirBaseUrl}/Practitioner/${session.practitioner}`, {
+          headers: {
+            'Authorization': `Bearer ${session.accessToken}`,
+            'Accept': 'application/fhir+json',
+          },
+        });
 
-          // Fetch practitioner details from FHIR
-          const response = await fetch(`${session.fhirBaseUrl}/Practitioner/${practitionerId}`, {
-            headers: {
-              'Authorization': `Bearer ${session.accessToken}`,
-              'Accept': 'application/fhir+json',
-            },
-          });
-
-          if (response.ok) {
-            providerData = await response.json();
-            if (providerData?.name && providerData.name.length > 0) {
-              const name = providerData.name[0];
-              const fullName = `${name.prefix ? name.prefix.join(' ') + ' ' : ''}${name.given ? name.given.join(' ') : ''} ${name.family || ''}`.trim();
-              providerName = fullName || 'Provider';
-            }
-          } else {
-            console.warn('Failed to fetch practitioner data:', response.status);
+        if (response.ok) {
+          providerData = await response.json();
+          if (providerData?.name && providerData.name.length > 0) {
+            const name = providerData.name[0];
+            const fullName = `${name.prefix ? name.prefix.join(' ') + ' ' : ''}${name.given ? name.given.join(' ') : ''} ${name.family || ''}`.trim();
+            providerName = fullName || 'Provider';
           }
+        } else {
+          console.warn('Failed to fetch practitioner data:', response.status);
         }
       } catch (error) {
         console.error('Error fetching provider data:', error);
@@ -119,18 +113,9 @@ export async function getProviderDashboardData(): Promise<{
       }
     }
 
-    // If we still don't have a name, try to use session.user or username
-    if (providerName === 'Provider') {
-      if ((session as AuthSession).username && (session as AuthSession).username !== 'portal') {
-        providerName = (session as AuthSession).username!;
-      } else if ((session as AuthSession).user) {
-        providerName = `Provider ${(session as AuthSession).user}`;
-      }
-    }
-
     return {
       provider: providerData,
-      session: session as AuthSession,
+      session: session,
       providerName
     };
   } catch (error) {

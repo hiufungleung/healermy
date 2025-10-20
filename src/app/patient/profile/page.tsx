@@ -46,7 +46,7 @@ export default async function PatientProfilePage() {
 
   // Extract patient name for Layout
   // Note: We'll fetch the full patient data in the client component
-  const patientName = session.patientName || session.patient || 'Patient';
+  const patientName = session.patient || 'Patient';
 
   return (
     <PatientProfileClient

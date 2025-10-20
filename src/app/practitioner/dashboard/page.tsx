@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { decrypt } from '@/library/auth/encryption';
 import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
-import type { AuthSession, SessionData } from '@/types/auth';
+import type { SessionData } from '@/types/auth';
 import DashboardWrapper from './DashboardWrapper';
 import type { Metadata } from 'next';
 
@@ -30,12 +30,12 @@ export default async function PractitionerDashboardPage() {
       redirect('/');
     }
 
-    // Extract practitioner name from session (stored from ID token during auth)
-    const practitionerName = (session as AuthSession).practitionerName || (session as AuthSession).username || 'Practitioner';
+    // Use practitioner ID as fallback for name display
+    const practitionerName = session.practitioner || 'Practitioner';
 
     return (
       <DashboardWrapper
-        session={session as AuthSession}
+        session={session}
         practitionerName={practitionerName}
       />
     );

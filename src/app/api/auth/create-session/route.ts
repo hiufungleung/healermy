@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
       patient: fullSessionData.patient,
       practitioner: fullSessionData.practitioner,
       tokenUrl: fullSessionData.tokenUrl || '',
+      revokeUrl: fullSessionData.revokeUrl || '',
       fhirBaseUrl: fullSessionData.fhirBaseUrl || fullSessionData.iss || '',
     };
 
