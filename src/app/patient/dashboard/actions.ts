@@ -2,11 +2,11 @@
 
 import { cookies } from 'next/headers';
 import { decrypt } from '@/library/auth/encryption';
-import { SESSION_COOKIE_NAME, TOKEN_COOKIE_NAME } from '@/library/auth/config';
+import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
 import { getPatient } from '@/app/api/fhir/patients/operations';
 import { searchAppointments } from '@/app/api/fhir/appointments/operations';
 import type { Patient, Appointment } from '@/types/fhir';
-import type { AuthSession, TokenData, SessionData } from '@/types/auth';
+import type { AuthSession, SessionData } from '@/types/auth';
 
 // Server action that gets session data only (no FHIR API calls for fast page render)
 export async function getSessionOnly(): Promise<{
@@ -14,41 +14,31 @@ export async function getSessionOnly(): Promise<{
   error?: string;
 }> {
   try {
-    // Get session from encrypted HTTP-only cookies
+    // Get session from encrypted HTTP-only cookie
     const cookieStore = await cookies();
     const tokenCookie = cookieStore.get(TOKEN_COOKIE_NAME);
-    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
 
-    if (!tokenCookie || !sessionCookie) {
+    if (!tokenCookie) {
       return {
         session: null,
         error: 'No session found'
       };
     }
 
-    // Decrypt both cookie parts
-    const decryptedTokenString = await decrypt(tokenCookie.value);
-    const decryptedSessionString = await decrypt(sessionCookie.value);
-
-    const tokenData: TokenData = JSON.parse(decryptedTokenString);
-    const sessionMetadata: SessionData = JSON.parse(decryptedSessionString);
-
-    // Combine into single session object
-    const session: AuthSession = {
-      ...tokenData,
-      ...sessionMetadata
-    };
+    // Decrypt session cookie
+    const decryptedSessionString = await decrypt(tokenCookie.value);
+    const session: SessionData = JSON.parse(decryptedSessionString);
 
     // Additional validation for required fields
     if (!session.patient || !session.accessToken || !session.fhirBaseUrl) {
       return {
-        session,
+        session: session as AuthSession,
         error: 'Incomplete session data'
       };
     }
 
     return {
-      session
+      session: session as AuthSession
     };
   } catch (error) {
     console.error('Error getting session data:', error);
@@ -67,12 +57,11 @@ export async function getDashboardData(): Promise<{
   error?: string;
 }> {
   try {
-    // Get session from encrypted HTTP-only cookies
+    // Get session from encrypted HTTP-only cookie
     const cookieStore = await cookies();
     const tokenCookie = cookieStore.get(TOKEN_COOKIE_NAME);
-    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
 
-    if (!tokenCookie || !sessionCookie) {
+    if (!tokenCookie) {
       return {
         patient: null,
         appointments: [],
@@ -81,25 +70,16 @@ export async function getDashboardData(): Promise<{
       };
     }
 
-    // Decrypt both cookie parts
-    const decryptedTokenString = await decrypt(tokenCookie.value);
-    const decryptedSessionString = await decrypt(sessionCookie.value);
-
-    const tokenData: TokenData = JSON.parse(decryptedTokenString);
-    const sessionMetadata: SessionData = JSON.parse(decryptedSessionString);
-
-    // Combine into single session object
-    const session: AuthSession = {
-      ...tokenData,
-      ...sessionMetadata
-    };
+    // Decrypt session cookie
+    const decryptedSessionString = await decrypt(tokenCookie.value);
+    const session: SessionData = JSON.parse(decryptedSessionString);
 
     // Additional validation for required fields
     if (!session.patient || !session.accessToken || !session.fhirBaseUrl) {
       return {
         patient: null,
         appointments: [],
-        session,
+        session: session as AuthSession,
         error: 'Incomplete session data'
       };
     }
@@ -116,7 +96,7 @@ export async function getDashboardData(): Promise<{
       return {
         patient: null,
         appointments: [],
-        session,
+        session: session as AuthSession,
         error: 'Failed to fetch patient data'
       };
     }
@@ -145,7 +125,7 @@ export async function getDashboardData(): Promise<{
     return {
       patient: patientData,
       appointments: appointmentData,
-      session
+      session: session as AuthSession
     };
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
