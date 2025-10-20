@@ -6,6 +6,12 @@ on:
     branches:
       - main
 
+# Security: Explicit permissions following principle of least privilege
+# This workflow only needs to read repository code for building Docker images
+# No write permissions are required as deployment happens via SSH to external servers
+permissions:
+  contents: read  # Required for actions/checkout to clone repository
+
 env:
   IMAGE_NAME: hiufungleung/healermy
   IMAGE_TAG: latest

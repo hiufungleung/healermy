@@ -389,16 +389,16 @@ export default function CallbackPage() {
               return (
                 <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-sm text-blue-800 mb-2">
-                    For more detailed information about this error:
+                    For more detailed information about this error, visit:
                   </p>
-                  <a
-                    href={errorUri}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 underline text-sm break-all"
-                  >
-                    View detailed error information →
-                  </a>
+                  <div className="bg-white p-3 rounded border border-blue-300">
+                    <code className="text-xs text-gray-700 break-all select-all">
+                      {errorUri}
+                    </code>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-2">
+                    💡 Copy the URL above and paste it into your browser
+                  </p>
                 </div>
               );
             } catch {
