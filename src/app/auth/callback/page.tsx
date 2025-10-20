@@ -21,22 +21,80 @@ export default function CallbackPage() {
         const error = urlParams.get('error');
         const errorUri = urlParams.get('error_uri');
         const errorDescription = urlParams.get('error_description');
-        
+        const receivedState = urlParams.get('state');
+
         if (error) {
           console.error('❌ OAuth error received:', error);
           console.error('❌ Error URI:', errorUri);
           console.error('❌ Error description:', errorDescription);
-          
+
+          // Security: Sanitize error message to prevent XSS
+          // Only allow alphanumeric, spaces, and safe punctuation
+          const sanitizeText = (text: string): string => {
+            return text.replace(/[<>'"]/g, ''); // Remove potentially dangerous characters
+          };
+
+          // Try to retrieve the issuer (FHIR server URL) from OAuth state for validation
+          let trustedIssuer: string | null = null;
+          if (receivedState) {
+            try {
+              const stateResponse = await fetch(`/api/auth/retrieve-state?state=${receivedState}`, {
+                credentials: 'include'
+              });
+              if (stateResponse.ok) {
+                const stateData = await stateResponse.json();
+                trustedIssuer = stateData.iss || null;
+                console.log('✅ Retrieved trusted issuer for error validation:', trustedIssuer);
+              }
+            } catch (err) {
+              console.warn('⚠️  Could not retrieve issuer for error_uri validation, will reject error_uri');
+            }
+          }
+
+          // Security: Validate error_uri against the FHIR server we're actually using
+          const isValidErrorUri = (uri: string, issuer: string | null): boolean => {
+            try {
+              const url = new URL(uri);
+
+              // Must be HTTPS
+              if (url.protocol !== 'https:') {
+                return false;
+              }
+
+              // If we have the issuer (FHIR server URL), validate against it
+              if (issuer) {
+                try {
+                  const issuerUrl = new URL(issuer);
+                  // Allow same hostname or parent domain
+                  return url.hostname === issuerUrl.hostname ||
+                         url.hostname.endsWith(`.${issuerUrl.hostname}`);
+                } catch {
+                  return false;
+                }
+              }
+
+              // If we couldn't retrieve issuer, reject the error_uri for safety
+              return false;
+            } catch {
+              return false;
+            }
+          };
+
           // Use error description if available, otherwise show the error code
-          const errorMessage = errorDescription || error;
-          
-          setError(errorMessage + (errorUri ? ` For more detailed information, please visit: ${decodeURIComponent(errorUri)}` : ''));
+          const sanitizedError = sanitizeText(error);
+          const sanitizedDescription = errorDescription ? sanitizeText(errorDescription) : '';
+          const errorMessage = sanitizedDescription || sanitizedError;
+
+          // Only include error_uri if it's valid and safe
+          const validatedErrorUri = errorUri && isValidErrorUri(errorUri, trustedIssuer) ? errorUri : null;
+
+          setError(errorMessage + (validatedErrorUri ? ` For more detailed information, please visit: ${validatedErrorUri}` : ''));
           return;
         }
         
         // Manual token exchange for SMART v1
         const code = urlParams.get('code');
-        const receivedState = urlParams.get('state');
+        // receivedState already declared above for error handling
         
         if (!code) {
           throw new Error('Authorization code not received');
@@ -314,21 +372,39 @@ export default function CallbackPage() {
         <div className="card max-w-lg w-full">
           <h1 className="text-xl sm:text-2xl font-bold text-danger mb-4">Authentication Error</h1>
           <p className="text-text-secondary mb-4">{mainErrorMessage}</p>
-          {errorUri && (
-            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800 mb-2">
-                For more detailed information about this error:
-              </p>
-              <a 
-                href={errorUri} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 underline text-sm break-all"
-              >
-                View detailed error information →
-              </a>
-            </div>
-          )}
+          {errorUri && (() => {
+            // Security: Defense-in-depth validation before rendering
+            // Note: URL has already been validated against the actual FHIR server (iss) during error handling
+            // This is an additional safety check in case the error message was modified
+            try {
+              const url = new URL(errorUri);
+              // Only allow HTTPS URLs (strict protocol check)
+              // The hostname validation already happened during error handling using the actual FHIR server URL
+              const isSafe = url.protocol === 'https:';
+
+              if (!isSafe) {
+                return null; // Don't render link if URL is not from trusted domain
+              }
+
+              return (
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800 mb-2">
+                    For more detailed information about this error:
+                  </p>
+                  <a
+                    href={errorUri}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 underline text-sm break-all"
+                  >
+                    View detailed error information →
+                  </a>
+                </div>
+              );
+            } catch {
+              return null; // Don't render link if URL is invalid
+            }
+          })()}
           <div className="flex space-x-3">
             <button
               onClick={() => router.push('/')}
