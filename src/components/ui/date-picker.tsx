@@ -3,6 +3,7 @@
 import * as React from "react"
 import { format } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
+import { Matcher } from "react-day-picker"
 
 import { cn } from "@/library/shadcn-utils"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,9 @@ interface DatePickerProps {
   minDate?: Date
   maxDate?: Date
   className?: string
+  modifiers?: Record<string, Matcher | Matcher[]>
+  modifiersClassNames?: Record<string, string>
+  onMonthChange?: (month: Date) => void
 }
 
 export function DatePicker({
@@ -31,6 +35,9 @@ export function DatePicker({
   minDate,
   maxDate,
   className,
+  modifiers,
+  modifiersClassNames,
+  onMonthChange,
 }: DatePickerProps) {
   return (
     <Popover>
@@ -53,11 +60,14 @@ export function DatePicker({
           mode="single"
           selected={date}
           onSelect={onDateChange}
+          onMonthChange={onMonthChange}
           disabled={(date) => {
             if (minDate && date < minDate) return true
             if (maxDate && date > maxDate) return true
             return false
           }}
+          modifiers={modifiers}
+          modifiersClassNames={modifiersClassNames}
           initialFocus
         />
       </PopoverContent>

@@ -1462,8 +1462,8 @@ function NewBookingFlow() {
     <Layout>
       <ContentContainer size="xl">
         {/* Header with Return Button */}
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-text-primary">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h1 className="text-xl sm:text-xl font-bold text-text-primary">
             Book New Appointment
           </h1>
           {currentStep === 1 && (
@@ -1492,9 +1492,9 @@ function NewBookingFlow() {
 
         {/* Step 1: Service Details & Doctor Selection */}
         {currentStep === 1 && (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-5 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {/* LEFT COLUMN: Service Details Filters - Desktop Only */}
-            <div className="hidden lg:block lg:col-span-1">
+            <div className="hidden sm:block sm:col-span-2 md:col-span-1 lg:col-span-1">
               <Card>
                 <h2 className="text-lg font-semibold text-gray-900 mb-6">Required Fields</h2>
 
@@ -1581,9 +1581,9 @@ function NewBookingFlow() {
             </div>
 
             {/* RIGHT COLUMN: Doctor Search & Results */}
-            <div className="lg:col-span-3">
+            <div className="sm:col-span-3 md:col-span-2 lg:col-span-3">
               {/* Mobile Dropdowns - Shows on mobile only */}
-              <div className="lg:hidden mb-4">
+              <div className="sm:hidden mb-4">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Select
@@ -1628,7 +1628,7 @@ function NewBookingFlow() {
                   </div>
                 </div>
               </div>
-              <Card>
+              <Card padding='sm'>
                 <h2 className="text-base sm:text-lg md:text-xl font-semibold mb-4">Select Doctor</h2>
 
                 {/* Search Bar */}
@@ -1638,7 +1638,7 @@ function NewBookingFlow() {
                     placeholder="Search doctor by name..."
                     value={searchTerm}
                     onChange={(e) => handleDoctorSearch(e.target.value)}
-                    className="px-4 py-3 pr-10"
+                    className="px-4 py-3 pr-10 text-sm"
                   />
                   {searchTerm && (
                     <button
@@ -1689,7 +1689,7 @@ function NewBookingFlow() {
                           >
                             <div className="flex flex-col gap-2">
                               {/* Doctor Name - Always takes first row */}
-                              <h3 className="font-semibold text-lg text-gray-900">{displayName}</h3>
+                              <h3 className="font-semibold text-md text-gray-900">{displayName}</h3>
 
                               {/* Address and Phone - Wrap to new lines if needed, no text breaking */}
                               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -1803,14 +1803,14 @@ function NewBookingFlow() {
                 </div>
               )}
 
-              {/* Responsive Grid: Two columns on tablet/desktop (md), stacked on mobile */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+              {/* Responsive Grid: Two columns on tablet/desktop (sm), stacked on mobile */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6 mb-6">
                 {/* LEFT COLUMN: Date Selection */}
-                <div className='md:col-span-2'>
+                <div className='sm:col-span-1 md:col-span-2'>
                   <h3 className="font-semibold mb-3">Select Date</h3>
 
                   {/* Mobile: Use shadcn DatePicker with dropdown */}
-                  <div className="md:hidden">
+                  <div className="sm:hidden">
                     <DatePicker
                       date={calendarDate}
                       onDateChange={(date) => {
@@ -1825,14 +1825,30 @@ function NewBookingFlow() {
                           setCalendarDate(date);
                         }
                       }}
+                      onMonthChange={(month) => {
+                        setCurrentMonth(month);
+                      }}
                       minDate={new Date()}
                       placeholder="Pick a date"
                       className="w-full"
+                      modifiers={{
+                        available: (date) => {
+                          // Only highlight dates with slots that are NOT in the past
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          const isPast = date < today;
+                          const dateStr = date.toISOString().split('T')[0];
+                          return !isPast && datesWithSlots.has(dateStr);
+                        }
+                      }}
+                      modifiersClassNames={{
+                        available: '!bg-green-100 hover:!bg-green-200 font-semibold [&>button]:!bg-transparent [&>button]:hover:!bg-transparent [&[data-selected=true]]:!bg-transparent [&[data-selected=true]>button]:!bg-primary [&[data-selected=true]>button]:!text-white'
+                      }}
                     />
                   </div>
 
                   {/* Desktop/Tablet: Show always-visible Calendar */}
-                  <div className="hidden md:block">
+                  <div className="hidden sm:block">
                     <div className="flex justify-center">
                       <Calendar
                         mode="single"
@@ -1871,15 +1887,15 @@ function NewBookingFlow() {
                         modifiersClassNames={{
                           available: '!bg-green-100 hover:!bg-green-200 font-semibold [&>button]:!bg-transparent [&>button]:hover:!bg-transparent [&[data-selected=true]]:!bg-transparent [&[data-selected=true]>button]:!bg-primary [&[data-selected=true]>button]:!text-white'
                         }}
-                        className="rounded-md border"
+                        className="rounded-sm border"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* RIGHT COLUMN: Time Selection */}
-                <div className='md:col-span-3'>
-                <h3 className="font-semibold mb-2">Available Times</h3>
+                <div className='sm:col-span-1 md:col-span-3'>
+                <h3 className="font-semibold mb-4 sm:mb-10">Available Times</h3>
 
                 {/* Service Type Color Legend - Compact */}
                 {availableSlots.length > 0 && practitionerSchedules.length > 0 && (

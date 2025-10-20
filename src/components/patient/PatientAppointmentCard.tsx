@@ -73,9 +73,6 @@ export function PatientAppointmentCard({ appointment, onAppointmentUpdated }: Pa
     try {
       const response = await fetch(`/api/fhir/appointments/${appointment.id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         credentials: 'include',
         body: JSON.stringify({
           action: 'request-reschedule',
@@ -109,9 +106,6 @@ export function PatientAppointmentCard({ appointment, onAppointmentUpdated }: Pa
     try {
       const response = await fetch(`/api/fhir/appointments/${appointment.id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json-patch+json',
-        },
         credentials: 'include',
         body: JSON.stringify([
           {
@@ -130,9 +124,6 @@ export function PatientAppointmentCard({ appointment, onAppointmentUpdated }: Pa
       // Send cancellation notification to provider
       const notificationResponse = await fetch('/api/fhir/communications', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/fhir+json',
-        },
         credentials: 'include',
         body: JSON.stringify({
           appointmentId: appointment.id,

@@ -403,12 +403,12 @@ export default function DashboardClient({
       </div>
 
       {/* Quick Actions - Visible on all devices */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 mb-6 sm:mb-8">
+      <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-6 mb-6 sm:mb-8">
         <h2 className="text-base font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <button
             onClick={() => router.push('/patient/book-appointment')}
-            className="group bg-white rounded-lg border-2 border-blue-200 p-4 hover:border-blue-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
+            className="group bg-white rounded-lg border-2 border-blue-200 p-2 hover:border-blue-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
           >
             <div className="flex items-center space-x-4">
               <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
@@ -424,7 +424,7 @@ export default function DashboardClient({
 
           <button
             onClick={() => router.push('/patient/notifications')}
-            className="group bg-white rounded-lg border-2 border-amber-200 p-4 hover:border-amber-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
+            className="group bg-white rounded-lg border-2 border-amber-200 p-2 hover:border-amber-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
           >
             <div className="flex items-center space-x-4">
               <div className="w-9 h-9bg-amber-100 rounded-lg flex items-center justify-center group-hover:bg-amber-200 transition-colors">
@@ -459,7 +459,7 @@ export default function DashboardClient({
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Upcoming Appointments - Second on mobile/tablet, left column on desktop */}
         <div className="lg:col-span-2 lg:order-1 order-2">
-          <div className="bg-white rounded-lg border border-border p-6">
+          <div className="bg-white rounded-lg border border-border p-4">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-base sm:text-lg md:text-xl font-semibold">Upcoming Appointments</h2>
               <Button

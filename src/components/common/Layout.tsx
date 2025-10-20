@@ -154,7 +154,7 @@ export function Layout({ children, patientName, providerName, practitionerName }
               {/* Mobile Menu Button - Animated Hamburger Icon */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors mr-2 relative z-50"
+                className="sm:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors mr-2 relative z-50"
                 aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
                 aria-expanded={mobileMenuOpen}
               >
@@ -183,12 +183,12 @@ export function Layout({ children, patientName, providerName, practitionerName }
               {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
                 <Link href="/" className="flex items-center">
-                  <span className="text-xl sm:text-2xl font-bold text-brand">HealerMy</span>
+                  <span className="text-xl sm:text-xl font-bold text-brand">HealerMy</span>
                 </Link>
               </div>
 
               {/* Desktop Navigation */}
-              <div className="hidden md:ml-8 md:flex md:space-x-6">
+              <div className="hidden sm:ml-8 sm:flex md:space-x-6">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   return (

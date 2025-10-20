@@ -21,7 +21,7 @@ export function ContentContainer({ children, size = 'lg', className }: ContentCo
 
   return (
     <div className={clsx(
-      'mx-auto px-4 sm:px-6 lg:px-8 py-8',
+      'mx-auto px-4 sm:px-6 lg:px-8 py-4',
       sizeClasses[size],
       className
     )}>
