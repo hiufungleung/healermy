@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Card } from '@/components/common/Card';
 import { Badge } from '@/components/common/Badge';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
 interface Encounter {
   id: string;
@@ -141,7 +142,7 @@ export const EncountersOverview: React.FC<EncountersOverviewProps> = ({
         <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-3">Visit History</h3>
         <Card>
           <div className="flex items-center justify-center py-8">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-3"></div>
+            <LoadingSpinner size="sm" className="mr-3" />
             <span className="text-text-secondary">Loading visit history...</span>
           </div>
         </Card>

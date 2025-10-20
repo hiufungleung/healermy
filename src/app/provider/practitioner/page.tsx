@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Layout } from '@/components/common/Layout';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
-import { SkeletonCard, Skeleton } from '@/components/common/LoadingSpinner';
+import { SkeletonCard, Skeleton } from '@/components/common/ContentSkeleton';
 import { PractitionerSearch } from '@/components/common/PractitionerSearch';
 import { CreatePractitionerForm } from '@/components/provider/CreatePractitionerForm';
 import { ViewPractitionerDetails } from '@/components/provider/ViewPractitionerDetails';

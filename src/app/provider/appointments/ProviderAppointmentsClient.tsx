@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
-import { AppointmentSkeleton } from '@/components/common/LoadingSpinner';
+import { AppointmentSkeleton } from '@/components/common/ContentSkeleton';
 import { ProviderAppointmentDetailModal } from '@/components/provider/ProviderAppointmentDetailModal';
 import type { Appointment } from '@/types/fhir';
 

@@ -5,10 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { Badge } from '@/components/common/Badge';
-import {
-  LoadingSpinner,
-  Skeleton
-} from '@/components/common/LoadingSpinner';
+import { Skeleton } from '@/components/common/ContentSkeleton';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { CreateScheduleForm } from '@/components/provider/CreateScheduleForm';
 import { GenerateSlotsForm } from '@/components/provider/GenerateSlotsForm';
 import { SlotCalendar } from '@/components/provider/SlotCalendar';

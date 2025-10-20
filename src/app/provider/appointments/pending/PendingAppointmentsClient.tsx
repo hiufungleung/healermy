@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
 interface Appointment {
   resource: {
@@ -297,14 +298,14 @@ export default function PendingAppointmentsClient({
                 >
                   {loadingAppointment === appointment.resource.id ? (
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <LoadingSpinner size="sm" />
                       Approving...
                     </div>
                   ) : (
                     'Approve'
                   )}
                 </Button>
-                
+
                 <Button
                   variant="danger"
                   onClick={() => handleReject(appointment.resource.id)}
@@ -313,7 +314,7 @@ export default function PendingAppointmentsClient({
                 >
                   {loadingAppointment === appointment.resource.id ? (
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <LoadingSpinner size="sm" />
                       Rejecting...
                     </div>
                   ) : (

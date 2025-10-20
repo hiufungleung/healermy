@@ -12,15 +12,21 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
 
-    const params = {
-      name: searchParams.get('name') || undefined,
-      active: searchParams.get('active') === 'true' ? true : searchParams.get('active') === 'false' ? false : undefined,
-      type: searchParams.get('type') || undefined,
-      _count: searchParams.get('_count') ? parseInt(searchParams.get('_count')!) : undefined,
-      _sort: searchParams.get('_sort') || undefined,
-    };
+    // Convert URLSearchParams to plain object, passing ALL parameters to FHIR API
+    const allParams: Record<string, string | boolean | number> = {};
+    searchParams.forEach((value, key) => {
+      if (key === 'active') {
+        // Handle boolean conversion for active parameter
+        allParams[key] = value === 'true' ? true : value === 'false' ? false : value;
+      } else if (key === '_count') {
+        // Handle numeric parameters
+        allParams[key] = parseInt(value);
+      } else {
+        allParams[key] = value;
+      }
+    });
 
-    const result = await searchOrganizations(token, session.fhirBaseUrl, params);
+    const result = await searchOrganizations(token, session.fhirBaseUrl, allParams);
 
     return NextResponse.json(result);
   } catch (error) {

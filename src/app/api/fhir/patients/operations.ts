@@ -251,8 +251,7 @@ export async function getPatientCoverage(
   patientId: string
 ) {
   const queryString = buildQueryString({
-    beneficiary: patientId,
-    status: 'active'
+    beneficiary: patientId
   });
   const response = await FHIRClient.fetchWithAuth(
     `${fhirBaseUrl}/Coverage?${queryString}`,

@@ -15,55 +15,33 @@ export async function GET(request: NextRequest) {
     // Extract session from middleware headers
     const session = await getSessionFromCookies();
 
-    // Parse query parameters
+    // Get ALL query parameters as-is (don't parse individually)
     const searchParams = request.nextUrl.searchParams;
-    let patientId = searchParams.get('patient');
-    let practitionerId = searchParams.get('practitioner');
-    const status = searchParams.get('status');
-    const dateFrom = searchParams.get('date-from');
-    const dateTo = searchParams.get('date-to');
-    const date = searchParams.get('date'); // For single date queries like ?date=2025-01-15
-    const ids = searchParams.get('_id'); // Batch fetch by IDs: ?_id=123,456,789
 
-    // Auto-filter by patient based on session role (like Communications API)
-    // This prevents fetching all appointments without filter
-    // Note: Providers get clinic-wide view (no practitioner filter), but rely on date/status filters
-    if (session.role === 'patient' && !patientId) {
-      patientId = session.patient || null;
+    // Convert URLSearchParams to plain object, passing ALL parameters to FHIR API
+    const allParams: Record<string, string> = {};
+    searchParams.forEach((value, key) => {
+      allParams[key] = value;
+    });
+
+    // Auto-filter by patient based on session role (security enforcement)
+    // Patients can only see their own appointments
+    if (session.role === 'patient' && !allParams.patient) {
+      allParams.patient = session.patient || '';
     }
 
-    // Call FHIR operations
+    // Call FHIR API with ALL query parameters
+    // This passes through _sort, start, _count, status, date, _id, and any other params
     const token = prepareToken(session.accessToken);
-    const _count = searchParams.get('_count');
 
-    // Build options object
-    const options: {
-      status?: string;
-      _count?: number;
-      _id?: string;
-    } = {};
-    if (status) options.status = status;
-    if (_count) options._count = parseInt(_count);
-    if (ids) options._id = ids; // Pass comma-separated IDs for batch fetch
-    
-    // Handle single date vs date range
-    let finalDateFrom = dateFrom;
-    let finalDateTo = dateTo;
-    
-    if (date && !dateFrom && !dateTo) {
-      // Single date query (like ?date=2025-01-15) - search for that day only
-      finalDateFrom = date;
-      finalDateTo = date;
-    }
-    
     const result = await searchAppointments(
       token,
       session.fhirBaseUrl,
-      patientId || undefined,
-      practitionerId || undefined,
-      Object.keys(options).length > 0 ? options : undefined,
-      finalDateFrom || undefined,
-      finalDateTo || undefined
+      allParams.patient,
+      allParams.practitioner,
+      allParams, // Pass ALL params as options
+      undefined, // Let options handle date params
+      undefined
     );
 
     // Extract appointments from FHIR Bundle structure

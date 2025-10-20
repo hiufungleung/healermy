@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { SessionData } from '@/types/auth';
 import type { Appointment, Encounter, Patient } from '@/types/fhir';
 
@@ -327,7 +328,7 @@ export default function PractitionerWorkstationClient({
   if (loading) {
     return (
       <Card className="p-8 text-center">
-        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+        <LoadingSpinner size="md" className="mx-auto mb-4" />
         <p className="text-text-secondary">Loading workstation...</p>
       </Card>
     );

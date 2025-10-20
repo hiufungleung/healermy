@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
-import { AppointmentSkeleton } from '@/components/common/LoadingSpinner';
+import { AppointmentSkeleton } from '@/components/common/ContentSkeleton';
 import type { Appointment } from '@/types/fhir';
 
 interface HistoryClientProps {

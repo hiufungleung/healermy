@@ -19,37 +19,18 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = request.nextUrl;
 
-    // Build search options from query parameters - Direct FHIR mapping
-    const searchOptions: {
-      _id?: string;
-      actor?: string;
-      date?: string;
-      specialty?: string;
-      serviceCategory?: string;
-      serviceType?: string;
-      _count?: number;
-    } = {};
+    // Convert URLSearchParams to plain object, passing ALL parameters to FHIR API
+    const allParams: Record<string, string> = {};
+    searchParams.forEach((value, key) => {
+      allParams[key] = value;
+    });
 
-    if (searchParams.get('_id')) {
-      searchOptions._id = searchParams.get('_id')!;
-    }
-    if (searchParams.get('actor')) {
-      searchOptions.actor = searchParams.get('actor')!;
-    }
-    if (searchParams.get('date')) {
-      searchOptions.date = searchParams.get('date')!;
-    }
-    if (searchParams.get('specialty')) {
-      searchOptions.specialty = searchParams.get('specialty')!;
-    }
-    if (searchParams.get('serviceCategory')) {
-      searchOptions.serviceCategory = searchParams.get('serviceCategory')!;
-    }
-    if (searchParams.get('service-type')) {
-      searchOptions.serviceType = searchParams.get('service-type')!;
-    }
-    if (searchParams.get('_count')) {
-      searchOptions._count = parseInt(searchParams.get('_count')!);
+    // Prepare search options with all parameters
+    const searchOptions: any = { ...allParams };
+
+    // Handle numeric parameters
+    if (searchOptions._count) {
+      searchOptions._count = parseInt(searchOptions._count);
     }
 
     const token = prepareToken(session.accessToken);

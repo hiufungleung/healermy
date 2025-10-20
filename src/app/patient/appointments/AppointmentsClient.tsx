@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
-import { AppointmentSkeleton } from '@/components/common/LoadingSpinner';
+import { AppointmentSkeleton } from '@/components/common/ContentSkeleton';
 import { PatientAppointmentCard } from '@/components/patient/PatientAppointmentCard';
 import { calculateQueuePosition, formatWaitTime, getQueueStatusMessage } from '@/lib/queueCalculation';
 import type { SessionData } from '@/types/auth';

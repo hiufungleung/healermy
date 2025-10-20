@@ -14,21 +14,16 @@ export async function getOrganization(
 export async function searchOrganizations(
   token: string,
   fhirBaseUrl: string,
-  params: {
-    name?: string;
-    active?: boolean;
-    type?: string;
-    _count?: number;
-    _sort?: string;
-  } = {}
+  params: Record<string, string | boolean | number> = {}
 ): Promise<Bundle<Organization>> {
   const queryParams = new URLSearchParams();
 
-  if (params.name) queryParams.append('name', params.name);
-  if (params.active !== undefined) queryParams.append('active', String(params.active));
-  if (params.type) queryParams.append('type', params.type);
-  if (params._count) queryParams.append('_count', String(params._count));
-  if (params._sort) queryParams.append('_sort', params._sort);
+  // Pass ALL parameters directly to FHIR API without filtering
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      queryParams.append(key, String(value));
+    }
+  });
 
   const url = `${fhirBaseUrl}/Organization?${queryParams.toString()}`;
   const response = await FHIRClient.fetchWithAuth(url, token);

@@ -7,6 +7,7 @@ import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import type { Patient } from '@/types/fhir';
 import type { SessionData } from '@/types/auth';
+import { formatAppointmentDateTime } from '@/library/timezone';
 
 // Cache for appointment details to avoid refetching
 const appointmentCache = new Map<string, { appointment: any; practitionerName: string }>();
@@ -96,21 +97,10 @@ function AppointmentDetailsExpanded({ appointmentId }: { appointmentId: string }
     return null;
   }
 
-  const appointmentDate = appointmentDetails.start
-    ? new Date(appointmentDetails.start).toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      })
-    : 'Date not available';
-
-  const appointmentTime = appointmentDetails.start
-    ? new Date(appointmentDetails.start).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit'
-      })
-    : 'Time not available';
+  // Use centralized formatting: "14:30, 25/12/2024" or "Today, 14:30" or "Tomorrow, 14:30"
+  const formattedDateTime = appointmentDetails.start
+    ? formatAppointmentDateTime(appointmentDetails.start)
+    : 'Date and time not available';
 
   return (
     <div className="mt-4 pt-4 border-t border-gray-200">
@@ -135,7 +125,7 @@ function AppointmentDetailsExpanded({ appointmentId }: { appointmentId: string }
           </svg>
           <div>
             <span className="text-text-secondary font-medium">Date & Time:</span>
-            <span className="text-text-primary ml-2">{appointmentDate} at {appointmentTime}</span>
+            <span className="text-text-primary ml-2">{formattedDateTime}</span>
           </div>
         </div>
       </div>
@@ -226,8 +216,22 @@ export default function NotificationsClient({
   const [selectedMessage, setSelectedMessage] = useState<Communication | null>(null);
   const [displayCount, setDisplayCount] = useState(10); // Show 10 notifications initially
 
+  // Track if we've already fetched to prevent duplicate calls
+  const hasFetchedRef = React.useRef(false);
+  const patientIdRef = React.useRef(session?.patient);
+
   // Fetch patient data and communications on client-side
   useEffect(() => {
+    if (!session?.patient) return;
+
+    // Only fetch if patient ID actually changed or first mount
+    if (hasFetchedRef.current && patientIdRef.current === session.patient) {
+      return;
+    }
+
+    hasFetchedRef.current = true;
+    patientIdRef.current = session.patient;
+
     async function fetchData() {
       try {
         setLoading(true);
@@ -262,9 +266,7 @@ export default function NotificationsClient({
       }
     }
 
-    if (session?.patient) {
-      fetchData();
-    }
+    fetchData();
   }, [session?.patient]);
 
   // Check URL parameters on mount and set filter accordingly
@@ -580,31 +582,34 @@ export default function NotificationsClient({
     return { id: appointmentId };
   };
 
+  // Format notification timestamp using centralized format (24-hour time, dd/mm/yyyy date)
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Unknown date';
-    
+
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
+
+    // Within 24 hours: show 24-hour time only (e.g., "14:30")
     if (diffInHours < 24) {
-      return date.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit' 
-      });
-    } else if (diffInHours < 7 * 24) {
-      return date.toLocaleDateString('en-US', { 
-        weekday: 'short',
-        hour: 'numeric',
-        minute: '2-digit'
-      });
-    } else {
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit'
-      });
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }
+    // Within 7 days: show day name + 24-hour time (e.g., "Mon, 14:30")
+    else if (diffInHours < 7 * 24) {
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const dayName = dayNames[date.getDay()];
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${dayName}, ${hours}:${minutes}`;
+    }
+    // Older: show dd/mm/yyyy (e.g., "25/12/2024")
+    else {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
     }
   };
 
@@ -715,7 +720,7 @@ export default function NotificationsClient({
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+      {/* <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <Card padding="sm">
           <div className="text-center py-2">
             <div className="text-xl sm:text-xl sm:text-2xl font-bold text-primary">{unreadCount}</div>
@@ -736,7 +741,7 @@ export default function NotificationsClient({
             <div className="text-xs sm:text-sm text-text-secondary">Total Messages</div>
           </div>
         </Card>
-      </div>
+      </div> */}
 
       {/* Filter Tabs */}
       <Card className="mb-6">

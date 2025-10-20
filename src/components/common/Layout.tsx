@@ -145,8 +145,8 @@ export function Layout({ children, patientName, providerName, practitionerName }
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sticky Navigation */}
-      <nav className="sticky top-0 z-50 bg-white shadow-sm border-b">
+      {/* Fixed Navigation - Always stays at top even during overscroll */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Left side: Mobile Menu Button and Logo */}
@@ -359,8 +359,8 @@ export function Layout({ children, patientName, providerName, practitionerName }
           </div>
         </div>
 
-      {/* Main Content */}
-      <main>{children}</main>
+      {/* Main Content - Add padding to account for fixed header (h-16 = 64px) */}
+      <main className="pt-16">{children}</main>
 
       {/* Logout Confirmation Modal */}
       <PopupConfirmation

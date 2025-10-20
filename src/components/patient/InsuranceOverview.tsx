@@ -3,6 +3,7 @@
 import React from 'react';
 import { Card } from '@/components/common/Card';
 import { Badge } from '@/components/common/Badge';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { Coverage, ExplanationOfBenefit } from '@/types/fhir';
 
 // CoverageDetails type definition (formerly from operations)
@@ -291,7 +292,7 @@ export const InsuranceOverview: React.FC<InsuranceOverviewProps> = ({
         </h2>
         <Card>
           <div className="flex items-center justify-center py-8">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-3"></div>
+            <LoadingSpinner size="sm" className="mr-3" />
             <span className="text-text-secondary">Loading insurance information...</span>
           </div>
         </Card>

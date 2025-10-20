@@ -8,7 +8,8 @@ import { PatientAppointmentCard } from '@/components/patient/PatientAppointmentC
 import {
   PatientInfoSkeleton,
   AppointmentSkeleton
-} from '@/components/common/LoadingSpinner';
+} from '@/components/common/ContentSkeleton';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { getNowInAppTimezone, formatAppointmentDateTime } from '@/library/timezone';
 import type { Patient } from '@/types/fhir';
 import type { SessionData } from '@/types/auth';
@@ -47,8 +48,19 @@ export default function DashboardClient({
   const [isPatientArrived, setIsPatientArrived] = useState(false);
   const [isEncounterPlanned, setIsEncounterPlanned] = useState(false);
 
+  // Track if we've already fetched to prevent duplicate calls
+  const hasFetchedRef = React.useRef(false);
+  const patientIdRef = React.useRef(session.patient);
+
   // Client-side data fetching
   useEffect(() => {
+    // Only fetch if patient ID actually changed or first mount
+    if (hasFetchedRef.current && patientIdRef.current === session.patient) {
+      return;
+    }
+
+    hasFetchedRef.current = true;
+    patientIdRef.current = session.patient;
     const fetchPatientData = async () => {
       try {
         setPatientError(null); // Clear previous errors
@@ -93,7 +105,7 @@ export default function DashboardClient({
         setAppointmentsError(null); // Clear previous errors
         const now = getNowInAppTimezone();
         // Only fetch future appointments, sorted by date (ascending = earliest first)
-        const response = await fetch(`/api/fhir/appointments?patient=${session.patient}&start=gt${now.toISOString()}&_sort=date`, {
+        const response = await fetch(`/api/fhir/appointments?patient=${session.patient}&date=ge${now.toISOString()}&_sort=date`, {
           credentials: 'include'
         });
 
@@ -393,7 +405,7 @@ export default function DashboardClient({
       {/* Quick Actions - Visible on all devices */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 mb-6 sm:mb-8">
         <h2 className="text-base font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <button
             onClick={() => router.push('/patient/book-appointment')}
             className="group bg-white rounded-lg border-2 border-blue-200 p-4 hover:border-blue-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
@@ -428,7 +440,7 @@ export default function DashboardClient({
 
           <button
             onClick={() => router.push('/patient/profile')}
-            className="group bg-white rounded-lg border-2 border-green-200 p-4 hover:border-green-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
+            className="hidden sm:block group bg-white rounded-lg border-2 border-green-200 p-4 hover:border-green-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
           >
             <div className="flex items-center space-x-4">
               <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
@@ -512,8 +524,12 @@ export default function DashboardClient({
           <div className="bg-white rounded-lg border border-border p-4 sm:p-6">
             <h2 className="text-base font-semibold mb-4 sm:mb-6">Next Appointment Status</h2>
 
-            <div className="space-y-4">
-              {todayStatus.nextAppointment ? (
+            <div className="space-y-4 transition-all duration-300 ease-in-out">
+              {loadingAppointments ? (
+                <div className="flex flex-col items-center justify-center py-1">
+                  <LoadingSpinner size="sm" />
+                </div>
+              ) : todayStatus.nextAppointment ? (
                 <>
                   {/* Show "Next Appointment" only if patient has NOT arrived */}
                   {!isPatientArrived && (

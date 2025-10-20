@@ -58,7 +58,7 @@ export function PatientAppointmentCard({ appointment, onAppointmentUpdated }: Pa
   // Get status display text
   const getStatusText = (status: string) => {
     if (status === 'booked') return 'Confirmed';
-    if (status === 'pending') return 'Pending Approval';
+    if (status === 'pending') return 'Pending';
     if (status === 'fulfilled') return 'Completed';
     if (status === 'cancelled') return 'Cancelled';
     return status;

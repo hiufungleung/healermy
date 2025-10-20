@@ -14,38 +14,39 @@ export async function GET(request: NextRequest) {
     // Extract session from middleware headers
     const session = await getSessionFromCookies();
 
-    // Parse query parameters
+    // Parse query parameters - pass ALL to FHIR API
     const searchParams = request.nextUrl.searchParams;
-    const givenName = searchParams.get('givenName');
-    const familyName = searchParams.get('familyName');
-    const phone = searchParams.get('phone');
-    const addressCity = searchParams.get('addressCity');
-    const addressState = searchParams.get('addressState');
-    const addressPostalCode = searchParams.get('addressPostalCode');
-    const addressCountry = searchParams.get('addressCountry');
-    const ids = searchParams.get('_id'); // FHIR standard: supports comma-separated IDs
-    const practitionerId = searchParams.get('practitionerId'); // Legacy parameter (kept for backward compatibility)
-    const page = searchParams.get('page');
-    const count = searchParams.get('count');
+
+    // Convert URLSearchParams to plain object, passing ALL parameters to FHIR API
+    const allParams: Record<string, string> = {};
+    searchParams.forEach((value, key) => {
+      allParams[key] = value;
+    });
+
+    // Handle special parameters
+    const page = allParams.page;
+    const count = allParams.count;
+    const practitionerId = allParams.practitionerId; // Legacy parameter
 
     // Prepare FHIR-compliant search options
-    const searchOptions: any = {};
-    if (givenName) searchOptions.given = givenName;
-    if (familyName) searchOptions.family = familyName;
-    if (phone) searchOptions.telecom = `phone|${phone}`;
-    if (addressCity) searchOptions['address-city'] = addressCity;
-    if (addressState) searchOptions['address-state'] = addressState;
-    if (addressPostalCode) searchOptions['address-postalcode'] = addressPostalCode;
-    if (addressCountry) searchOptions['address-country'] = addressCountry;
-    // Prefer _id (FHIR standard), fallback to practitionerId (legacy)
-    if (ids) searchOptions._id = ids;
-    else if (practitionerId) searchOptions._id = practitionerId;
-    if (count) searchOptions._count = parseInt(count);
+    const searchOptions: any = { ...allParams };
+
+    // Legacy support: Convert practitionerId to _id if needed
+    if (practitionerId && !searchOptions._id) {
+      searchOptions._id = practitionerId;
+      delete searchOptions.practitionerId;
+    }
+
+    // Handle pagination
+    if (count) {
+      searchOptions._count = parseInt(count);
+    }
 
     // Use proper FHIR pagination with offset
     if (page && parseInt(page) > 1) {
       const offset = (parseInt(page) - 1) * (parseInt(count || '10') || 10);
       searchOptions._getpagesoffset = offset;
+      delete searchOptions.page; // Don't send 'page' to FHIR, use _getpagesoffset
     }
 
     // Call FHIR operations

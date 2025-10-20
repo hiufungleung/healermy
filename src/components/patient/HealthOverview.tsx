@@ -3,6 +3,7 @@
 import React from 'react';
 import { Card } from '@/components/common/Card';
 import { Badge } from '@/components/common/Badge';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { Condition, MedicationRequest, AllergyIntolerance, Procedure } from '@/types/fhir';
 
 interface HealthOverviewProps {
@@ -77,7 +78,7 @@ export const HealthOverview: React.FC<HealthOverviewProps> = ({
       <Card className="bg-white border-gray-200 shadow-sm">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-3"></div>
+            <LoadingSpinner size="sm" className="mr-3" />
             <span className="text-text-secondary">Loading health information...</span>
           </div>
         ) : (
