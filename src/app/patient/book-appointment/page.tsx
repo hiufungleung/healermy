@@ -2082,7 +2082,7 @@ function NewBookingFlow() {
                   maxLength={500}
                   rows={4}
                   placeholder="Describe any symptoms or additional information..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="text-sm w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
                 <p className="text-xs text-gray-500 mt-1">{symptoms.length}/500 characters</p>
               </div>

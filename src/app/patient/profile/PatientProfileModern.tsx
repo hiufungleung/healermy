@@ -17,6 +17,7 @@ import type {
   ExplanationOfBenefit,
 } from '@/types/fhir';
 import { Badge } from '@/components/common/Badge';
+import { formatDateForDisplay } from '@/library/timezone';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Collapsible,
@@ -472,11 +473,7 @@ export function ModernPatientProfile({
                     {condition.recordedDate ? (
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-blue-600" />
-                        <span className="font-medium">Diagnosed: {new Date(condition.recordedDate).toLocaleDateString('en-US', { 
-                          year: 'numeric', 
-                          month: 'long', 
-                          day: 'numeric' 
-                        })}</span>
+                        <span className="font-medium">Diagnosed: {formatDateForDisplay(condition.recordedDate)}</span>
                       </div>
                     ) : condition.onsetDateTime ? (
                       <div className="flex items-center gap-2">

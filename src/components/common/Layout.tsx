@@ -151,10 +151,10 @@ export function Layout({ children, patientName, providerName, practitionerName }
           <div className="flex justify-between items-center h-16">
             {/* Left side: Mobile Menu Button and Logo */}
             <div className="flex items-center">
-              {/* Mobile Menu Button - Animated Hamburger Icon */}
+              {/* Mobile Menu Button - Animated Hamburger Icon with larger tap area */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="sm:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors mr-2 relative z-50"
+                className="sm:hidden p-4 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors mr-0 relative z-50"
                 aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
                 aria-expanded={mobileMenuOpen}
               >
