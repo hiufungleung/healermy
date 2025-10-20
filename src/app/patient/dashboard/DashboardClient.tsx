@@ -3,45 +3,35 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
-import { Badge } from '@/components/common/Badge';
 import { PatientAppointmentCard } from '@/components/patient/PatientAppointmentCard';
-import {
-  PatientInfoSkeleton,
-  AppointmentSkeleton
-} from '@/components/common/ContentSkeleton';
+import { AppointmentSkeleton } from '@/components/common/ContentSkeleton';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { getNowInAppTimezone, formatAppointmentDateTime } from '@/library/timezone';
-import type { Patient } from '@/types/fhir';
 import type { SessionData } from '@/types/auth';
 import type { AppointmentWithPractitionerDetails } from '@/library/appointmentDetailInfo';
 
 interface DashboardClientProps {
   patientName: string | undefined;
   session: SessionData;
-  onPatientNameUpdate?: (name: string) => void;
 }
 
 export default function DashboardClient({
   patientName: initialPatientName,
-  session,
-  onPatientNameUpdate
+  session
 }: DashboardClientProps) {
   const router = useRouter();
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [patientName, setPatientName] = useState(initialPatientName || 'Patient');
 
-  // Extract first name from initial patient name for immediate display
+  // Extract first name from patient name - reactive to prop changes
   const getFirstName = (fullName: string | undefined) => {
     if (!fullName) return 'Patient';
     if (fullName.startsWith('Patient ')) return 'Patient';
     return fullName.split(' ')[0] || 'Patient';
   };
 
-  const [firstName, setFirstName] = useState(getFirstName(initialPatientName));
+  // Use prop directly (reactive to AuthProvider updates)
+  const firstName = getFirstName(initialPatientName);
   const [appointments, setAppointments] = useState<AppointmentWithPractitionerDetails[]>([]);
-  const [loadingPatient, setLoadingPatient] = useState(true);
   const [loadingAppointments, setLoadingAppointments] = useState(true);
-  const [patientError, setPatientError] = useState<string | null>(null);
   const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
   const [estimatedWaitTime, setEstimatedWaitTime] = useState<number | null>(null);
@@ -52,7 +42,7 @@ export default function DashboardClient({
   const hasFetchedRef = React.useRef(false);
   const patientIdRef = React.useRef(session.patient);
 
-  // Client-side data fetching
+  // Client-side data fetching - ONLY appointments (patient data comes from AuthProvider)
   useEffect(() => {
     // Only fetch if patient ID actually changed or first mount
     if (hasFetchedRef.current && patientIdRef.current === session.patient) {
@@ -61,44 +51,6 @@ export default function DashboardClient({
 
     hasFetchedRef.current = true;
     patientIdRef.current = session.patient;
-    const fetchPatientData = async () => {
-      try {
-        setPatientError(null); // Clear previous errors
-        const response = await fetch(`/api/fhir/patients/${session.patient}`, {
-          credentials: 'include'
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Failed to load patient data (${response.status})`);
-        }
-
-        const patientData = await response.json();
-        setPatient(patientData);
-
-        // Extract real patient name from FHIR data
-        if (patientData?.name?.[0]) {
-          const givenNames = patientData.name[0]?.given || [];
-          const family = patientData.name[0]?.family || '';
-          const givenNamesString = givenNames.join(' ');
-          const fullName = `${givenNamesString} ${family}`.trim();
-          const firstNameOnly = givenNames[0] || 'Patient';
-
-          if (fullName) {
-            setPatientName(fullName);
-            setFirstName(firstNameOnly);
-            // Update the parent component (Layout) with the real patient name
-            onPatientNameUpdate?.(fullName);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching patient data:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Failed to load patient information';
-        setPatientError(errorMessage);
-      } finally {
-        setLoadingPatient(false);
-      }
-    };
 
     const fetchAppointments = async () => {
       try {
@@ -130,7 +82,6 @@ export default function DashboardClient({
       }
     };
 
-    fetchPatientData();
     fetchAppointments();
   }, [session.patient]);
 
@@ -154,19 +105,6 @@ export default function DashboardClient({
     }
   };
 
-  // Extract patient information
-  const patientGender = patient?.gender;
-  const patientBirthDate = patient?.birthDate;
-  const patientAge = patientBirthDate ? 
-    Math.floor((Date.now() - new Date(patientBirthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null;
-  
-  const patientPhone = patient?.telecom?.find(t => t.system === 'phone')?.value;
-  const patientEmail = patient?.telecom?.find(t => t.system === 'email')?.value;
-  
-  const patientAddress = patient?.address?.[0];
-  const formattedAddress = patientAddress ? 
-    `${patientAddress.line?.join(', ') || ''} ${patientAddress.city || ''} ${patientAddress.state || ''} ${patientAddress.postalCode || ''}`.trim() : null;
-  
   // Filter appointments for upcoming section: confirmed/pending within next 3 days
   const nowLocal = getNowInAppTimezone();
   const threeDaysFromNow = new Date(nowLocal);

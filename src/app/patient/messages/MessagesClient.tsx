@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { Card } from '@/components/common/Card';
-import type { Patient } from '@/types/fhir';
 
 interface Communication {
   id: string;
@@ -35,11 +34,11 @@ export default function MessagesClient({
   const [selectedMessage, setSelectedMessage] = useState<Communication | null>(null);
   const [filter, setFilter] = useState<'all' | 'received' | 'sent'>('all');
   const [localCommunications, setLocalCommunications] = useState<Communication[]>([]);
-  const [patient, setPatient] = useState<Patient | null>(null);
+  // Removed patient state - use session.patient directly since we only need the ID
   const [loading, setLoading] = useState(true);
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
 
-  // Fetch patient data and communications on client-side
+  // Fetch communications only (patient data not needed - we have session.patient)
   useEffect(() => {
     async function fetchData() {
       if (!session.patient) {
@@ -51,17 +50,7 @@ export default function MessagesClient({
       try {
         setLoading(true);
 
-        // Fetch patient data
-        const patientResponse = await fetch(`/api/fhir/patients/${session.patient}`, {
-          credentials: 'include',
-        });
-
-        if (patientResponse.ok) {
-          const patientData = await patientResponse.json();
-          setPatient(patientData);
-        }
-
-        // Fetch communications
+        // Only fetch communications (no need to fetch patient data)
         const communicationsResponse = await fetch(`/api/fhir/communications?patient=${session.patient}`, {
           credentials: 'include',
         });
@@ -85,7 +74,7 @@ export default function MessagesClient({
 
   // Function to check if message is read (uses local state for immediate updates)
   const isMessageRead = (comm: Communication): boolean => {
-    const patientRef = `Patient/${patient?.id}`;
+    const patientRef = `Patient/${session.patient}`;
     const isReceivedByPatient = comm.recipient?.some(r => r.reference === patientRef);
     
     // Only check read status for messages received by patient
@@ -178,7 +167,7 @@ export default function MessagesClient({
   const filteredCommunications = localCommunications.filter(comm => {
     if (filter === 'all') return true;
     
-    const patientRef = `Patient/${patient?.id}`;
+    const patientRef = `Patient/${session.patient}`;
     const isReceived = comm.recipient?.some(r => r.reference === patientRef);
     const isSent = comm.sender?.reference === patientRef;
     
@@ -233,7 +222,7 @@ export default function MessagesClient({
   };
 
   const getSenderDisplay = (comm: Communication) => {
-    const patientRef = `Patient/${patient?.id}`;
+    const patientRef = `Patient/${session.patient}`;
     const isFromPatient = comm.sender?.reference === patientRef;
     
     if (isFromPatient) {
@@ -312,8 +301,8 @@ export default function MessagesClient({
               <nav className="-mb-px flex space-x-8">
                 {([
                   { key: 'all' as const, label: 'All Messages', count: localCommunications.length },
-                  { key: 'received' as const, label: 'Received', count: localCommunications.filter(c => c.recipient?.some(r => r.reference === `Patient/${patient?.id}`)).length },
-                  { key: 'sent' as const, label: 'Sent', count: localCommunications.filter(c => c.sender?.reference === `Patient/${patient?.id}`).length }
+                  { key: 'received' as const, label: 'Received', count: localCommunications.filter(c => c.recipient?.some(r => r.reference === `Patient/${session.patient}`)).length },
+                  { key: 'sent' as const, label: 'Sent', count: localCommunications.filter(c => c.sender?.reference === `Patient/${session.patient}`).length }
                 ] as const).map((tab) => (
                   <button
                     key={tab.key}

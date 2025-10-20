@@ -16,40 +16,27 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<SessionData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+interface AuthProviderProps {
+  children: ReactNode;
+  initialSession: SessionData | null;
+}
+
+export function AuthProvider({ children, initialSession }: AuthProviderProps) {
+  const [session, setSession] = useState<SessionData | null>(initialSession);
+  const [isLoading, setIsLoading] = useState(false); // No loading needed - we have session from server
   const [userName, setUserName] = useState<string | null>(null);
   const [isLoadingUserName, setIsLoadingUserName] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
 
-  const checkSession = async () => {
-    try {
-      const response = await fetch('/api/auth/session', {
-        credentials: 'include', // Important: Include HTTP-only cookies
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.authenticated && data.session) {
-          setSession(data.session);
-          console.log('✅ Session loaded:', data.session.role);
-          return data.session;
-        }
-      } else if (response.status === 401) {
-        // No session found - this is expected when not logged in
-        setSession(null);
-        setUserName(null);
-      } else {
-        console.warn('⚠️ Session check failed:', response.status);
-      }
-    } catch (error) {
-      console.error('❌ Error checking session:', error);
+  // Initialize session from prop (server-side cookie read)
+  useEffect(() => {
+    if (initialSession) {
+      setSession(initialSession);
+      console.log('✅ Session loaded from server:', initialSession.role);
     }
-    return null;
-  };
+  }, [initialSession]);
 
   // Fetch user name when session is established
   useEffect(() => {
@@ -235,36 +222,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Listen for session updates (e.g., after successful login)
+  // Note: This is triggered by login callback to refresh the page
   useEffect(() => {
-    const initializeAuth = async () => {
-      await checkSession();
-      setIsLoading(false);
-    };
-
-    initializeAuth();
-
-    // Listen for session updates (e.g., after successful login)
-    const handleSessionUpdate = async () => {
-      console.log('🔄 Session update detected, refreshing...');
-      await checkSession();
+    const handleSessionUpdate = () => {
+      console.log('🔄 Session update detected, reloading page...');
+      window.location.reload();
     };
 
     window.addEventListener('sessionUpdated', handleSessionUpdate);
-    
+
     return () => {
       window.removeEventListener('sessionUpdated', handleSessionUpdate);
     };
   }, []);
-
-  // Re-check session when navigating to protected pages
-  useEffect(() => {
-    if (pathname.startsWith('/patient/') || pathname.startsWith('/provider/') || pathname.startsWith('/practitioner/')) {
-      if (!session && !isLoading) {
-        console.log('🔄 Protected route accessed, re-checking session...');
-        checkSession();
-      }
-    }
-  }, [pathname, session, isLoading]);
 
   // Fetch notifications on session load and poll every 30 seconds
   useEffect(() => {

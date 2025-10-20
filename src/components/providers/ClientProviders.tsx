@@ -1,10 +1,16 @@
 'use client';
 
 import { AuthProvider } from '@/components/auth/AuthProvider';
+import type { SessionData } from '@/types/auth';
 
-export function ClientProviders({ children }: { children: React.ReactNode }) {
+interface ClientProvidersProps {
+  children: React.ReactNode;
+  initialSession: SessionData | null;
+}
+
+export function ClientProviders({ children, initialSession }: ClientProvidersProps) {
   return (
-    <AuthProvider>
+    <AuthProvider initialSession={initialSession}>
       {children}
     </AuthProvider>
   );

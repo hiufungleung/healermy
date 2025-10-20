@@ -21,7 +21,6 @@ export default function DashboardWrapper({
         <DashboardClient
           patientName={userName || undefined}
           session={session}
-          onPatientNameUpdate={() => {}} // No-op since name is managed by AuthProvider
         />
       </div>
     </Layout>

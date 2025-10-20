@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
-import type { Patient } from '@/types/fhir';
 import type { SessionData } from '@/types/auth';
 import { formatAppointmentDateTime } from '@/library/timezone';
 
@@ -210,7 +209,7 @@ export default function NotificationsClient({
   const searchParams = useSearchParams();
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'action_required'>('all');
   const [localCommunications, setLocalCommunications] = useState<Communication[]>([]);
-  const [patient, setPatient] = useState<Patient | null>(null);
+  // Removed patient state - use session.patient directly since we only need the ID
   const [loading, setLoading] = useState(true);
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
   const [selectedMessage, setSelectedMessage] = useState<Communication | null>(null);
@@ -220,7 +219,7 @@ export default function NotificationsClient({
   const hasFetchedRef = React.useRef(false);
   const patientIdRef = React.useRef(session?.patient);
 
-  // Fetch patient data and communications on client-side
+  // Fetch communications only (patient data not needed - we have session.patient)
   useEffect(() => {
     if (!session?.patient) return;
 
@@ -236,21 +235,10 @@ export default function NotificationsClient({
       try {
         setLoading(true);
 
-        // Parallel requests - both APIs called at the same time (faster!)
-        const [patientResponse, communicationsResponse] = await Promise.all([
-          fetch(`/api/fhir/patients/${session.patient}`, {
-            credentials: 'include',
-          }),
-          fetch(`/api/fhir/communications`, {
-            credentials: 'include',
-          })
-        ]);
-
-        // Process patient data
-        if (patientResponse.ok) {
-          const patientData = await patientResponse.json();
-          setPatient(patientData);
-        }
+        // Only fetch communications (no need to fetch patient data)
+        const communicationsResponse = await fetch(`/api/fhir/communications`, {
+          credentials: 'include',
+        });
 
         // Process communications data
         if (communicationsResponse.ok) {
@@ -295,7 +283,7 @@ export default function NotificationsClient({
 
   // Function to check if message is read
   const isMessageRead = (comm: Communication): boolean => {
-    const patientRef = `Patient/${patient?.id}`;
+    const patientRef = `Patient/${session.patient}`;
     const isReceivedByPatient = comm.recipient?.some(r => r.reference === patientRef);
     
     // Only check read status for messages received by patient
@@ -511,7 +499,7 @@ export default function NotificationsClient({
   };
 
   const getSenderDisplay = (comm: Communication) => {
-    const patientRef = `Patient/${patient?.id}`;
+    const patientRef = `Patient/${session.patient}`;
     const isFromPatient = comm.sender?.reference === patientRef;
     
     if (isFromPatient) {
@@ -615,7 +603,7 @@ export default function NotificationsClient({
 
   // Filter communications
   const filteredCommunications = localCommunications.filter(comm => {
-    const patientRef = `Patient/${patient?.id}`;
+    const patientRef = `Patient/${session.patient}`;
     const isReceived = comm.recipient?.some(r => r.reference === patientRef);
     const isSent = comm.sender?.reference === patientRef;
     const category = comm.category?.[0]?.text;
@@ -651,8 +639,8 @@ export default function NotificationsClient({
 
   // Counts for communications
   const unreadCount = localCommunications.filter(comm => !isMessageRead(comm)).length;
-  const sentCount = localCommunications.filter(comm => comm.sender?.reference === `Patient/${patient?.id}`).length;
-  const receivedCount = localCommunications.filter(comm => comm.recipient?.some(r => r.reference === `Patient/${patient?.id}`)).length;
+  const sentCount = localCommunications.filter(comm => comm.sender?.reference === `Patient/${session.patient}`).length;
+  const receivedCount = localCommunications.filter(comm => comm.recipient?.some(r => r.reference === `Patient/${session.patient}`)).length;
 
   // Action Required count - Communications don't have actionRequired flag
   const actionRequiredCount = 0;
