@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
 interface Communication {
   id: string;
@@ -849,35 +850,10 @@ export default function ProviderNotificationsClient() {
 
         <TabsContent value={activeFilter} className="space-y-4 mt-6">
         {isLoading ? (
-          <div className="space-y-4 animate-pulse">
-            {[...Array(4)].map((_, i) => (
-              <Card key={i} className="p-4">
-                <div className="flex items-start space-x-4">
-                  <div className="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0"></div>
-                  <div className="flex-1 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="space-y-2 w-full sm:w-auto">
-                        <div className="h-4 bg-gray-200 rounded w-48"></div>
-                        <div className="flex flex-wrap gap-2">
-                          <div className="h-4 bg-gray-200 rounded w-20"></div>
-                          <div className="h-4 bg-gray-200 rounded w-24"></div>
-                        </div>
-                      </div>
-                      <div className="h-3 bg-gray-200 rounded w-24"></div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="h-3 bg-gray-200 rounded w-full"></div>
-                      <div className="h-3 bg-gray-200 rounded w-5/6"></div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <div className="h-8 bg-gray-200 rounded w-28"></div>
-                      <div className="h-8 bg-gray-200 rounded w-24"></div>
-                      <div className="h-8 bg-gray-200 rounded w-24"></div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            ))}
+          // Loading state with spinner
+          <div className="flex flex-col items-center justify-center py-12">
+            <LoadingSpinner size="lg" />
+            <p className="text-text-secondary text-sm mt-4">Loading notifications...</p>
           </div>
         ) : allFilteredItems.length === 0 ? (
           <Card className="text-center py-12">

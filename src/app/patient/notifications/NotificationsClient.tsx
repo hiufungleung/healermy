@@ -6,6 +6,7 @@ import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { SessionData } from '@/types/auth';
 import { formatAppointmentDateTime } from '@/library/timezone';
 
@@ -731,20 +732,10 @@ export default function NotificationsClient({
         {/* Notifications List for All */}
         <TabsContent value="all" className="space-y-4 mt-6">
         {loading ? (
-          // Loading skeleton - only for notification list
-          <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <div className="flex items-start space-x-4">
-                  <div className="w-10 h-10 rounded-full bg-gray-200"></div>
-                  <div className="flex-1 space-y-3">
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-full"></div>
-                  </div>
-                </div>
-              </Card>
-            ))}
+          // Loading state with spinner
+          <div className="flex flex-col items-center justify-center py-12">
+            <LoadingSpinner size="lg" />
+            <p className="text-text-secondary text-sm mt-4">Loading notifications...</p>
           </div>
         ) : allFilteredItems.length === 0 ? (
           <Card className="text-center py-12">
@@ -922,20 +913,10 @@ export default function NotificationsClient({
         {/* Notifications List for Unread */}
         <TabsContent value="unread" className="space-y-4 mt-6">
         {loading ? (
-          // Loading skeleton - only for notification list
-          <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <div className="flex items-start space-x-4">
-                  <div className="w-10 h-10 rounded-full bg-gray-200"></div>
-                  <div className="flex-1 space-y-3">
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-full"></div>
-                  </div>
-                </div>
-              </Card>
-            ))}
+          // Loading state with spinner
+          <div className="flex flex-col items-center justify-center py-12">
+            <LoadingSpinner size="lg" />
+            <p className="text-text-secondary text-sm mt-4">Loading notifications...</p>
           </div>
         ) : allFilteredItems.length === 0 ? (
           <Card className="text-center py-12">
@@ -1113,20 +1094,10 @@ export default function NotificationsClient({
         {/* Notifications List for Action Required */}
         <TabsContent value="action_required" className="space-y-4 mt-6">
         {loading ? (
-          // Loading skeleton - only for notification list
-          <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <div className="flex items-start space-x-4">
-                  <div className="w-10 h-10 rounded-full bg-gray-200"></div>
-                  <div className="flex-1 space-y-3">
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-full"></div>
-                  </div>
-                </div>
-              </Card>
-            ))}
+          // Loading state with spinner
+          <div className="flex flex-col items-center justify-center py-12">
+            <LoadingSpinner size="lg" />
+            <p className="text-text-secondary text-sm mt-4">Loading notifications...</p>
           </div>
         ) : allFilteredItems.length === 0 ? (
           <Card className="text-center py-12">
