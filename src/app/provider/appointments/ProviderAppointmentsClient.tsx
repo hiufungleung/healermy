@@ -1,605 +1,459 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card } from '@/components/common/Card';
-import { Button } from '@/components/common/Button';
-import { Badge } from '@/components/common/Badge';
-import { AppointmentSkeleton } from '@/components/common/ContentSkeleton';
-import { ProviderAppointmentDetailModal } from '@/components/provider/ProviderAppointmentDetailModal';
-import { formatAppointmentDateTime } from '@/library/timezone';
-import type { Appointment } from '@/types/fhir';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  ColumnFiltersState,
+  SortingState,
+  VisibilityState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { columns, AppointmentRow } from './columns';
+import type { Appointment, Encounter } from '@/types/fhir';
 
-interface AppointmentStats {
-  today: number;
-  pending: number;
-  completed: number;
-  cancelled: number;
-}
+type TimeFilter = 'all' | 'today' | 'upcoming-7' | 'upcoming' | 'past';
+type StatusFilter = 'pending' | 'booked' | 'fulfilled' | 'cancelled';
 
-interface ProviderAppointmentsClientProps {
-  appointments: Appointment[];
-  stats: AppointmentStats;
-  session: {
-    role: string;
-    userId: string;
-  };
-  showAllHistory?: boolean;
-}
-
-export default function ProviderAppointmentsClient({
-  appointments: initialAppointments,
-  stats,
-  session,
-  showAllHistory = false
-}: ProviderAppointmentsClientProps) {
+export default function ProviderAppointmentsClient() {
   const router = useRouter();
-  const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
-  const [loadingAppointment, setLoadingAppointment] = useState<string | null>(null);
-  const [loadingNames, setLoadingNames] = useState(true);
-  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const searchParams = useSearchParams();
 
-  const handleOpenModal = (appointmentId: string) => {
-    setSelectedAppointmentId(appointmentId);
-    setIsModalOpen(true);
-  };
+  const [appointments, setAppointments] = useState<AppointmentRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedAppointmentId(null);
-  };
+  // Initialize filter state from URL params (default: today, no status)
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>(() => {
+    const time = searchParams.get('time');
+    if (time && ['all', 'today', 'upcoming-7', 'upcoming', 'past'].includes(time)) {
+      return time as TimeFilter;
+    }
+    return 'today';
+  });
 
-  // Enhance appointments with real names on mount
-  React.useEffect(() => {
-    const resolveAppointmentNames = async () => {
-      try {
-        if (initialAppointments.length > 0) {
-          const { enhanceAppointmentsWithNames } = await import('@/library/fhirNameResolver');
-          const enhancedAppointments = await enhanceAppointmentsWithNames(initialAppointments);
-          setAppointments(enhancedAppointments);
-        }
-      } catch (error) {
-        console.error('Error resolving appointment names:', error);
-      } finally {
-        setLoadingNames(false);
+  const [statusFilters, setStatusFilters] = useState<StatusFilter[]>(() => {
+    const status = searchParams.get('status');
+    if (status) {
+      const statuses = status.split(',').filter(s =>
+        ['pending', 'booked', 'fulfilled', 'cancelled'].includes(s)
+      );
+      return statuses as StatusFilter[];
+    }
+    return [];
+  });
+
+  // Fetch all appointments with filters - OPTIMIZED to 4 API calls
+  const fetchAppointments = useCallback(async () => {
+    setLoading(true);
+    try {
+      console.log('[APPOINTMENTS] Starting optimized fetch with filters');
+
+      // Build query parameters for appointments
+      const appointmentParams = new URLSearchParams();
+      appointmentParams.append('_sort', '-date');
+
+      // Add time filter
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayEnd = new Date(today);
+      todayEnd.setDate(todayEnd.getDate() + 1);
+
+      switch (timeFilter) {
+        case 'all':
+          // No date filter for 'all'
+          break;
+        case 'today':
+          appointmentParams.append('date', `ge${today.toISOString()}`);
+          appointmentParams.append('date', `lt${todayEnd.toISOString()}`);
+          break;
+        case 'upcoming-7':
+          const next7Days = new Date(today);
+          next7Days.setDate(next7Days.getDate() + 7);
+          appointmentParams.append('date', `ge${today.toISOString()}`);
+          appointmentParams.append('date', `lt${next7Days.toISOString()}`);
+          break;
+        case 'upcoming':
+          appointmentParams.append('date', `ge${today.toISOString()}`);
+          break;
+        case 'past':
+          appointmentParams.append('date', `lt${today.toISOString()}`);
+          break;
       }
+
+      // Add status filter (comma-separated, no spaces)
+      if (statusFilters.length > 0) {
+        appointmentParams.append('status', statusFilters.join(','));
+      }
+
+      // CALL 1: Fetch appointments with filters
+      const appointmentsResponse = await fetch(
+        `/api/fhir/appointments?${appointmentParams.toString()}`,
+        { credentials: 'include' }
+      );
+
+      if (!appointmentsResponse.ok) {
+        throw new Error('Failed to fetch appointments');
+      }
+
+      const appointmentsData = await appointmentsResponse.json();
+      const fetchedAppointments: Appointment[] = appointmentsData.appointments || [];
+      console.log('[APPOINTMENTS] ✅ Call 1/4: Fetched', fetchedAppointments.length, 'appointments');
+
+      // Extract appointment IDs, patient IDs, and practitioner IDs
+      const appointmentIds = fetchedAppointments.map(apt => apt.id).filter(Boolean);
+      const patientIds = new Set<string>();
+      const practitionerIds = new Set<string>();
+
+      fetchedAppointments.forEach(apt => {
+        // Extract patient ID
+        const patientRef = apt.participant?.find(p =>
+          p.actor?.reference?.startsWith('Patient/')
+        );
+        if (patientRef?.actor?.reference) {
+          const patientId = patientRef.actor.reference.split('/')[1];
+          patientIds.add(patientId);
+        }
+
+        // Extract practitioner ID
+        const practitionerRef = apt.participant?.find(p =>
+          p.actor?.reference?.startsWith('Practitioner/')
+        );
+        if (practitionerRef?.actor?.reference) {
+          const practitionerId = practitionerRef.actor.reference.split('/')[1];
+          practitionerIds.add(practitionerId);
+        }
+      });
+
+      // CALLS 2-4: Fetch encounters, patients, and practitioners in parallel
+      const [encountersResponse, patientsResponse, practitionersResponse] = await Promise.all([
+        // Call 2: Fetch encounters by appointment IDs
+        appointmentIds.length > 0
+          ? fetch(
+              `/api/fhir/encounters?appointment=${appointmentIds.join(',')}`,
+              { credentials: 'include' }
+            )
+          : null,
+
+        // Call 3: Fetch patients by IDs
+        patientIds.size > 0
+          ? fetch(
+              `/api/fhir/patients?_id=${Array.from(patientIds).join(',')}`,
+              { credentials: 'include' }
+            )
+          : null,
+
+        // Call 4: Fetch practitioners by IDs
+        practitionerIds.size > 0
+          ? fetch(
+              `/api/fhir/practitioners?_id=${Array.from(practitionerIds).join(',')}`,
+              { credentials: 'include' }
+            )
+          : null,
+      ]);
+
+      // Process encounters
+      const encountersByAppointment = new Map<string, Encounter>();
+      if (encountersResponse?.ok) {
+        const encountersData = await encountersResponse.json();
+        const encounters: Encounter[] = encountersData.encounters || [];
+        encounters.forEach(enc => {
+          if (enc.appointment && enc.appointment.length > 0) {
+            const appointmentRef = enc.appointment[0].reference;
+            if (appointmentRef) {
+              const appointmentId = appointmentRef.split('/')[1];
+              if (appointmentId) {
+                encountersByAppointment.set(appointmentId, enc);
+              }
+            }
+          }
+        });
+        console.log('[APPOINTMENTS] ✅ Call 2/4: Fetched', encounters.length, 'encounters');
+      } else {
+        console.log('[APPOINTMENTS] ⏭️  Call 2/4: Skipped (no appointments)');
+      }
+
+      // Process patients
+      const patientsMap = new Map<string, any>();
+      if (patientsResponse?.ok) {
+        const patientsData = await patientsResponse.json();
+        const patients = patientsData.patients || [];
+        patients.forEach((patient: any) => {
+          if (patient.id) patientsMap.set(patient.id, patient);
+        });
+        console.log('[APPOINTMENTS] ✅ Call 3/4: Fetched', patients.length, 'patients');
+      } else {
+        console.log('[APPOINTMENTS] ⏭️  Call 3/4: Skipped (no patients)');
+      }
+
+      // Process practitioners
+      const practitionersMap = new Map<string, any>();
+      if (practitionersResponse?.ok) {
+        const practitionersData = await practitionersResponse.json();
+        const practitioners = practitionersData.practitioners || [];
+        practitioners.forEach((practitioner: any) => {
+          if (practitioner.id) practitionersMap.set(practitioner.id, practitioner);
+        });
+        console.log('[APPOINTMENTS] ✅ Call 4/4: Fetched', practitioners.length, 'practitioners');
+      } else {
+        console.log('[APPOINTMENTS] ⏭️  Call 4/4: Skipped (no practitioners)');
+      }
+
+      // Enhance appointments with patient, practitioner, and encounter data
+      const enhanced = fetchedAppointments.map(apt => {
+        // Get patient name
+        const patientRef = apt.participant?.find(p =>
+          p.actor?.reference?.startsWith('Patient/')
+        );
+        let patientName = 'Unknown Patient';
+        if (patientRef?.actor?.reference) {
+          const patientId = patientRef.actor.reference.split('/')[1];
+          const patient = patientsMap.get(patientId);
+          if (patient?.name?.[0]) {
+            const name = patient.name[0];
+            patientName = `${name.given?.[0] || ''} ${name.family || ''}`.trim();
+          }
+        }
+
+        // Get practitioner name
+        const practitionerRef = apt.participant?.find(p =>
+          p.actor?.reference?.startsWith('Practitioner/')
+        );
+        let practitionerName = 'Unknown Practitioner';
+        if (practitionerRef?.actor?.reference) {
+          const practitionerId = practitionerRef.actor.reference.split('/')[1];
+          const practitioner = practitionersMap.get(practitionerId);
+          if (practitioner?.name?.[0]) {
+            const name = practitioner.name[0];
+            practitionerName = `${name.given?.[0] || ''} ${name.family || ''}`.trim();
+          }
+        }
+
+        // Get encounter by appointment ID
+        const encounter = apt.id ? encountersByAppointment.get(apt.id) : undefined;
+
+        return {
+          ...apt,
+          patientName,
+          practitionerName,
+          encounter
+        } as AppointmentRow;
+      });
+
+      console.log('[APPOINTMENTS] ✅ Enhanced', enhanced.length, 'appointments with data');
+      setAppointments(enhanced);
+    } catch (error) {
+      console.error('Error fetching appointments:', error);
+      setAppointments([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [timeFilter, statusFilters]);
+
+  // Update URL when filters change
+  const updateURL = useCallback((time: TimeFilter, statuses: StatusFilter[]) => {
+    const params = new URLSearchParams();
+
+    // Only add time param if not default (today)
+    if (time !== 'today') {
+      params.set('time', time);
+    }
+
+    // Only add status param if not empty
+    if (statuses.length > 0) {
+      params.set('status', statuses.join(','));
+    }
+
+    const newURL = params.toString() ? `?${params.toString()}` : '/provider/appointments';
+    router.push(newURL);
+  }, [router]);
+
+  // Sync URL when filters change
+  useEffect(() => {
+    updateURL(timeFilter, statusFilters);
+  }, [timeFilter, statusFilters, updateURL]);
+
+  // Initial fetch and refetch when filters change
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
+
+  // Listen for refresh events from actions
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchAppointments();
     };
 
-    resolveAppointmentNames();
-  }, [initialAppointments]);
+    window.addEventListener('refresh-appointments', handleRefresh);
+    return () => window.removeEventListener('refresh-appointments', handleRefresh);
+  }, [fetchAppointments]);
 
-  const getPatientName = (appointment: Appointment) => {
-    const patientParticipant = appointment.participant?.find(p =>
-      p.actor?.reference?.startsWith('Patient/')
+  // Initialize table (following shadcn pattern exactly)
+  const table = useReactTable({
+    data: appointments,
+    columns,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+    },
+  });
+
+  // Toggle status filter
+  const toggleStatusFilter = (status: StatusFilter) => {
+    setStatusFilters((prev) =>
+      prev.includes(status)
+        ? prev.filter((s) => s !== status)
+        : [...prev, status]
     );
-
-    // Try display name first, then extract from reference if available
-    if (patientParticipant?.actor?.display) {
-      return patientParticipant.actor.display;
-    }
-
-    // If no display name, try to get patient ID from reference
-    if (patientParticipant?.actor?.reference) {
-      const patientId = patientParticipant.actor.reference.replace('Patient/', '');
-      return `Patient ${patientId}`;
-    }
-
-    return 'Unknown Patient';
   };
-
-  const getPractitionerName = (appointment: Appointment) => {
-    const practitionerParticipant = appointment.participant?.find(p =>
-      p.actor?.reference?.startsWith('Practitioner/')
-    );
-
-    // Try display name first, then extract from reference if available
-    if (practitionerParticipant?.actor?.display) {
-      return practitionerParticipant.actor.display;
-    }
-
-    // If no display name, try to get practitioner ID from reference
-    if (practitionerParticipant?.actor?.reference) {
-      const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
-      return `Dr. ${practitionerId}`;
-    }
-
-    return 'Unknown Practitioner';
-  };
-
-  const formatDuration = (start: string, end: string) => {
-    const startTime = new Date(start);
-    const endTime = new Date(end);
-    const diffMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
-    return `${diffMinutes}min`;
-  };
-
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'booked':
-      case 'fulfilled':
-        return 'success';
-      case 'pending':
-      case 'proposed':
-        return 'warning';
-      case 'cancelled':
-      case 'noshow':
-      case 'entered-in-error':
-        return 'danger';
-      case 'arrived':
-      case 'checked-in':
-        return 'info';
-      default:
-        return 'info';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'booked': return 'Confirmed';
-      case 'pending': return 'Pending';
-      case 'proposed': return 'Proposed';
-      case 'fulfilled': return 'Completed';
-      case 'cancelled': return 'Cancelled';
-      case 'noshow': return 'No Show';
-      case 'arrived': return 'Arrived';
-      case 'checked-in': return 'Checked In';
-      case 'waitlist': return 'Waitlist';
-      case 'entered-in-error': return 'Error';
-      default: return status;
-    }
-  };
-
-  const handleApprove = async (appointmentId: string) => {
-    setLoadingAppointment(appointmentId);
-
-    try {
-      // First, get the current appointment to find the practitioner participant
-      const getResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-
-      if (!getResponse.ok) {
-        throw new Error('Failed to fetch appointment details');
-      }
-
-      const appointment = await getResponse.json();
-
-      // Find the practitioner participant
-      const practitionerParticipant = appointment.participant?.find((p: any) =>
-        p.actor?.reference?.startsWith('Practitioner/')
-      );
-
-      if (!practitionerParticipant) {
-        throw new Error('No practitioner found in appointment');
-      }
-
-      // Use PATCH to update appointment status
-      const patchResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json-patch+json',
-        },
-        body: JSON.stringify([
-          {
-            op: 'replace',
-            path: '/status',
-            value: 'booked'
-          },
-          {
-            op: 'replace',
-            path: `/participant/${appointment.participant.indexOf(practitionerParticipant)}/status`,
-            value: 'accepted'
-          }
-        ]),
-      });
-
-      if (patchResponse.ok) {
-        // Update appointment status locally instead of removing
-        setAppointments(prev => prev.map(apt =>
-          apt.id === appointmentId
-            ? { ...apt, status: 'booked' }
-            : apt
-        ));
-        router.refresh();
-
-        // Trigger notification bell update
-        window.dispatchEvent(new CustomEvent('messageUpdate'));
-      } else {
-        const errorData = await patchResponse.json();
-        console.error('Failed to approve appointment:', errorData);
-        alert('Failed to approve appointment. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error approving appointment:', error);
-      alert('Error approving appointment. Please try again.');
-    } finally {
-      setLoadingAppointment(null);
-    }
-  };
-
-  const handleReject = async (appointmentId: string) => {
-    setLoadingAppointment(appointmentId);
-
-    try {
-      // First, get the current appointment to find the practitioner participant
-      const getResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-
-      if (!getResponse.ok) {
-        throw new Error('Failed to fetch appointment details');
-      }
-
-      const appointment = await getResponse.json();
-
-      // Find the practitioner participant
-      const practitionerParticipant = appointment.participant?.find((p: any) =>
-        p.actor?.reference?.startsWith('Practitioner/')
-      );
-
-      if (!practitionerParticipant) {
-        throw new Error('No practitioner found in appointment');
-      }
-
-      // Use PATCH to update appointment status
-      const patchResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json-patch+json',
-        },
-        body: JSON.stringify([
-          {
-            op: 'replace',
-            path: '/status',
-            value: 'cancelled'
-          },
-          {
-            op: 'replace',
-            path: `/participant/${appointment.participant.indexOf(practitionerParticipant)}/status`,
-            value: 'declined'
-          }
-        ]),
-      });
-
-      if (patchResponse.ok) {
-        // Update appointment status locally instead of removing
-        setAppointments(prev => prev.map(apt =>
-          apt.id === appointmentId
-            ? { ...apt, status: 'cancelled' }
-            : apt
-        ));
-        router.refresh();
-
-        // Trigger notification bell update
-        window.dispatchEvent(new CustomEvent('messageUpdate'));
-      } else {
-        const errorData = await patchResponse.json();
-        console.error('Failed to reject appointment:', errorData);
-        alert('Failed to reject appointment. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error rejecting appointment:', error);
-      alert('Error rejecting appointment. Please try again.');
-    } finally {
-      setLoadingAppointment(null);
-    }
-  };
-
-  const handleComplete = async (appointmentId: string) => {
-    setLoadingAppointment(appointmentId);
-
-    try {
-      // First, get the current appointment to find the practitioner participant
-      const getResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-
-      if (!getResponse.ok) {
-        throw new Error('Failed to fetch appointment details');
-      }
-
-      const appointment = await getResponse.json();
-
-      // Find the practitioner participant
-      const practitionerParticipant = appointment.participant?.find((p: any) =>
-        p.actor?.reference?.startsWith('Practitioner/')
-      );
-
-      if (!practitionerParticipant) {
-        throw new Error('No practitioner found in appointment');
-      }
-
-      // Use PATCH to update appointment status to fulfilled (completed)
-      const patchResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json-patch+json',
-        },
-        body: JSON.stringify([
-          {
-            op: 'replace',
-            path: '/status',
-            value: 'fulfilled'
-          }
-        ]),
-      });
-
-      if (patchResponse.ok) {
-        // Update appointment status locally
-        setAppointments(prev => prev.map(apt =>
-          apt.id === appointmentId
-            ? { ...apt, status: 'fulfilled' }
-            : apt
-        ));
-        router.refresh();
-
-        // Trigger notification bell update
-        window.dispatchEvent(new CustomEvent('messageUpdate'));
-      } else {
-        const errorData = await patchResponse.json();
-        console.error('Failed to complete appointment:', errorData);
-        alert('Failed to complete appointment. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error completing appointment:', error);
-      alert('Error completing appointment. Please try again.');
-    } finally {
-      setLoadingAppointment(null);
-    }
-  };
-
-  const handleCancel = async (appointmentId: string) => {
-    setLoadingAppointment(appointmentId);
-
-    try {
-      // Use PATCH to update appointment status to cancelled
-      const patchResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json-patch+json',
-        },
-        body: JSON.stringify([
-          {
-            op: 'replace',
-            path: '/status',
-            value: 'cancelled'
-          }
-        ]),
-      });
-
-      if (patchResponse.ok) {
-        // Update appointment status locally
-        setAppointments(prev => prev.map(apt =>
-          apt.id === appointmentId
-            ? { ...apt, status: 'cancelled' }
-            : apt
-        ));
-        router.refresh();
-
-        // Trigger notification bell update
-        window.dispatchEvent(new CustomEvent('messageUpdate'));
-      } else {
-        const errorData = await patchResponse.json();
-        console.error('Failed to cancel appointment:', errorData);
-        alert('Failed to cancel appointment. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error cancelling appointment:', error);
-      alert('Error cancelling appointment. Please try again.');
-    } finally {
-      setLoadingAppointment(null);
-    }
-  };
-
-  const handleQuickAction = (appointmentId: string, action: string) => {
-    // TODO: Implement quick actions (check-in, etc.)
-    console.log(`Quick action ${action} for appointment ${appointmentId}`);
-  };
-
-  // Filter appointments to show only current week (Saturday to Friday)
-  const getCurrentWeekAppointments = (allAppointments: Appointment[]) => {
-    const today = new Date();
-    const startOfWeek = new Date(today); // Start from today (Saturday)
-    const endOfWeek = new Date(today);
-    endOfWeek.setDate(today.getDate() + 6); // Today + 6 days = 7 days total
-
-    const startOfWeekStr = startOfWeek.toISOString().split('T')[0];
-    const endOfWeekStr = endOfWeek.toISOString().split('T')[0];
-
-    return allAppointments.filter((appointment) => {
-      // Always include pending appointments regardless of date
-      if (appointment.status === 'pending') return true;
-
-      // For other appointments, filter by current week
-      if (!appointment.start) return false;
-
-      const appointmentDate = appointment.start.split('T')[0];
-      return appointmentDate >= startOfWeekStr && appointmentDate <= endOfWeekStr;
-    });
-  };
-
-  // Get filtered appointments for display
-  const displayAppointments = showAllHistory ? appointments : getCurrentWeekAppointments(appointments);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-text-primary">
+          Appointments
+        </h1>
+      </div>
+
+      {/* Filters */}
+      <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Time Filter */}
         <div>
-          <h1 className="text-xl sm:text-2xl sm:text-3xl font-bold text-text-primary">Appointments</h1>
-          <p className="text-text-secondary">
-            {(() => {
-              const today = new Date();
-              const endOfPeriod = new Date(today);
-              endOfPeriod.setDate(today.getDate() + 6);
-              return `${today.toLocaleDateString(navigator.language, {
-                month: 'short',
-                day: 'numeric'
-              })} - ${endOfPeriod.toLocaleDateString(navigator.language, {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-              })}`;
-            })()}
-          </p>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">Time</label>
+          <Tabs value={timeFilter} onValueChange={(value) => setTimeFilter(value as TimeFilter)}>
+            <TabsList>
+              <TabsTrigger className='text-[13px]' value="today">Today</TabsTrigger>
+              <TabsTrigger className='text-[13px]' value="upcoming-7">Upcoming 7 days</TabsTrigger>
+              <TabsTrigger className='text-[13px]' value="upcoming">Upcoming</TabsTrigger>
+              <TabsTrigger className='text-[13px]' value="past">Past</TabsTrigger>
+              <TabsTrigger className='text-[13px]' value="all">All</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
-        <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => window.location.reload()}>
-            Refresh
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => router.push('/provider/appointments/history')}
-          >
-            View All History
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => window.location.reload()}
-          >
-            Review Pending ({stats.pending})
-          </Button>
+
+        {/* Status Filter */}
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">Appointment Status</label>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={statusFilters.includes('pending') ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => toggleStatusFilter('pending')}
+              className="text-[13px]"
+            >
+              Pending
+            </Button>
+            <Button
+              variant={statusFilters.includes('booked') ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => toggleStatusFilter('booked')}
+              className="text-[13px]"
+            >
+              Booked
+            </Button>
+            <Button
+              variant={statusFilters.includes('fulfilled') ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => toggleStatusFilter('fulfilled')}
+              className="text-[13px]"
+            >
+              Completed
+            </Button>
+            <Button
+              variant={statusFilters.includes('cancelled') ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => toggleStatusFilter('cancelled')}
+              className="text-[13px]"
+            >
+              Cancelled
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid md:grid-cols-4 gap-6 mb-8">
-        <Card className="text-center" padding="sm">
-          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-            <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <div className="text-xl sm:text-2xl font-bold text-blue-600">{stats.today}</div>
-          <div className="text-sm text-text-secondary">Today</div>
-        </Card>
-
-        <Card className="text-center" padding="sm">
-          <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
-            <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div className="text-xl sm:text-2xl font-bold text-yellow-600">{stats.pending}</div>
-          <div className="text-sm text-text-secondary">Pending</div>
-        </Card>
-
-        <Card className="text-center" padding="sm">
-          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-            <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div className="text-xl sm:text-2xl font-bold text-green-600">{stats.completed}</div>
-          <div className="text-sm text-text-secondary">Completed</div>
-        </Card>
-
-        <Card className="text-center" padding="sm">
-          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
-            <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </div>
-          <div className="text-xl sm:text-2xl font-bold text-red-600">{stats.cancelled}</div>
-          <div className="text-sm text-text-secondary">Cancelled</div>
-        </Card>
-      </div>
-
-      {/* Appointments List */}
-      {loadingNames ? (
-        <AppointmentSkeleton count={Math.max(3, Math.min(displayAppointments.length, 5))} />
-      ) : (
-        <Card>
-          {displayAppointments.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <h3 className="text-sm sm:text-base md:text-lg font-medium text-text-primary mb-2">No Appointments</h3>
-              <p className="text-text-secondary">No appointments found for the selected period.</p>
-            </div>
-          ) : (
-          <div className="space-y-4">
-            {displayAppointments.map((appointment) => (
-              <div
-                key={appointment.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                onClick={() => handleOpenModal(appointment.id!)}
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="text-center min-w-[100px]">
-                    <div className="font-semibold text-primary">
-                      {appointment.start ? formatAppointmentDateTime(appointment.start) : 'TBD'}
-                    </div>
-                    <div className="text-xs text-text-secondary">
-                      {appointment.start && appointment.end
-                        ? formatDuration(appointment.start, appointment.end)
-                        : '30min'
-                      }
-                    </div>
-                  </div>
-
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-text-primary">
-                      {getPatientName(appointment)}
-                    </h3>
-                    <p className="text-sm text-text-secondary">
-                      Dr. {getPractitionerName(appointment)}
-                    </p>
-                    <p className="text-sm text-text-secondary">
-                      {appointment.reasonCode?.[0]?.text || appointment.description || 'General consultation'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Badge
-                    variant={getStatusVariant(appointment.status)}
-                    size="sm"
-                  >
-                    {getStatusLabel(appointment.status)}
-                  </Badge>
-                </div>
-              </div>
+      <div className="overflow-hidden rounded-md border bg-white">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
             ))}
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* Appointment Detail Modal */}
-      <ProviderAppointmentDetailModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        appointmentId={selectedAppointmentId}
-        appointment={appointments.find(apt => apt.id === selectedAppointmentId)}
-        onApprove={async (id) => {
-          await handleApprove(id);
-          handleCloseModal();
-        }}
-        onReject={async (id) => {
-          await handleReject(id);
-          handleCloseModal();
-        }}
-        onComplete={async (id) => {
-          await handleComplete(id);
-          handleCloseModal();
-        }}
-        onCancel={async (id) => {
-          await handleCancel(id);
-          handleCloseModal();
-        }}
-      />
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              // Skeleton loading rows
+              Array.from({ length: 20 }).map((_, index) => (
+                <TableRow key={`skeleton-${index}`}>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  No appointments found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

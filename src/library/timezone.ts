@@ -147,10 +147,14 @@ export function isTomorrow(checkDate: Date, referenceDate: Date): boolean {
  * Format appointment date/time with smart labels (Today/Tomorrow/Date)
  * - Today: "Today, 14:30"
  * - Tomorrow: "Tomorrow, 10:00"
- * - Future: "14:30, 25/12/2024" (time first, then dd/mm/yyyy)
+ * - Future (with year): "14:30, 25/12/2024" (time first, then dd/mm/yyyy)
+ * - Future (without year): "14:30, 25/12" (time first, then dd/mm)
  * All times in 24-hour format
+ *
+ * @param dateString - ISO date string
+ * @param showYear - Whether to include the year in the date (default: true)
  */
-export function formatAppointmentDateTime(dateString: string): string {
+export function formatAppointmentDateTime(dateString: string, showYear: boolean = true): string {
   const appointmentDate = new Date(dateString);
   const now = getNowInAppTimezone();
 
@@ -166,14 +170,18 @@ export function formatAppointmentDateTime(dateString: string): string {
     return `Tomorrow, ${time}`;
   }
 
-  // Future date: "14:30, 25/12/2024" (time first, then date)
+  // Future date: "14:30, 25/12/2024" or "14:30, 25/12" (time first, then date)
   const time = formatTimeForDisplay(appointmentDate);
   const dateObj = new Date(dateString);
   const day = String(dateObj.getDate()).padStart(2, '0');
   const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-  const year = dateObj.getFullYear();
 
-  return `${time}, ${day}/${month}/${year}`;
+  if (showYear) {
+    const year = dateObj.getFullYear();
+    return `${time}, ${day}/${month}/${year}`;
+  } else {
+    return `${time}, ${day}/${month}`;
+  }
 }
 
 /**

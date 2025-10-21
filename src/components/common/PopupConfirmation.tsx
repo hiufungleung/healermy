@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/library/shadcn-utils';
 
 interface PopupConfirmationProps {
@@ -78,7 +78,7 @@ export function PopupConfirmation({
 
   return (
     <AlertDialog open={isOpen}>
-      <AlertDialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[90vh] overflow-y-auto">
         <AlertDialogHeader>
           <div className="flex items-center space-x-3">
             {/* Icon */}
@@ -95,7 +95,7 @@ export function PopupConfirmation({
           {isLoading && progressMessage ? (
             <div className="mt-4">
               <div className="flex items-center justify-center mb-3">
-                <LoadingSpinner size="sm" className="mr-3" />
+                <Spinner className="mr-3 size-5" />
                 <span className="text-sm text-gray-700">{loadingText || 'Processing...'}</span>
               </div>
               <div className="bg-gray-50 rounded-md p-3">
@@ -118,12 +118,11 @@ export function PopupConfirmation({
           )}
         </AlertDialogHeader>
 
-        <AlertDialogFooter className="gap-2 sm:gap-0">
+        <AlertDialogFooter className='flex-row justify-end space-x-2'>
           {showCancel && onCancel && (
-            <AlertDialogCancel 
-              onClick={onCancel} 
+            <AlertDialogCancel className='mt-0'
+              onClick={onCancel}
               disabled={isLoading}
-              className="w-full sm:w-auto"
             >
               {cancelText}
             </AlertDialogCancel>
@@ -131,11 +130,11 @@ export function PopupConfirmation({
           <AlertDialogAction
             onClick={onConfirm}
             disabled={isLoading}
-            className={cn(variantActionClasses[variant], "w-full sm:w-auto")}
+            className={cn(variantActionClasses[variant])}
           >
             {isLoading ? (
               <>
-                <LoadingSpinner size="sm" className="mr-2 inline-block" />
+                <Spinner className="mr-2 size-4" />
                 {loadingText || 'Processing...'}
               </>
             ) : confirmText}

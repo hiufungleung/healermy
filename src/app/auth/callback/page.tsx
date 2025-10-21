@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserRole } from '@/types/auth';
 import { AuthorisationLoader } from '@/components/common/AuthorisationLoader';
@@ -8,20 +8,48 @@ import { AuthorisationLoader } from '@/components/common/AuthorisationLoader';
 export default function CallbackPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const executedRef = useRef(false);
 
   useEffect(() => {
-    debugger;
+    console.log('[CALLBACK] useEffect triggered, executedRef.current:', executedRef.current);
+
+    // Prevent double execution
+    if (executedRef.current) {
+      console.log('[CALLBACK] ⏭️  Already executed, skipping');
+      return;
+    }
+
+    console.log('[CALLBACK] ✅ Setting executedRef to true');
+    executedRef.current = true;
+
     const completeAuth = async () => {
       try {
-        console.log('🎯 Starting callback');
-        console.log('🔍 Current URL:', window.location.href);
-        
-        // Check for OAuth errors first
+        console.log('[CALLBACK] 🎯 Starting callback authentication');
+        console.log('[CALLBACK] 🔍 Current URL:', window.location.href);
+
+        // Check for OAuth parameters
         const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const state = urlParams.get('state');
         const error = urlParams.get('error');
+
+        // If no OAuth parameters, this is likely a page reload/navigation after auth completed
+        if (!code && !state && !error) {
+          console.log('[CALLBACK] ⚠️  No OAuth parameters found in URL');
+          console.log('[CALLBACK] 🔄 This is likely a page reload or navigation back to callback');
+          console.log('[CALLBACK] ⏭️  Redirecting to home (middleware will handle dashboard redirect)');
+
+          // Redirect to home page - middleware will redirect to appropriate dashboard
+          router.push('/');
+          return;
+        }
+
+        console.log('[CALLBACK] ✅ OAuth parameters found, proceeding with authentication flow');
+
+        // Get additional OAuth parameters
         const errorUri = urlParams.get('error_uri');
         const errorDescription = urlParams.get('error_description');
-        const receivedState = urlParams.get('state');
+        const receivedState = state;
 
         if (error) {
           console.error('❌ OAuth error received:', error);
@@ -91,29 +119,32 @@ export default function CallbackPage() {
           setError(errorMessage + (validatedErrorUri ? ` For more detailed information, please visit: ${validatedErrorUri}` : ''));
           return;
         }
-        
+
         // Manual token exchange for SMART v1
-        const code = urlParams.get('code');
-        // receivedState already declared above for error handling
-        
+        // code, state, receivedState already declared above
+
         if (!code) {
           throw new Error('Authorization code not received');
         }
         
         // Retrieve OAuth state from server (secure, encrypted cookie)
-        console.log('🔍 Retrieving OAuth state from server for state:', receivedState?.substring(0, 8) + '...');
+        console.log('[CALLBACK] 🔍 Retrieving OAuth state from server for state:', receivedState?.substring(0, 8) + '...');
+        console.log('[CALLBACK] 📡 Calling /api/auth/retrieve-state?state=' + receivedState);
 
         const retrieveStateResponse = await fetch(`/api/auth/retrieve-state?state=${receivedState}`, {
           credentials: 'include'
         });
 
+        console.log('[CALLBACK] 📥 retrieve-state response status:', retrieveStateResponse.status);
+
         if (!retrieveStateResponse.ok) {
           const errorData = await retrieveStateResponse.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('[CALLBACK] ❌ retrieve-state failed:', errorData);
           throw new Error(`Failed to retrieve OAuth state: ${errorData.error || 'Invalid or expired state'}`);
         }
 
         const stateData = await retrieveStateResponse.json();
-        console.log('✅ OAuth state retrieved from server');
+        console.log('[CALLBACK] ✅ OAuth state retrieved from server:', Object.keys(stateData));
 
         const { iss, role: storedRole, codeVerifier, tokenUrl, revokeUrl, launchToken } = stateData;
 
@@ -332,24 +363,17 @@ export default function CallbackPage() {
         sessionStorage.removeItem('auth_launch');
         sessionStorage.removeItem('auth_role');
 
-        console.log('✅ OAuth state cleaned up (server-side cookie deleted)');
-        
-        console.log('🚀 Authentication successful, redirecting...');
-        
-        // Trigger session update for AuthProvider
-        window.dispatchEvent(new CustomEvent('sessionUpdated'));
-        
-        // Small delay to ensure session is fully created before redirect
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Redirect based on role
-        if (role === 'provider') {
-          router.push('/provider/dashboard');
-        } else if (role === 'practitioner') {
-          router.push('/practitioner/dashboard');
-        } else {
-          router.push('/patient/dashboard');
-        }
+        console.log('[CALLBACK] ✅ OAuth state cleaned up (server-side cookie deleted)');
+        console.log('[CALLBACK] 🚀 Authentication successful, redirecting...');
+
+        // Use window.location.href for full page redirect to prevent re-renders
+        // This ensures the callback page doesn't run again with the same OAuth params
+        const dashboardPath = role === 'provider' ? '/provider/dashboard'
+                            : role === 'practitioner' ? '/practitioner/dashboard'
+                            : '/patient/dashboard';
+
+        console.log('[CALLBACK] 🔄 Full page redirect to:', dashboardPath);
+        window.location.href = dashboardPath;
         
       } catch (err) {
         const error = err as Error;

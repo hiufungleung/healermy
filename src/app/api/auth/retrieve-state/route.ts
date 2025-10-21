@@ -40,8 +40,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const state = searchParams.get('state');
 
+    console.log('[RETRIEVE-STATE] 📨 Request received for state:', state?.substring(0, 8) + '...');
+
     if (!state || typeof state !== 'string') {
-      console.error('Missing or invalid state parameter in retrieve-state');
+      console.error('[RETRIEVE-STATE] ❌ Missing or invalid state parameter');
       return NextResponse.json(
         { error: 'Missing or invalid state parameter' },
         { status: 400 }
@@ -52,8 +54,12 @@ export async function GET(request: NextRequest) {
     const cookieName = `${STATE_COOKIE_PREFIX}${state}`;
     const encryptedState = request.cookies.get(cookieName)?.value;
 
+    console.log('[RETRIEVE-STATE] 🍪 Looking for cookie:', cookieName);
+    console.log('[RETRIEVE-STATE] 🍪 Cookie found:', !!encryptedState);
+
     if (!encryptedState) {
-      console.error('OAuth state cookie not found:', cookieName);
+      console.error('[RETRIEVE-STATE] ❌ OAuth state cookie not found:', cookieName);
+      console.log('[RETRIEVE-STATE] 🍪 Available cookies:', request.cookies.getAll().map(c => c.name).join(', '));
       return NextResponse.json(
         { error: 'Invalid or expired OAuth state' },
         { status: 400 }
@@ -82,7 +88,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('OAuth state retrieved successfully for state:', state.substring(0, 8) + '...');
+    console.log('[RETRIEVE-STATE] ✅ OAuth state retrieved successfully for state:', state.substring(0, 8) + '...');
+    console.log('[RETRIEVE-STATE] 🗑️  Deleting one-time-use cookie:', cookieName);
 
     // Delete the state cookie (one-time use)
     const response = NextResponse.json({
@@ -95,6 +102,7 @@ export async function GET(request: NextRequest) {
     });
     response.cookies.delete(cookieName);
 
+    console.log('[RETRIEVE-STATE] ✅ Response sent with cookie deleted');
     return response;
   } catch (error) {
     console.error('Error retrieving OAuth state:', error);

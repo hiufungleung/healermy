@@ -157,7 +157,12 @@ export interface Appointment {
     display?: string;
   }>;
   reasonCode?: Array<{
-    text: string;
+    text?: string;
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
   }>;
 }
 

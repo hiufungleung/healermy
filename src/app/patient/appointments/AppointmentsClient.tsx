@@ -1,37 +1,42 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { AppointmentSkeleton } from '@/components/common/ContentSkeleton';
 import { PatientAppointmentCard } from '@/components/patient/PatientAppointmentCard';
-import { calculateQueuePosition, formatWaitTime, getQueueStatusMessage } from '@/library/queueCalculation';
 import type { SessionData } from '@/types/auth';
 import type { AppointmentWithPractitionerDetails } from '@/library/appointmentDetailInfo';
-import type { Encounter } from '@/types/fhir';
 
 interface AppointmentsClientProps {
   session: SessionData;
 }
 
-type FilterStatus = 'all' | 'pending' | 'booked' | 'completed' | 'cancelled';
-
-interface QueueInfo {
-  position: number;
-  encountersAhead: number;
-  estimatedWaitMinutes: number;
-}
+type FilterStatus = 'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled';
 
 export default function AppointmentsClient({ session }: AppointmentsClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [appointments, setAppointments] = useState<AppointmentWithPractitionerDetails[]>([]);
-  const [encounters, setEncounters] = useState<Record<string, Encounter[]>>({});
-  const [queueInfo, setQueueInfo] = useState<Record<string, QueueInfo>>({});
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Fetch appointments and encounters
+  // Get filter status from URL params, default to 'confirmed'
+  const urlStatus = searchParams.get('status') as FilterStatus | null;
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>(
+    urlStatus && ['all', 'pending', 'confirmed', 'completed', 'cancelled'].includes(urlStatus)
+      ? urlStatus
+      : 'confirmed'
+  );
+
+  // Update URL when filter status changes
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('status', filterStatus);
+    router.replace(`/patient/appointments?${params.toString()}`, { scroll: false });
+  }, [filterStatus, router, searchParams]);
+
+  // Fetch appointments
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
@@ -46,15 +51,6 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
           const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');
           const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
           setAppointments(enhancedAppointments);
-
-          // Fetch encounters for queue calculation (only for booked/arrived appointments)
-          const bookedAppointments = enhancedAppointments.filter(apt =>
-            apt.status === 'booked' || apt.status === 'arrived'
-          );
-
-          if (bookedAppointments.length > 0) {
-            await fetchEncountersAndCalculateQueue(bookedAppointments);
-          }
         } else {
           console.error('Failed to fetch appointments:', response.status, response.statusText);
           setAppointments([]);
@@ -70,60 +66,40 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
     fetchAppointments();
   }, [session.patient]);
 
-  // Fetch encounters and calculate queue position
-  const fetchEncountersAndCalculateQueue = async (bookedAppointments: AppointmentWithPractitionerDetails[]) => {
-    const encountersMap: Record<string, Encounter[]> = {};
-    const queueMap: Record<string, QueueInfo> = {};
-
-    for (const appointment of bookedAppointments) {
-      if (!appointment.id || !appointment.start) continue;
-
-      try {
-        // Extract practitioner ID from appointment
-        const practitionerRef = appointment.participant?.find(p =>
-          p.actor?.reference?.startsWith('Practitioner/')
-        )?.actor?.reference;
-
-        if (!practitionerRef) continue;
-
-        const practitionerId = practitionerRef.replace('Practitioner/', '');
-
-        // Fetch all encounters for this practitioner on the same day
-        const appointmentDate = new Date(appointment.start);
-        const startOfDay = new Date(appointmentDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(appointmentDate);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        const encountersResponse = await fetch(
-          `/api/fhir/encounters?practitioner=${practitionerId}&date=ge${startOfDay.toISOString()}&date=le${endOfDay.toISOString()}&_count=100`,
-          { credentials: 'include' }
-        );
-
-        if (encountersResponse.ok) {
-          const encountersData = await encountersResponse.json();
-          const practitionerEncounters = encountersData.encounters || [];
-          encountersMap[appointment.id] = practitionerEncounters;
-
-          // Calculate queue position
-          const queueData = calculateQueuePosition(appointment.start, practitionerEncounters);
-          queueMap[appointment.id] = queueData;
-        }
-      } catch (error) {
-        console.error(`Error fetching encounters for appointment ${appointment.id}:`, error);
-      }
-    }
-
-    setEncounters(encountersMap);
-    setQueueInfo(queueMap);
-  };
-
   // Filter and search appointments
   const filteredAppointments = (Array.isArray(appointments) ? appointments : []).filter((appointment) => {
-    // Status filter
+    // Status filter mapping
+    // 'confirmed' = upcoming booked appointments
+    // 'pending' = upcoming pending appointments
+    // 'completed' = fulfilled appointments
+    // 'cancelled' = cancelled appointments
+    // 'all' = all appointments
+
     if (filterStatus !== 'all') {
-      if (appointment.status !== filterStatus) {
-        return false;
+      const now = new Date();
+      const appointmentDate = appointment.start ? new Date(appointment.start) : null;
+      const isUpcoming = appointmentDate && appointmentDate >= now;
+
+      if (filterStatus === 'confirmed') {
+        // Confirmed = upcoming booked appointments
+        if (appointment.status !== 'booked' || !isUpcoming) {
+          return false;
+        }
+      } else if (filterStatus === 'pending') {
+        // Pending = upcoming pending appointments
+        if (appointment.status !== 'pending' || !isUpcoming) {
+          return false;
+        }
+      } else if (filterStatus === 'completed') {
+        // Completed = fulfilled appointments
+        if (appointment.status !== 'fulfilled') {
+          return false;
+        }
+      } else if (filterStatus === 'cancelled') {
+        // Cancelled = cancelled appointments
+        if (appointment.status !== 'cancelled') {
+          return false;
+        }
       }
     }
 
@@ -157,19 +133,15 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
         const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');
         const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
         setAppointments(enhancedAppointments);
-
-        // Fetch encounters for queue calculation (only for booked/arrived appointments)
-        const bookedAppointments = enhancedAppointments.filter(apt =>
-          apt.status === 'booked' || apt.status === 'arrived'
-        );
-
-        if (bookedAppointments.length > 0) {
-          await fetchEncountersAndCalculateQueue(bookedAppointments);
-        }
       }
     } catch (error) {
       console.error('Error refreshing appointments:', error);
     }
+  };
+
+  // Handle tab change
+  const handleTabChange = (status: FilterStatus) => {
+    setFilterStatus(status);
   };
 
   return (
@@ -206,22 +178,22 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
             <h2 className="text-base sm:text-lg md:text-xl font-semibold">
               {filterStatus === 'all' ? 'All Appointments' :
-               filterStatus === 'booked' ? 'Confirmed Appointments' :
+               filterStatus === 'confirmed' ? 'Confirmed Appointments' :
                `${filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)} Appointments`}
             </h2>
 
             {/* Status Filter Pills */}
             <div className="flex flex-wrap gap-2">
               {[
-                { key: 'all', label: 'All' },
+                { key: 'confirmed', label: 'Confirmed' },
                 { key: 'pending', label: 'Pending' },
-                { key: 'booked', label: 'Confirmed' },
                 { key: 'completed', label: 'Completed' },
-                { key: 'cancelled', label: 'Cancelled' }
+                { key: 'cancelled', label: 'Cancelled' },
+                { key: 'all', label: 'All' }
               ].map(({ key, label }) => (
                 <button
                   key={key}
-                  onClick={() => setFilterStatus(key as FilterStatus)}
+                  onClick={() => handleTabChange(key as FilterStatus)}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-colors min-w-0 ${
                     filterStatus === key
                       ? 'bg-primary text-white'
@@ -264,43 +236,11 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
           ) : (
             <div className="space-y-4">
               {filteredAppointments.map((appointment) => (
-                <div key={appointment.id} className="space-y-3">
-                  <PatientAppointmentCard
-                    appointment={appointment}
-                    onAppointmentUpdated={refreshAppointments}
-                  />
-
-                  {/* Queue Information for booked/arrived appointments */}
-                  {appointment.id && queueInfo[appointment.id] && (appointment.status === 'booked' || appointment.status === 'arrived') && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-start space-x-2">
-                        <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-blue-900 mb-1">
-                            {getQueueStatusMessage(queueInfo[appointment.id].position)}
-                          </p>
-                          {queueInfo[appointment.id].encountersAhead > 0 && (
-                            <>
-                              <p className="text-xs text-blue-700">
-                                {queueInfo[appointment.id].encountersAhead} {queueInfo[appointment.id].encountersAhead === 1 ? 'patient' : 'patients'} ahead of you
-                              </p>
-                              <p className="text-xs text-blue-700 mt-1">
-                                Estimated wait: <span className="font-medium">{formatWaitTime(queueInfo[appointment.id].estimatedWaitMinutes)}</span>
-                              </p>
-                            </>
-                          )}
-                          {queueInfo[appointment.id].encountersAhead === 0 && (
-                            <p className="text-xs text-blue-700">
-                              Please proceed to check-in
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <PatientAppointmentCard
+                  key={appointment.id}
+                  appointment={appointment}
+                  onAppointmentUpdated={refreshAppointments}
+                />
               ))}
             </div>
           )}

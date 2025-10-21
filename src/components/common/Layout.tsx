@@ -234,7 +234,7 @@ export function Layout({ children, patientName, providerName, practitionerName }
                             {isLoadingUserName ? (
                               <span className="inline-block animate-pulse bg-gray-200 rounded h-4 w-24"></span>
                             ) : (
-                              displayName || 'User'
+                              displayName || 'Healthcare Provider'
                             )}
                           </p>
                           <p className="text-xs leading-none text-muted-foreground">
