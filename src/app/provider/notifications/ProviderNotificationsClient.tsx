@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 
@@ -23,6 +23,7 @@ interface Communication {
 }
 
 export default function ProviderNotificationsClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'action_required' | 'urgent'>('all');
@@ -828,7 +829,14 @@ export default function ProviderNotificationsClient() {
           ].map((filter) => (
             <button
               key={filter.key}
-              onClick={() => setActiveFilter(filter.key as any)}
+              onClick={() => {
+                setActiveFilter(filter.key as any);
+                // Update URL parameter
+                const newUrl = filter.key === 'all'
+                  ? '/provider/notifications'
+                  : `/provider/notifications?filter=${filter.key}`;
+                router.push(newUrl);
+              }}
               className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors flex-shrink-0 ${
                 activeFilter === filter.key
                   ? 'bg-primary text-white'

@@ -731,7 +731,14 @@ export default function NotificationsClient({
           ] as const).map((filter) => (
             <button
               key={filter.key}
-              onClick={() => setActiveFilter(filter.key)}
+              onClick={() => {
+                setActiveFilter(filter.key);
+                // Update URL parameter
+                const newUrl = filter.key === 'all'
+                  ? '/patient/notifications'
+                  : `/patient/notifications?filter=${filter.key}`;
+                router.push(newUrl);
+              }}
               className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors flex-shrink-0 ${
                 activeFilter === filter.key
                   ? 'bg-primary text-white'
