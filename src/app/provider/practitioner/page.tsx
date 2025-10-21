@@ -105,27 +105,27 @@ export default function PractitionerManagement() {
     try {
       const params = new URLSearchParams();
       
-      // Add FHIR-compliant search parameters
+      // Add FHIR-compliant search parameters with :contains for partial matching
       if (searchFilters.givenName && searchFilters.givenName.length >= 2) {
-        params.append('given', searchFilters.givenName);
+        params.append('given:contains', searchFilters.givenName);
       }
       if (searchFilters.familyName && searchFilters.familyName.length >= 2) {
-        params.append('family', searchFilters.familyName);
+        params.append('family:contains', searchFilters.familyName);
       }
       if (searchFilters.phone) {
-        params.append('phone', searchFilters.phone);
+        params.append('phone:contains', searchFilters.phone);
       }
       if (searchFilters.addressCity) {
-        params.append('address-city', searchFilters.addressCity);
+        params.append('address-city:contains', searchFilters.addressCity);
       }
       if (searchFilters.addressState) {
-        params.append('address-state', searchFilters.addressState);
+        params.append('address-state:contains', searchFilters.addressState);
       }
       if (searchFilters.addressPostalCode) {
-        params.append('address-postalcode', searchFilters.addressPostalCode);
+        params.append('address-postalcode:contains', searchFilters.addressPostalCode);
       }
       if (searchFilters.addressCountry) {
-        params.append('address-country', searchFilters.addressCountry);
+        params.append('address-country:contains', searchFilters.addressCountry);
       }
       if (searchFilters.practitionerId) {
         params.append('_id', searchFilters.practitionerId);

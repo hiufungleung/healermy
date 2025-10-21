@@ -108,6 +108,7 @@ export function CreateScheduleForm({
       const scheduleData: Schedule = {
         resourceType: 'Schedule',
         id: '', // Will be assigned by server
+        active: true, // Set schedule as active by default
         actor: [{
           reference: `Practitioner/${practitionerId}`,
           display: 'Healthcare Provider'

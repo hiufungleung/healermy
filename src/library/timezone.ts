@@ -279,3 +279,26 @@ export function getTimeInputValue(date?: Date): string {
   const targetDate = date || getNowInAppTimezone();
   return targetDate.toTimeString().slice(0, 5);
 }
+
+/**
+ * Format date with conditional year display
+ * Shows "dd/mm" if in current year, "dd/mm/yyyy" if different year
+ * Examples: "15/01" (current year) or "15/01/2026" (different year)
+ *
+ * @param date - Date to format
+ * @param includeYear - Force include year regardless of current year (default: false)
+ */
+export function formatDate(date: Date | string, includeYear: boolean = false): string {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  const currentYear = new Date().getFullYear();
+  const dateYear = dateObj.getFullYear();
+
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+
+  if (!includeYear && dateYear === currentYear) {
+    return `${day}/${month}`;
+  } else {
+    return `${day}/${month}/${dateYear}`;
+  }
+}

@@ -12,6 +12,8 @@ import { GenerateSlotsForm } from '@/components/provider/GenerateSlotsForm';
 import { SlotCalendar } from '@/components/provider/SlotCalendar';
 import { SlotFilters } from '@/components/provider/SlotFilters';
 import { ScheduleFilters } from '@/components/provider/ScheduleFilters';
+import PractitionerSchedulesTab from './PractitionerSchedulesTab';
+import PractitionerAppointmentsTab from './PractitionerAppointmentsTab';
 import {
   Tabs,
   TabsContent,
@@ -1707,7 +1709,15 @@ export default function PractitionerDetailClient({
         </TabsList>
 
         <TabsContent value="schedules">
-          {renderSchedulesContent()}
+          <PractitionerSchedulesTab
+            practitionerId={practitionerId}
+            onScheduleUpdate={() => {
+              // Refresh stats if needed
+              if (onStatsUpdate) {
+                fetchSlotsForStats();
+              }
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="slots">
@@ -1715,7 +1725,7 @@ export default function PractitionerDetailClient({
         </TabsContent>
 
         <TabsContent value="appointments">
-          {renderAppointmentsContent()}
+          <PractitionerAppointmentsTab practitionerId={practitionerId} />
         </TabsContent>
       </Tabs>
 
