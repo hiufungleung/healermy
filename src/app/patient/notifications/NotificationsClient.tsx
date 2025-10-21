@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import type { SessionData } from '@/types/auth';
 import { formatAppointmentDateTime } from '@/library/timezone';
 
@@ -703,37 +704,32 @@ export default function NotificationsClient({
       </div> */}
 
       {/* Filter Tabs */}
-      <Card className="mb-6">
-        <div className="flex flex-wrap gap-2 sm:gap-3">
-          {([
-            { key: 'all' as const, label: 'All', count: totalCount },
-            { key: 'unread' as const, label: 'Unread', count: unreadCount },
-            { key: 'action_required' as const, label: 'Action Required', count: actionRequiredCount }
-          ] as const).map((filter) => (
-            <button
-              key={filter.key}
-              onClick={() => {
-                setActiveFilter(filter.key);
-                // Update URL parameter
-                const newUrl = filter.key === 'all'
-                  ? '/patient/notifications'
-                  : `/patient/notifications?filter=${filter.key}`;
-                router.push(newUrl);
-              }}
-              className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors flex-shrink-0 ${
-                activeFilter === filter.key
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-text-secondary hover:bg-gray-200'
-              }`}
-            >
-              <span className="whitespace-nowrap">{filter.label} ({filter.count})</span>
-            </button>
-          ))}
-        </div>
-      </Card>
+      <Tabs
+        value={activeFilter}
+        onValueChange={(value) => {
+          setActiveFilter(value as typeof activeFilter);
+          // Update URL parameter
+          const newUrl = value === 'all'
+            ? '/patient/notifications'
+            : `/patient/notifications?filter=${value}`;
+          router.push(newUrl);
+        }}
+        className="mb-6"
+      >
+        <TabsList className="grid w-full grid-cols-3 h-auto">
+          <TabsTrigger value="all" className="text-xs sm:text-sm">
+            All ({totalCount})
+          </TabsTrigger>
+          <TabsTrigger value="unread" className="text-xs sm:text-sm">
+            Unread ({unreadCount})
+          </TabsTrigger>
+          <TabsTrigger value="action_required" className="text-xs sm:text-sm">
+            Action Required ({actionRequiredCount})
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Notifications List */}
-      <div className="space-y-4">
+        {/* Notifications List for All */}
+        <TabsContent value="all" className="space-y-4 mt-6">
         {loading ? (
           // Loading skeleton - only for notification list
           <div className="space-y-4">
@@ -909,19 +905,402 @@ export default function NotificationsClient({
             );
           })
         )}
-      </div>
 
-      {/* Load More */}
-      {hasMoreItems && (
-        <div className="text-center mt-8">
-          <Button variant="outline" onClick={loadMoreItems}>
-            Load More Notifications
-          </Button>
-          <p className="text-text-secondary text-sm mt-2">
-            Showing {displayedItems.length} of {allFilteredItems.length} notifications
-          </p>
-        </div>
-      )}
+        {/* Load More */}
+        {hasMoreItems && (
+          <div className="text-center mt-8">
+            <Button variant="outline" onClick={loadMoreItems}>
+              Load More Notifications
+            </Button>
+            <p className="text-text-secondary text-sm mt-2">
+              Showing {displayedItems.length} of {allFilteredItems.length} notifications
+            </p>
+          </div>
+        )}
+        </TabsContent>
+
+        {/* Notifications List for Unread */}
+        <TabsContent value="unread" className="space-y-4 mt-6">
+        {loading ? (
+          // Loading skeleton - only for notification list
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <div className="flex items-start space-x-4">
+                  <div className="w-10 h-10 rounded-full bg-gray-200"></div>
+                  <div className="flex-1 space-y-3">
+                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-full"></div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : allFilteredItems.length === 0 ? (
+          <Card className="text-center py-12">
+            <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <p className="text-text-secondary">No unread notifications</p>
+          </Card>
+        ) : (
+          displayedItems.map((item) => {
+            const comm = item.data;
+            const appointmentInfo = getAppointmentInfo(comm);
+            const isExpanded = selectedMessage?.id === comm.id;
+
+            const messageContent = comm.payload?.[0]?.contentString || 'No content';
+            const isLongMessage = messageContent.length > 150;
+
+            return (
+              <div
+                key={comm.id}
+                onMouseEnter={() => {
+                  // Prefetch appointment details on hover for faster expansion
+                  if (appointmentInfo && !appointmentCache.has(appointmentInfo.id)) {
+                    prefetchAppointmentDetails(appointmentInfo.id);
+                  }
+                }}
+              >
+                <Card
+                  className={`transition-all duration-200 cursor-pointer ${
+                    !isMessageRead(comm) ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
+                  } ${isExpanded ? 'shadow-lg ring-2 ring-primary/30' : 'hover:shadow-md'}`}
+                  onClick={() => handleMessageClick(comm)}
+                >
+                  <div className="flex items-start space-x-4">
+                  {/* Icon */}
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
+                      {getNotificationIcon(comm)}
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className={`font-semibold ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
+                            {getMessageTitle(comm)}
+                          </h3>
+                          {!isMessageRead(comm) && (
+                            <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <Badge variant="info" size="sm">
+                            {getCategoryDisplay(comm.category)}
+                          </Badge>
+                          <span className="text-xs text-text-secondary">
+                            From: {getSenderDisplay(comm)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                        {!isMessageRead(comm) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (comm.id) {
+                                setLocalCommunications(prev =>
+                                  prev.map(localComm =>
+                                    localComm.id === comm.id
+                                      ? {
+                                          ...localComm,
+                                          extension: [
+                                            ...(localComm.extension || []),
+                                            {
+                                              url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
+                                              valueDateTime: new Date().toISOString()
+                                            }
+                                          ]
+                                        }
+                                      : localComm
+                                  )
+                                );
+                                markAsRead(comm.id);
+                              }
+                            }}
+                            className="text-sm text-primary hover:underline whitespace-nowrap"
+                          >
+                            Mark as Read
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNotification(comm.id);
+                          }}
+                          className="text-sm text-text-secondary hover:text-red-600 whitespace-nowrap"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Message Preview/Full Content */}
+                    <div>
+                      <p className={`text-text-secondary text-sm mb-2 ${isExpanded ? '' : 'line-clamp-3'}`}>
+                        {isExpanded ? messageContent : `${messageContent.substring(0, 150)}${isLongMessage ? '...' : ''}`}
+                      </p>
+
+                      {/* Expand/Collapse Indicator */}
+                      {isLongMessage && (
+                        <div className="flex items-center gap-1 text-xs text-primary hover:underline mb-2">
+                          <span>{isExpanded ? 'Show less' : 'Read more'}</span>
+                          <svg
+                            className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      )}
+
+                      <p className="text-xs text-text-secondary">
+                        {formatDate(comm.sent)}
+                      </p>
+                    </div>
+
+                    {/* Expanded Details */}
+                    {isExpanded && appointmentInfo && (
+                      <AppointmentDetailsExpanded appointmentId={appointmentInfo.id} />
+                    )}
+
+                    {/* Action Buttons - only show if expanded and has appointment */}
+                    {isExpanded && appointmentInfo && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/patient/appointments/${appointmentInfo.id}`);
+                          }}
+                        >
+                          View Appointment Details
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                </Card>
+              </div>
+            );
+          })
+        )}
+
+        {/* Load More */}
+        {hasMoreItems && (
+          <div className="text-center mt-8">
+            <Button variant="outline" onClick={loadMoreItems}>
+              Load More Notifications
+            </Button>
+            <p className="text-text-secondary text-sm mt-2">
+              Showing {displayedItems.length} of {allFilteredItems.length} notifications
+            </p>
+          </div>
+        )}
+        </TabsContent>
+
+        {/* Notifications List for Action Required */}
+        <TabsContent value="action_required" className="space-y-4 mt-6">
+        {loading ? (
+          // Loading skeleton - only for notification list
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <div className="flex items-start space-x-4">
+                  <div className="w-10 h-10 rounded-full bg-gray-200"></div>
+                  <div className="flex-1 space-y-3">
+                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-full"></div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : allFilteredItems.length === 0 ? (
+          <Card className="text-center py-12">
+            <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <p className="text-text-secondary">No action required</p>
+          </Card>
+        ) : (
+          displayedItems.map((item) => {
+            const comm = item.data;
+            const appointmentInfo = getAppointmentInfo(comm);
+            const isExpanded = selectedMessage?.id === comm.id;
+
+            const messageContent = comm.payload?.[0]?.contentString || 'No content';
+            const isLongMessage = messageContent.length > 150;
+
+            return (
+              <div
+                key={comm.id}
+                onMouseEnter={() => {
+                  // Prefetch appointment details on hover for faster expansion
+                  if (appointmentInfo && !appointmentCache.has(appointmentInfo.id)) {
+                    prefetchAppointmentDetails(appointmentInfo.id);
+                  }
+                }}
+              >
+                <Card
+                  className={`transition-all duration-200 cursor-pointer ${
+                    !isMessageRead(comm) ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
+                  } ${isExpanded ? 'shadow-lg ring-2 ring-primary/30' : 'hover:shadow-md'}`}
+                  onClick={() => handleMessageClick(comm)}
+                >
+                  <div className="flex items-start space-x-4">
+                  {/* Icon */}
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
+                      {getNotificationIcon(comm)}
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className={`font-semibold ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
+                            {getMessageTitle(comm)}
+                          </h3>
+                          {!isMessageRead(comm) && (
+                            <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <Badge variant="info" size="sm">
+                            {getCategoryDisplay(comm.category)}
+                          </Badge>
+                          <span className="text-xs text-text-secondary">
+                            From: {getSenderDisplay(comm)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                        {!isMessageRead(comm) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (comm.id) {
+                                setLocalCommunications(prev =>
+                                  prev.map(localComm =>
+                                    localComm.id === comm.id
+                                      ? {
+                                          ...localComm,
+                                          extension: [
+                                            ...(localComm.extension || []),
+                                            {
+                                              url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
+                                              valueDateTime: new Date().toISOString()
+                                            }
+                                          ]
+                                        }
+                                      : localComm
+                                  )
+                                );
+                                markAsRead(comm.id);
+                              }
+                            }}
+                            className="text-sm text-primary hover:underline whitespace-nowrap"
+                          >
+                            Mark as Read
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNotification(comm.id);
+                          }}
+                          className="text-sm text-text-secondary hover:text-red-600 whitespace-nowrap"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Message Preview/Full Content */}
+                    <div>
+                      <p className={`text-text-secondary text-sm mb-2 ${isExpanded ? '' : 'line-clamp-3'}`}>
+                        {isExpanded ? messageContent : `${messageContent.substring(0, 150)}${isLongMessage ? '...' : ''}`}
+                      </p>
+
+                      {/* Expand/Collapse Indicator */}
+                      {isLongMessage && (
+                        <div className="flex items-center gap-1 text-xs text-primary hover:underline mb-2">
+                          <span>{isExpanded ? 'Show less' : 'Read more'}</span>
+                          <svg
+                            className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      )}
+
+                      <p className="text-xs text-text-secondary">
+                        {formatDate(comm.sent)}
+                      </p>
+                    </div>
+
+                    {/* Expanded Details */}
+                    {isExpanded && appointmentInfo && (
+                      <AppointmentDetailsExpanded appointmentId={appointmentInfo.id} />
+                    )}
+
+                    {/* Action Buttons - only show if expanded and has appointment */}
+                    {isExpanded && appointmentInfo && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/patient/appointments/${appointmentInfo.id}`);
+                          }}
+                        >
+                          View Appointment Details
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                </Card>
+              </div>
+            );
+          })
+        )}
+
+        {/* Load More */}
+        {hasMoreItems && (
+          <div className="text-center mt-8">
+            <Button variant="outline" onClick={loadMoreItems}>
+              Load More Notifications
+            </Button>
+            <p className="text-text-secondary text-sm mt-2">
+              Showing {displayedItems.length} of {allFilteredItems.length} notifications
+            </p>
+          </div>
+        )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

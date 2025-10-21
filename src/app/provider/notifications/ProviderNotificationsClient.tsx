@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 interface Communication {
   id: string;
@@ -819,38 +820,34 @@ export default function ProviderNotificationsClient() {
       </div>
 
       {/* Filter Tabs */}
-      <Card className="mb-6">
-        <div className="flex flex-wrap gap-2 sm:gap-3">
-          {[
-            { key: 'all', label: 'All', count: totalCount },
-            { key: 'unread', label: 'Unread', count: unreadCount },
-            { key: 'urgent', label: 'Urgent', count: urgentCount },
-            { key: 'action_required', label: 'Action Required', count: actionRequiredCount }
-          ].map((filter) => (
-            <button
-              key={filter.key}
-              onClick={() => {
-                setActiveFilter(filter.key as any);
-                // Update URL parameter
-                const newUrl = filter.key === 'all'
-                  ? '/provider/notifications'
-                  : `/provider/notifications?filter=${filter.key}`;
-                router.push(newUrl);
-              }}
-              className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors flex-shrink-0 ${
-                activeFilter === filter.key
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-text-secondary hover:bg-gray-200'
-              }`}
-            >
-              <span className="whitespace-nowrap">{filter.label} ({filter.count})</span>
-            </button>
-          ))}
-        </div>
-      </Card>
+      <Tabs
+        value={activeFilter}
+        onValueChange={(value) => {
+          setActiveFilter(value as typeof activeFilter);
+          // Update URL parameter
+          const newUrl = value === 'all'
+            ? '/provider/notifications'
+            : `/provider/notifications?filter=${value}`;
+          router.push(newUrl);
+        }}
+        className="mb-6"
+      >
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto">
+          <TabsTrigger value="all" className="text-xs sm:text-sm">
+            All ({totalCount})
+          </TabsTrigger>
+          <TabsTrigger value="unread" className="text-xs sm:text-sm">
+            Unread ({unreadCount})
+          </TabsTrigger>
+          <TabsTrigger value="urgent" className="text-xs sm:text-sm">
+            Urgent ({urgentCount})
+          </TabsTrigger>
+          <TabsTrigger value="action_required" className="text-xs sm:text-sm">
+            Action Required ({actionRequiredCount})
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Notifications List */}
-      <div className="space-y-4">
+        <TabsContent value={activeFilter} className="space-y-4 mt-6">
         {isLoading ? (
           <div className="space-y-4 animate-pulse">
             {[...Array(4)].map((_, i) => (
@@ -1114,19 +1111,20 @@ export default function ProviderNotificationsClient() {
               );
           })
         )}
-      </div>
 
-      {/* Load More */}
-      {hasMoreItems && (
-        <div className="text-center mt-8">
-          <Button variant="outline" onClick={loadMoreItems}>
-            Load More Notifications
-          </Button>
-          <p className="text-text-secondary text-sm mt-2">
-            Showing {displayedItems.length} of {allFilteredItems.length} notifications
-          </p>
-        </div>
-      )}
+        {/* Load More */}
+        {hasMoreItems && (
+          <div className="text-center mt-8">
+            <Button variant="outline" onClick={loadMoreItems}>
+              Load More Notifications
+            </Button>
+            <p className="text-text-secondary text-sm mt-2">
+              Showing {displayedItems.length} of {allFilteredItems.length} notifications
+            </p>
+          </div>
+        )}
+        </TabsContent>
+      </Tabs>
         </div>
       </div>
     </div>
