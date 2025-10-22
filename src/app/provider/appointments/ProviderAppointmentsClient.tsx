@@ -22,7 +22,9 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Search } from 'lucide-react';
 import { columns, AppointmentRow } from './columns';
 import type { Appointment, Encounter } from '@/types/fhir';
 
@@ -38,6 +40,9 @@ export default function ProviderAppointmentsClient() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [updatingRows, setUpdatingRows] = useState<Set<string>>(new Set()); // Track rows being updated
+  const [searchId, setSearchId] = useState(''); // Search input state
+  const [activeSearchId, setActiveSearchId] = useState(''); // Active search filter
 
   // Initialize filter state from URL params (default: today, no status)
   const [timeFilter, setTimeFilter] = useState<TimeFilter>(() => {
@@ -68,6 +73,11 @@ export default function ProviderAppointmentsClient() {
       // Build query parameters for appointments
       const appointmentParams = new URLSearchParams();
       appointmentParams.append('_sort', '-date');
+
+      // Add ID filter if active search
+      if (activeSearchId) {
+        appointmentParams.append('_id', activeSearchId);
+      }
 
       // Add time filter
       const now = new Date();
@@ -264,7 +274,7 @@ export default function ProviderAppointmentsClient() {
     } finally {
       setLoading(false);
     }
-  }, [timeFilter, statusFilters]);
+  }, [timeFilter, statusFilters, activeSearchId]);
 
   // Update URL when filters change
   const updateURL = useCallback((time: TimeFilter, statuses: StatusFilter[]) => {
@@ -294,15 +304,63 @@ export default function ProviderAppointmentsClient() {
     fetchAppointments();
   }, [fetchAppointments]);
 
+  // Update a single appointment optimistically using data from PATCH response
+  const updateSingleAppointment = useCallback((
+    appointmentId: string,
+    updatedAppointment?: Appointment,
+    updatedEncounter?: Encounter
+  ) => {
+    console.log('[APPOINTMENTS] Optimistic update for appointment:', appointmentId);
+
+    // Mark row as updating
+    setUpdatingRows(prev => new Set(prev).add(appointmentId));
+
+    // Use setTimeout to ensure visual feedback is shown
+    setTimeout(() => {
+      try {
+        // Update the appointment in the list with data from PATCH response
+        setAppointments(prev => prev.map(apt => {
+          if (apt.id === appointmentId) {
+            return {
+              ...(updatedAppointment || apt), // Use updated data if provided
+              patientName: apt.patientName, // Keep existing patient name
+              practitionerName: apt.practitionerName, // Keep existing practitioner name
+              encounter: updatedEncounter || apt.encounter // Use updated encounter if provided
+            } as AppointmentRow;
+          }
+          return apt;
+        }));
+
+        console.log('[APPOINTMENTS] ✅ Optimistic update completed for:', appointmentId);
+      } finally {
+        // Remove from updating set
+        setUpdatingRows(prev => {
+          const next = new Set(prev);
+          next.delete(appointmentId);
+          return next;
+        });
+      }
+    }, 100); // Small delay to show visual feedback
+  }, []);
+
   // Listen for refresh events from actions
   useEffect(() => {
-    const handleRefresh = () => {
-      fetchAppointments();
+    const handleRefresh = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { appointmentId, updatedAppointment, updatedEncounter } = customEvent.detail || {};
+
+      if (appointmentId) {
+        // Optimistic update using data from PATCH response (no additional GET request)
+        updateSingleAppointment(appointmentId, updatedAppointment, updatedEncounter);
+      } else {
+        // Full refresh if no appointment ID provided
+        fetchAppointments();
+      }
     };
 
     window.addEventListener('refresh-appointments', handleRefresh);
     return () => window.removeEventListener('refresh-appointments', handleRefresh);
-  }, [fetchAppointments]);
+  }, [fetchAppointments, updateSingleAppointment]);
 
   // Initialize table (following shadcn pattern exactly)
   const table = useReactTable({
@@ -328,6 +386,24 @@ export default function ProviderAppointmentsClient() {
         ? prev.filter((s) => s !== status)
         : [...prev, status]
     );
+  };
+
+  // Handle search by ID
+  const handleSearch = () => {
+    setActiveSearchId(searchId.trim());
+  };
+
+  // Handle Enter key in search input
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  // Clear search
+  const handleClearSearch = () => {
+    setSearchId('');
+    setActiveSearchId('');
   };
 
   return (
@@ -394,6 +470,41 @@ export default function ProviderAppointmentsClient() {
         </div>
       </div>
 
+      {/* Search by ID */}
+      <div className="mb-4">
+        <div className="flex gap-2">
+          <Input
+            placeholder="Filter by appointment ID..."
+            value={searchId}
+            onChange={(e) => setSearchId(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            className="text-[13px] max-w-xs"
+          />
+          <Button
+            onClick={handleSearch}
+            disabled={!searchId.trim()}
+            className="text-[13px]"
+          >
+            <Search className="h-4 w-4 mr-2" />
+            Search
+          </Button>
+          {activeSearchId && (
+            <Button
+              variant="outline"
+              onClick={handleClearSearch}
+              className="text-[13px]"
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+        {activeSearchId && (
+          <p className="text-[13px] text-gray-600 mt-2">
+            Filtering by ID: <span className="font-mono font-medium">{activeSearchId}</span>
+          </p>
+        )}
+      </div>
+
       <div className="overflow-hidden rounded-md border bg-white">
         <Table>
           <TableHeader>
@@ -419,6 +530,7 @@ export default function ProviderAppointmentsClient() {
               // Skeleton loading rows
               Array.from({ length: 20 }).map((_, index) => (
                 <TableRow key={`skeleton-${index}`}>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
@@ -429,18 +541,24 @@ export default function ProviderAppointmentsClient() {
                 </TableRow>
               ))
             ) : table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              table.getRowModel().rows.map((row) => {
+                const isUpdating = updatingRows.has(row.original.id || '');
+                return (
+                  <TableRow
+                    key={row.id}
+                    className={isUpdating ? 'opacity-60 pointer-events-none' : ''}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell

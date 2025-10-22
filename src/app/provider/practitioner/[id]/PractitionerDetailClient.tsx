@@ -9,8 +9,7 @@ import { Skeleton } from '@/components/common/ContentSkeleton';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { CreateScheduleForm } from '@/components/provider/CreateScheduleForm';
 import { GenerateSlotsForm } from '@/components/provider/GenerateSlotsForm';
-import { SlotCalendar } from '@/components/provider/SlotCalendar';
-import { SlotFilters } from '@/components/provider/SlotFilters';
+import { SlotCalendar } from '@/components/provider/SlotCalendarNew';
 import { ScheduleFilters } from '@/components/provider/ScheduleFilters';
 import PractitionerSchedulesTab from './PractitionerSchedulesTab';
 import PractitionerAppointmentsTab from './PractitionerAppointmentsTab';
@@ -340,78 +339,14 @@ export default function PractitionerDetailClient({
   }, [practitionerId, scheduleFilterValid]);
 
 
-  // Fetch slots - only when slots tab is active and slots haven't been loaded yet
+  // Slots are now fetched by SlotCalendar component itself (month-based with caching)
+  // Just mark as loaded when tab is active
   useEffect(() => {
-    // Only fetch slots when slots tab is active and slots haven't been loaded
-    if (activeTab !== 'slots' || slotsLoaded) {
-      return;
-    }
-
-    if (schedules.length === 0) {
-      setSlots([]);
+    if (activeTab === 'slots' && !slotsLoaded) {
+      setLoadingSlots(false);
       setSlotsLoaded(true);
-      return;
     }
-
-    const fetchSlots = async () => {
-      setLoadingSlots(true);
-      try {
-        setSlotsError(null);
-        console.log('🔄 Loading slots for Slots tab...');
-
-        // Get all slots for all schedules
-        const scheduleIds = schedules.map(s => s.id).filter(Boolean);
-        if (scheduleIds.length === 0) {
-          setSlots([]);
-          setSlotsLoaded(true);
-          setLoadingSlots(false);
-          return;
-        }
-
-        const slotPromises = scheduleIds.map(async (scheduleId) => {
-          try {
-            const response = await fetch(`/api/fhir/slots?schedule=Schedule/${scheduleId}`, {
-              method: 'GET',
-              credentials: 'include',
-            });
-            if (response.ok) {
-              const data = await response.json();
-              return data.slots || [];
-            } else {
-              console.warn(`Failed to fetch slots for schedule ${scheduleId}:`, response.status);
-              return [];
-            }
-          } catch (error) {
-            console.warn(`Error fetching slots for schedule ${scheduleId}:`, error);
-            return [];
-          }
-        });
-
-        const slotArrays = await Promise.all(slotPromises);
-        const allSlots = slotArrays.flat();
-        setSlots(allSlots);
-        console.log('✅ Loaded slots:', allSlots.length);
-
-        // Mark past free slots as busy-unavailable
-        await markPastSlotsAsBusy(allSlots);
-      } catch (error) {
-        console.error('Error fetching slots:', error);
-        setSlotsError(error instanceof Error ? error.message : 'Failed to load slots');
-      } finally {
-        setLoadingSlots(false);
-        setSlotsLoaded(true);
-      }
-    };
-
-    fetchSlots();
-
-    // Auto-refresh slots every 60 seconds
-    const refreshInterval = setInterval(() => {
-      fetchSlots();
-    }, 60000); // 60 seconds
-
-    return () => clearInterval(refreshInterval);
-  }, [activeTab, schedules, slotsLoaded]);
+  }, [activeTab, slotsLoaded]);
 
   // Fetch appointments - only when appointments tab is active
   useEffect(() => {
@@ -1061,137 +996,43 @@ export default function PractitionerDetailClient({
   };
 
   const renderSlotsContent = () => {
-    // Check if any filters are active
-    const hasActiveFilters =
-      selectedSchedules.length > 0 ||
-      selectedCategories.length > 0 ||
-      selectedServiceTypes.length > 0 ||
-      selectedSpecialties.length > 0;
-
-    // If no filters are active, show all slots
-    let filteredSlots = slots;
-
-    if (hasActiveFilters) {
-      // Filter schedules based on selected characteristics
-      const filteredScheduleIds = schedules
-        .filter(schedule => {
-          // Filter by selected schedules (if any selected)
-          if (selectedSchedules.length > 0 && !selectedSchedules.includes(schedule.id!)) {
-            return false;
-          }
-
-          // Filter by category
-          if (selectedCategories.length > 0) {
-            const scheduleCategories = schedule.serviceCategory?.flatMap(cat =>
-              cat.coding?.map(code => code.display).filter(Boolean) || []
-            ) || [];
-            if (!selectedCategories.some(cat => scheduleCategories.includes(cat))) {
-              return false;
-            }
-          }
-
-          // Filter by service type
-          if (selectedServiceTypes.length > 0) {
-            const scheduleTypes = schedule.serviceType?.flatMap(type =>
-              type.coding?.map(code => code.display).filter(Boolean) || []
-            ) || [];
-            if (!selectedServiceTypes.some(type => scheduleTypes.includes(type))) {
-              return false;
-            }
-          }
-
-          // Filter by specialty
-          if (selectedSpecialties.length > 0) {
-            const scheduleSpecialties = schedule.specialty?.flatMap(spec =>
-              spec.coding?.map(code => code.display).filter(Boolean) || []
-            ) || [];
-            if (!selectedSpecialties.some(spec => scheduleSpecialties.includes(spec))) {
-              return false;
-            }
-          }
-
-          return true;
-        })
-        .map(s => s.id!);
-
-      // Filter slots to only include those from filtered schedules
-      filteredSlots = slots.filter(slot => {
-        const scheduleId = slot.schedule?.reference?.replace('Schedule/', '');
-        return filteredScheduleIds.includes(scheduleId!);
-      });
-    }
-
     return (
-      <div className="flex gap-4">
-        {/* Left Sidebar - Filters (hidden on mobile, shown on md+) */}
-        <div className="hidden md:block w-64 flex-shrink-0">
-          <SlotFilters
+      <div className="space-y-4">
+        {/* Header with Generate Slots button */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <h2 className="text-lg md:text-base sm:text-lg md:text-xl font-semibold">
+            Slot Calendar
+          </h2>
+          <Button
+            onClick={() => setShowGenerateSlots(true)}
+            variant="primary"
+            size="sm"
+          >
+            Generate Slots
+          </Button>
+        </div>
+
+        {/* Calendar */}
+        {loadingSlots ? (
+          <SlotCalendarSkeleton />
+        ) : slotsError ? (
+          <Card>
+            <div className="p-6 text-center">
+              <div className="text-red-600 mb-2">Failed to load slots</div>
+              <div className="text-sm text-gray-500">{slotsError}</div>
+            </div>
+          </Card>
+        ) : (
+          <SlotCalendar
             slots={slots}
             schedules={schedules}
-            selectedSchedules={selectedSchedules}
-            selectedCategories={selectedCategories}
-            selectedServiceTypes={selectedServiceTypes}
-            selectedSpecialties={selectedSpecialties}
-            onSchedulesChange={setSelectedSchedules}
-            onCategoriesChange={setSelectedCategories}
-            onServiceTypesChange={setSelectedServiceTypes}
-            onSpecialtiesChange={setSelectedSpecialties}
+            practitionerId={practitionerId}
+            onSlotUpdate={() => {
+              // Refresh slots when a slot is updated/deleted
+              setSlotsLoaded(false);
+            }}
           />
-        </div>
-
-        {/* Main Content - Calendar */}
-        <div className="flex-1 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-            <h2 className="text-lg md:text-base sm:text-lg md:text-xl font-semibold">
-              Slot Calendar
-              {filteredSlots.length < slots.length && (
-                <span className="text-sm text-gray-500 ml-2">
-                  ({filteredSlots.length} of {slots.length} slots)
-                </span>
-              )}
-            </h2>
-            <Button
-              onClick={() => setShowGenerateSlots(true)}
-              variant="primary"
-              size="sm"
-            >
-              Generate Slots
-            </Button>
-          </div>
-
-          {loadingSlots ? (
-            <SlotCalendarSkeleton />
-          ) : slotsError ? (
-            <Card>
-              <div className="p-6 text-center">
-                <div className="text-red-600 mb-2">Failed to load slots</div>
-                <div className="text-sm text-gray-500">{slotsError}</div>
-              </div>
-            </Card>
-          ) : (
-            <>
-              {filteredSlots.length === 0 && hasActiveFilters && (
-                <Card className="mb-4">
-                  <div className="p-4 text-center text-yellow-700 bg-yellow-50 rounded-lg">
-                    <p className="font-medium">No slots match the selected filters</p>
-                    <p className="text-sm mt-1">Try adjusting your filter criteria or clear all filters to see all slots.</p>
-                  </div>
-                </Card>
-              )}
-              <SlotCalendar
-                slots={filteredSlots}
-                onSlotUpdate={() => {
-                  // Refresh slots when a slot is updated/deleted
-                  setSlotsLoaded(false);
-                  if (activeTab === 'slots') {
-                    // Will trigger re-fetch via useEffect
-                    setSlotsLoaded(false);
-                  }
-                }}
-              />
-            </>
-          )}
-        </div>
+        )}
       </div>
     );
   };

@@ -14,6 +14,14 @@ import {
 import { Badge } from '@/components/common/Badge';
 import { formatDateForDisplay } from '@/library/timezone';
 import type { Schedule } from '@/types/fhir';
+import {
+  SERVICE_CATEGORY_LABELS,
+  SPECIALTY_LABELS,
+  SERVICE_TYPES_BY_CATEGORY,
+  type ServiceCategoryCode,
+  type ServiceTypeCode,
+  type SpecialtyCode,
+} from '@/constants/fhir';
 
 export interface ScheduleRow extends Schedule {
   // Extended properties if needed
@@ -36,22 +44,41 @@ function formatPeriod(period: { start?: string; end?: string } | undefined): str
   return `${start} - ${end}`;
 }
 
-// Helper to extract service category
+// Helper to extract service category - map code to label
 function extractServiceCategory(schedule: Schedule): string {
-  return schedule.serviceCategory?.[0]?.coding?.[0]?.display || '-';
+  const code = schedule.serviceCategory?.[0]?.coding?.[0]?.code;
+  if (!code) return '-';
+
+  // Map code to human-readable label
+  return SERVICE_CATEGORY_LABELS[code as ServiceCategoryCode] || code;
 }
 
-// Helper to extract service type
+// Helper to extract service type - map code to label
 function extractServiceType(schedule: Schedule): string {
-  return schedule.serviceType?.[0]?.coding?.[0]?.display || '-';
+  const typeCode = schedule.serviceType?.[0]?.coding?.[0]?.code;
+  const categoryCode = schedule.serviceCategory?.[0]?.coding?.[0]?.code;
+
+  if (!typeCode) return '-';
+  if (!categoryCode) return typeCode;
+
+  // Find the label from the SERVICE_TYPES_BY_CATEGORY mapping
+  const categoryTypes = SERVICE_TYPES_BY_CATEGORY[categoryCode as ServiceCategoryCode] || [];
+  const type = categoryTypes.find(t => t.value === typeCode);
+
+  return type?.label || typeCode;
 }
 
-// Helper to extract specialty
+// Helper to extract specialty - map code to label
 function extractSpecialty(schedule: Schedule): string {
-  return schedule.specialty?.[0]?.coding?.[0]?.display || '-';
+  const code = schedule.specialty?.[0]?.coding?.[0]?.code;
+  if (!code) return '-';
+
+  // Map code to human-readable label
+  return SPECIALTY_LABELS[code as SpecialtyCode] || code;
 }
 
 export const columns: ColumnDef<ScheduleRow>[] = [
+  // 1. #
   {
     accessorKey: 'id',
     header: ({ column }) => (
@@ -60,13 +87,90 @@ export const columns: ColumnDef<ScheduleRow>[] = [
         onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         className="text-[13px] px-0 hover:bg-transparent"
       >
-        Schedule ID
+        #
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => <div className="text-[13px] font-mono">{row.original.id || '-'}</div>,
-    size: 120,
+    cell: ({ row }) => <div className="text-[13px] font-mono text-gray-600">{row.original.id || '-'}</div>,
+    size: 100,
   },
+  // 2. Specialty
+  {
+    accessorFn: (row) => extractSpecialty(row),
+    id: 'specialty',
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+        className="text-[13px] px-0 hover:bg-transparent"
+      >
+        Specialty
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => (
+      <div className="text-[13px]">{extractSpecialty(row.original)}</div>
+    ),
+    size: 150,
+  },
+  // 3. Service Category
+  {
+    accessorFn: (row) => extractServiceCategory(row),
+    id: 'serviceCategory',
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+        className="text-[13px] px-0 hover:bg-transparent"
+      >
+        Service Category
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => (
+      <div className="text-[13px]">{extractServiceCategory(row.original)}</div>
+    ),
+    size: 150,
+  },
+  // 4. Service Type
+  {
+    accessorFn: (row) => extractServiceType(row),
+    id: 'serviceType',
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+        className="text-[13px] px-0 hover:bg-transparent"
+      >
+        Service Type
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => (
+      <div className="text-[13px]">{extractServiceType(row.original)}</div>
+    ),
+    size: 150,
+  },
+  // 5. Schedule Interval (was Planning Horizon)
+  {
+    accessorFn: (row) => formatPeriod(row.planningHorizon),
+    id: 'planningHorizon',
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+        className="text-[13px] px-0 hover:bg-transparent"
+      >
+        Schedule Interval
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => (
+      <div className="text-[13px]">{formatPeriod(row.original.planningHorizon)}</div>
+    ),
+    size: 150,
+  },
+  // 6. Status
   {
     accessorKey: 'active',
     header: ({ column }) => (
@@ -89,78 +193,7 @@ export const columns: ColumnDef<ScheduleRow>[] = [
     ),
     size: 100,
   },
-  {
-    accessorFn: (row) => formatPeriod(row.planningHorizon),
-    id: 'planningHorizon',
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        className="text-[13px] px-0 hover:bg-transparent"
-      >
-        Planning Horizon
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <div className="text-[13px]">{formatPeriod(row.original.planningHorizon)}</div>
-    ),
-    size: 200,
-  },
-  {
-    accessorFn: (row) => extractServiceCategory(row),
-    id: 'serviceCategory',
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        className="text-[13px] px-0 hover:bg-transparent"
-      >
-        Service Category
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <div className="text-[13px]">{extractServiceCategory(row.original)}</div>
-    ),
-    size: 150,
-  },
-  {
-    accessorFn: (row) => extractServiceType(row),
-    id: 'serviceType',
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        className="text-[13px] px-0 hover:bg-transparent"
-      >
-        Service Type
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <div className="text-[13px]">{extractServiceType(row.original)}</div>
-    ),
-    size: 150,
-  },
-  {
-    accessorFn: (row) => extractSpecialty(row),
-    id: 'specialty',
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        className="text-[13px] px-0 hover:bg-transparent"
-      >
-        Specialty
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <div className="text-[13px]">{extractSpecialty(row.original)}</div>
-    ),
-    size: 150,
-  },
+  // 7. Actions
   {
     id: 'actions',
     header: () => <div className="text-[13px]">Actions</div>,

@@ -37,8 +37,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/common/Button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { Search } from 'lucide-react';
 import { columns, ScheduleRow } from './columns-schedules';
 import { CreateScheduleForm } from '@/components/provider/CreateScheduleForm';
 import { GenerateSlotsForm } from '@/components/provider/GenerateSlotsForm';
@@ -74,6 +76,8 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
   const [selectedServiceType, setSelectedServiceType] = useState<ServiceTypeCode | ''>('');
   const [selectedSpecialty, setSelectedSpecialty] = useState<SpecialtyCode | ''>('');
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
+  const [searchId, setSearchId] = useState(''); // Search input state
+  const [activeSearchId, setActiveSearchId] = useState(''); // Active search filter
 
   // Available service types based on selected category
   const [availableServiceTypes, setAvailableServiceTypes] = useState<Array<{value: ServiceTypeCode, label: string}>>([]);
@@ -109,6 +113,11 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
     try {
       const params = new URLSearchParams();
       params.append('actor', `Practitioner/${practitionerId}`);
+
+      // Add ID filter if active search
+      if (activeSearchId) {
+        params.append('_id', activeSearchId);
+      }
 
       // Add date filter based on valid/expired selection
       const today = new Date().toISOString().split('T')[0];
@@ -181,7 +190,7 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
     } finally {
       setLoading(false);
     }
-  }, [practitionerId, scheduleFilterValid, activeStatus, selectedCategory, selectedServiceType, selectedSpecialty, dateRange]);  // All filters trigger API refetch
+  }, [practitionerId, scheduleFilterValid, activeStatus, selectedCategory, selectedServiceType, selectedSpecialty, dateRange, activeSearchId]);  // All filters trigger API refetch
 
   useEffect(() => {
     fetchSchedules();
@@ -392,6 +401,24 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
     },
   });
 
+  // Handle search by ID
+  const handleSearch = () => {
+    setActiveSearchId(searchId.trim());
+  };
+
+  // Handle Enter key in search input
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  // Clear search
+  const handleClearSearch = () => {
+    setSearchId('');
+    setActiveSearchId('');
+  };
+
   // Clear all filters
   const clearAllFilters = () => {
     setActiveStatus('all');
@@ -550,6 +577,41 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
               Clear All Filters
             </Button>
           </div>
+        )}
+      </div>
+
+      {/* Search by ID */}
+      <div className="mb-4">
+        <div className="flex gap-2">
+          <Input
+            placeholder="Filter by schedule ID..."
+            value={searchId}
+            onChange={(e) => setSearchId(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            className="text-[13px] max-w-xs"
+          />
+          <Button
+            onClick={handleSearch}
+            disabled={!searchId.trim()}
+            className="text-[13px]"
+          >
+            <Search className="h-4 w-4 mr-2" />
+            Search
+          </Button>
+          {activeSearchId && (
+            <Button
+              variant="outline"
+              onClick={handleClearSearch}
+              className="text-[13px]"
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+        {activeSearchId && (
+          <p className="text-[13px] text-gray-600 mt-2">
+            Filtering by ID: <span className="font-mono font-medium">{activeSearchId}</span>
+          </p>
         )}
       </div>
 

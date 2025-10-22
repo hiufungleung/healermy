@@ -24,11 +24,12 @@ export interface AppointmentRow extends Appointment {
 }
 
 // Get status badge variant
-function getStatusBadgeVariant(status: string): 'success' | 'warning' | 'danger' | 'info' {
+function getStatusBadgeVariant(status: string): 'success' | 'warning' | 'danger' | 'info' | 'secondary' {
   switch (status) {
     case 'booked':
-    case 'fulfilled':
       return 'success';
+    case 'fulfilled':
+      return 'secondary'; // Grey for archived feeling
     case 'pending':
     case 'proposed':
       return 'warning';
@@ -46,10 +47,10 @@ function getStatusBadgeVariant(status: string): 'success' | 'warning' | 'danger'
 }
 
 // Get encounter status badge variant
-function getEncounterBadgeVariant(status: string): 'success' | 'warning' | 'danger' | 'info' {
+function getEncounterBadgeVariant(status: string): 'success' | 'warning' | 'danger' | 'info' | 'secondary' {
   switch (status) {
     case 'finished':
-      return 'success';
+      return 'secondary'; // Grey for archived feeling
     case 'planned':
     case 'on-hold':
       return 'warning';
@@ -65,6 +66,32 @@ function getEncounterBadgeVariant(status: string): 'success' | 'warning' | 'dang
 }
 
 export const columns: ColumnDef<AppointmentRow>[] = [
+  {
+    accessorKey: 'id',
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          className="text-[13px] px-0 hover:bg-transparent"
+        >
+          #
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      );
+    },
+    cell: ({ row }) => {
+      const appointmentId = row.original.id;
+      if (!appointmentId) return <span className="text-gray-400 text-[13px]">-</span>;
+
+      return (
+        <div className="text-[13px] font-mono text-gray-600">
+          {appointmentId}
+        </div>
+      );
+    },
+    size: 100,
+  },
   {
     accessorKey: 'start',
     header: ({ column }) => {
@@ -228,14 +255,20 @@ export const columns: ColumnDef<AppointmentRow>[] = [
 
       const handleAction = async (action: string) => {
         try {
-          await executeAction(
+          const result = await executeAction(
             action,
             appointment.id!,
             appointment.encounter?.id
           );
 
-          // Refresh the data
-          window.dispatchEvent(new CustomEvent('refresh-appointments'));
+          // Dispatch event with updated data from PATCH response
+          window.dispatchEvent(new CustomEvent('refresh-appointments', {
+            detail: {
+              appointmentId: appointment.id,
+              updatedAppointment: result.appointment,
+              updatedEncounter: result.encounter
+            }
+          }));
         } catch (error) {
           console.error('Error executing action:', error);
           alert(`Failed to ${getActionLabel(action).toLowerCase()}. Please try again.`);

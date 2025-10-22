@@ -90,6 +90,23 @@ export async function updateSchedule(
 }
 
 /**
+ * Patch a schedule with JSON Patch operations
+ */
+export async function patchSchedule(
+  token: string,
+  fhirBaseUrl: string,
+  scheduleId: string,
+  patchOperations: any[]
+): Promise<any> {
+  const url = `${fhirBaseUrl}/Schedule/${scheduleId}`;
+  const response = await FHIRClient.fetchWithAuth(url, token, {
+    method: 'PATCH',
+    body: JSON.stringify(patchOperations),
+  });
+  return response.json();
+}
+
+/**
  * Delete a schedule and all associated slots and appointments
  */
 export async function deleteSchedule(
