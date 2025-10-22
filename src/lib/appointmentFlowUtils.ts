@@ -5,7 +5,7 @@
  * Flow Summary:
  * 1. Patient books → pending → provider approves → booked
  * 2. Patient arrives → arrived
- * 3. Practitioner clicks "Will be finished in 10 min" → creates encounter (planned)
+ * 3. Practitioner clicks "Start in 10 Minutes" → creates encounter (planned)
  * 4. Practitioner starts encounter → in-progress
  * 5. Practitioner completes encounter → finished + appointment fulfilled
  */
@@ -77,8 +77,9 @@ export async function markPatientArrived(appointmentId: string): Promise<any> {
 }
 
 /**
- * Create encounter for an arrived patient (status: 'planned')
- * This is called when practitioner clicks "Will be finished in 10 minutes" for the next patient
+ * Create encounter for an arrived patient with status 'planned'
+ * This is called when practitioner clicks "Start in 10 Minutes" for an arrived patient
+ * Indicates the patient will be seen within 10 minutes
  * Returns the created encounter resource
  */
 export async function createPlannedEncounter(appointmentId: string): Promise<any> {
@@ -118,28 +119,6 @@ export async function startEncounter(encounterId: string): Promise<any> {
 
   if (!response.ok) {
     throw new Error('Failed to start encounter');
-  }
-
-  return response.json(); // Return updated encounter
-}
-
-/**
- * Mark encounter as "will be finished soon" (on-hold status)
- * This notifies the patient that the appointment will begin within 10 minutes
- * Returns the updated encounter resource from PATCH response
- */
-export async function markEncounterFinishingSoon(encounterId: string): Promise<any> {
-  const response = await fetch(`/api/fhir/encounters/${encounterId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json-patch+json' },
-    credentials: 'include',
-    body: JSON.stringify([
-      { op: 'replace', path: '/status', value: 'on-hold' }
-    ])
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to mark encounter as finishing soon');
   }
 
   return response.json(); // Return updated encounter
@@ -216,9 +195,9 @@ export function getAvailableActions(
     return actions;
   }
 
-  // Arrived appointments without encounter
+  // Arrived appointments without encounter - can notify patient (create planned encounter)
   if (appointmentStatus === 'arrived' && !encounterStatus) {
-    actions.push('start-encounter');
+    actions.push('start-in-10-min');
     return actions;
   }
 
@@ -229,7 +208,7 @@ export function getAvailableActions(
     }
 
     if (encounterStatus === 'in-progress') {
-      actions.push('will-be-finished', 'complete-encounter');
+      actions.push('complete-encounter');
     }
   }
 
@@ -249,8 +228,8 @@ export function getActionLabel(action: string): string {
     'confirm': 'Confirm',
     'cancel': 'Cancel',
     'mark-arrived': 'Patient Arrived',
+    'start-in-10-min': 'Start in 10 Minutes',
     'start-encounter': 'Start Encounter',
-    'will-be-finished': 'Will be Finished Soon',
     'complete-encounter': 'Complete Encounter'
   };
 
@@ -279,22 +258,17 @@ export async function executeAction(
       const arrivedAppointment = await markPatientArrived(appointmentId);
       return { appointment: arrivedAppointment };
 
-    case 'start-encounter':
-      if (encounterId) {
-        const updatedEncounter = await startEncounter(encounterId);
-        return { encounter: updatedEncounter };
-      } else {
-        // Create encounter for arrived patient
-        const newEncounter = await createPlannedEncounter(appointmentId);
-        return { encounter: newEncounter };
-      }
+    case 'start-in-10-min':
+      // Create encounter with 'planned' status for arrived patient
+      const newEncounter = await createPlannedEncounter(appointmentId);
+      return { encounter: newEncounter };
 
-    case 'will-be-finished':
+    case 'start-encounter':
       if (!encounterId) {
         throw new Error('Encounter ID required for this action');
       }
-      const onHoldEncounter = await markEncounterFinishingSoon(encounterId);
-      return { encounter: onHoldEncounter };
+      const updatedEncounter = await startEncounter(encounterId);
+      return { encounter: updatedEncounter };
 
     case 'complete-encounter':
       if (!encounterId) {

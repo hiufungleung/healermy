@@ -25,21 +25,19 @@ export function calculateQueuePosition(
   position: number;
   encountersAhead: number;
   estimatedWaitMinutes: number;
-  isOnHold: boolean;
   isPlanned: boolean;
   hasInProgressAhead: boolean;
 } {
-  // Check if patient's own encounter is on-hold or planned
-  const isOnHold = patientEncounter?.status === 'on-hold';
+  // Check if patient's own encounter is planned (within 10 minutes)
   const isPlanned = patientEncounter?.status === 'planned';
 
-  // Filter encounters that are in-progress, on-hold, or planned, and before patient's appointment
+  // Filter encounters that are in-progress or planned, and before patient's appointment
   const encountersAhead = encounters.filter(encounter => {
     // Skip the patient's own encounter
     if (patientEncounter && encounter.id === patientEncounter.id) return false;
 
     // Only count encounters that are actively blocking the queue
-    const isActive = encounter.status === 'in-progress' || encounter.status === 'on-hold' || encounter.status === 'planned';
+    const isActive = encounter.status === 'in-progress' || encounter.status === 'planned';
     if (!isActive) return false;
 
     // Get encounter start time from period
@@ -98,7 +96,6 @@ export function calculateQueuePosition(
     position,
     encountersAhead: count,
     estimatedWaitMinutes,
-    isOnHold,
     isPlanned,
     hasInProgressAhead,
   };
@@ -134,23 +131,16 @@ export function formatWaitTime(minutes: number): string {
  * Get queue status message for patient
  *
  * @param position - Queue position (1 = next, 2 = second, etc.)
- * @param isOnHold - Whether patient's encounter is on-hold (starting soon)
  * @param isPlanned - Whether patient's encounter is planned (< 10 min wait)
  * @param hasInProgressAhead - Whether there's an in-progress encounter ahead
  * @returns Human-readable status message
  */
 export function getQueueStatusMessage(
   position: number,
-  isOnHold: boolean = false,
   isPlanned: boolean = false,
   hasInProgressAhead: boolean = false
 ): string {
-  // Special message if patient's encounter is on-hold
-  if (isOnHold) {
-    return "Your appointment will begin within 10 minutes";
-  }
-
-  // Special message if patient's encounter is planned (created by "Will be finished in 10 min")
+  // Special message if patient's encounter is planned (created by "Start in 10 Minutes")
   if (isPlanned) {
     return "Your appointment will begin within 10 minutes";
   }

@@ -116,44 +116,26 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
           {/* Personal Information */}
           <div>
             <h3 className="text-sm sm:text-base font-semibold text-text-primary mb-4">Personal Information</h3>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <h4 className="text-sm font-medium text-text-secondary mb-2">Full Name</h4>
-                <div className="space-y-1">
-                  {name?.prefix && (
-                    <p className="text-sm">
-                      <strong>Prefix:</strong> {name.prefix.join(', ')}
-                    </p>
-                  )}
-                  {name?.given && (
-                    <p className="text-sm">
-                      <strong>Given Name(s):</strong> {name.given.join(' ')}
-                    </p>
-                  )}
-                  {name?.family && (
-                    <p className="text-sm">
-                      <strong>Family Name:</strong> {name.family}
-                    </p>
-                  )}
-                  {name?.suffix && (
-                    <p className="text-sm">
-                      <strong>Suffix:</strong> {name.suffix.join(', ')}
-                    </p>
-                  )}
-                </div>
-              </div>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+              {/* Row 1: Given Name and Family Name */}
+              {name?.given && (
+                <p className="text-sm">
+                  <strong className="text-text-secondary">Given Name(s):</strong> {name.given.join(' ')}
+                </p>
+              )}
+              {name?.family && (
+                <p className="text-sm">
+                  <strong className="text-text-secondary">Family Name:</strong> {name.family}
+                </p>
+              )}
 
-              <div>
-                <h4 className="text-sm font-medium text-text-secondary mb-2">Demographics</h4>
-                <div className="space-y-1">
-                  <p className="text-sm capitalize">
-                    <strong>Gender:</strong> {practitioner.gender || 'Not specified'}
-                  </p>
-                  <p className="text-sm">
-                    <strong>Status:</strong> {practitioner.active ? 'Active' : 'Inactive'}
-                  </p>
-                </div>
-              </div>
+              {/* Row 2: Gender and Status (only if exists) */}
+              <p className="text-sm capitalize">
+                <strong className="text-text-secondary">Gender:</strong> {practitioner.gender || 'Not Specified'}
+              </p>
+              <p className="text-sm">
+                <strong className="text-text-secondary">Status:</strong> {practitioner.active ? 'Active' : 'Inactive'}
+              </p>
             </div>
           </div>
 
@@ -162,65 +144,33 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
           {/* Contact Information */}
           <div>
             <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-4">Contact Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-2">
               {/* Phone */}
               {phone && (
-                <div>
-                  <h4 className="text-sm font-medium text-text-secondary mb-2">Phone</h4>
-                  <div className="flex items-center">
-                    <svg className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                    <span className="text-sm">{phone}</span>
-                  </div>
-                </div>
+                <p className="text-sm">
+                  <strong className="text-text-secondary">Phone</strong>
+                  <br />
+                  <svg className="w-4 h-4 text-gray-400 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  {phone}
+                </p>
               )}
 
-              {/* Email */}
-              {email && (
-                <div>
-                  <h4 className="text-sm font-medium text-text-secondary mb-2">Email</h4>
-                  <div className="flex items-center">
-                    <svg className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <span className="text-sm">{email}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Fax */}
-              {fax && (
-                <div>
-                  <h4 className="text-sm font-medium text-text-secondary mb-2">Fax</h4>
-                  <div className="flex items-center">
-                    <svg className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-9 0h10m-5 8V9m0 0l-2 2m2-2l2 2" />
-                    </svg>
-                    <span className="text-sm">{fax}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Address - Full width row */}
+              {/* Address */}
               {address && (
-                <div className="col-span-full">
-                  <h4 className="text-sm font-medium text-text-secondary mb-2">Address</h4>
-                  <div className="flex items-start">
-                    <svg className="w-4 h-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <div className="text-sm">
-                      <p>
-                        {address.line && address.line.join(', ')}
-                        {address.line && address.line.length > 0 && (address.city || address.state || address.postalCode) && ', '}
-                        {[address.city, address.state, address.postalCode].filter(Boolean).join(' ')}
-                        {address.country && `, ${address.country}`}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <p className="text-sm">
+                  <strong className="text-text-secondary">Address</strong>
+                  <br />
+                  <svg className="w-4 h-4 text-gray-400 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  {address.line && address.line.join(', ')}
+                  {address.line && address.line.length > 0 && (address.city || address.state || address.postalCode) && ', '}
+                  {[address.city, address.state, address.postalCode].filter(Boolean).join(' ')}
+                  {address.country && `, ${address.country}`}
+                </p>
               )}
             </div>
           </div>
@@ -230,49 +180,34 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
           {/* Professional Information */}
           <div>
             <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-4">Professional Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+              {/* Identifiers */}
+              <div className="col-span-2">
                 <h4 className="text-sm font-medium text-text-secondary mb-2">Identifiers</h4>
-                <div className="space-y-2">
-                  {npi && (
-                    <p className="text-sm">
-                      <strong>NPI:</strong> {npi}
-                    </p>
-                  )}
-                  {providerNumber && (
-                    <p className="text-sm">
-                      <strong>Provider Number:</strong> {providerNumber}
-                    </p>
-                  )}
-                  {practitioner.identifier?.map((identifier, index) => (
-                    <p key={index} className="text-xs text-text-secondary">
-                      <strong>System:</strong> {identifier.system}<br />
-                      <strong>Value:</strong> {identifier.value}
-                    </p>
-                  ))}
-                </div>
               </div>
 
-              <div>
+              {practitioner.identifier?.map((identifier, index) => (
+                <p key={index} className="text-sm">
+                  <strong className="text-text-secondary">System:</strong> {identifier.system}
+                  <br />
+                  <strong className="text-text-secondary">Value:</strong> {identifier.value}
+                </p>
+              ))}
+
+              {/* Qualifications */}
+              <div className="col-span-2 mt-2">
                 <h4 className="text-sm font-medium text-text-secondary mb-2">Qualifications</h4>
-                <div className="space-y-2">
-                  {practitioner.qualification?.map((qual, index) => (
-                    <div key={index} className="text-sm">
-                      <p><strong>Code:</strong> {qual.code?.text || qual.code?.coding?.[0]?.display}</p>
-                      {qual.period?.start && (
-                        <p className="text-xs text-text-secondary">
-                          <strong>Start Date:</strong> {new Date(qual.period.start).toLocaleDateString()}
-                        </p>
-                      )}
-                      {qual.period?.end && (
-                        <p className="text-xs text-text-secondary">
-                          <strong>End Date:</strong> {new Date(qual.period.end).toLocaleDateString()}
-                        </p>
-                      )}
-                    </div>
-                  )) || <p className="text-sm text-text-secondary">No qualifications recorded</p>}
-                </div>
               </div>
+
+              {practitioner.qualification && practitioner.qualification.length > 0 ? (
+                practitioner.qualification.map((qual, index) => (
+                  <p key={index} className="text-sm">
+                    {qual.code?.text || qual.code?.coding?.[0]?.display || 'No qualification recorded'}
+                  </p>
+                ))
+              ) : (
+                <p className="text-sm text-text-secondary col-span-2">No qualifications recorded</p>
+              )}
             </div>
           </div>
 
@@ -281,19 +216,17 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
           {/* System Information */}
           <div>
             <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-4">System Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="text-sm font-medium text-text-secondary mb-2">Resource Metadata</h4>
-                <div className="space-y-1 text-sm">
-                  <p><strong>Resource Type:</strong> {practitioner.resourceType}</p>
-                  <p><strong>Resource ID:</strong> {practitioner.id}</p>
-                  {versionId && <p><strong>Version ID:</strong> {versionId}</p>}
-                  {lastUpdated && (
-                    <p>
-                      <strong>Last Updated:</strong> {new Date(lastUpdated).toLocaleString()}
-                    </p>
-                  )}
-                </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-medium text-text-secondary mb-2">Resource Metadata</h4>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
+                <p><strong className="text-text-secondary">Resource Type:</strong> {practitioner.resourceType}</p>
+                <p><strong className="text-text-secondary">Resource ID:</strong> {practitioner.id}</p>
+                {versionId && <p><strong className="text-text-secondary">Version ID:</strong> {versionId}</p>}
+                {lastUpdated && (
+                  <p className={versionId ? '' : 'col-span-2'}>
+                    <strong className="text-text-secondary">Last Updated:</strong> {new Date(lastUpdated).toLocaleString()}
+                  </p>
+                )}
               </div>
             </div>
           </div>

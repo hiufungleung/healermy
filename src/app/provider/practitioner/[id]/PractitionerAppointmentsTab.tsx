@@ -45,6 +45,7 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
     practitionerName: false  // Hide practitioner column on practitioner-specific page
   });
   const [updatingRows, setUpdatingRows] = useState<Set<string>>(new Set());
+  const [updatingActions, setUpdatingActions] = useState<Map<string, string>>(new Map());
 
   // Initialize filter state from URL params (default: today, no status)
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('today');
@@ -276,8 +277,9 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
   }, [fetchAppointments]); // Include fetchAppointments for fallback
 
   // Handlers for tracking updating rows
-  const handleActionStart = useCallback((appointmentId: string) => {
+  const handleActionStart = useCallback((appointmentId: string, action: string) => {
     setUpdatingRows(prev => new Set(prev).add(appointmentId));
+    setUpdatingActions(prev => new Map(prev).set(appointmentId, action));
   }, []);
 
   const handleActionEnd = useCallback((appointmentId: string) => {
@@ -286,14 +288,20 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
       next.delete(appointmentId);
       return next;
     });
+    setUpdatingActions(prev => {
+      const next = new Map(prev);
+      next.delete(appointmentId);
+      return next;
+    });
   }, []);
 
   // Create columns with context for spinner display
   const columns = useMemo(() => createColumns({
     updatingRows,
+    updatingActions,
     onActionStart: handleActionStart,
     onActionEnd: handleActionEnd
-  }), [updatingRows, handleActionStart, handleActionEnd]);
+  }), [updatingRows, updatingActions, handleActionStart, handleActionEnd]);
 
   // Initialize table (following shadcn pattern exactly)
   const table = useReactTable({

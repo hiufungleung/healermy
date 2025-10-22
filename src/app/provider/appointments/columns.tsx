@@ -27,7 +27,8 @@ export interface AppointmentRow extends Appointment {
 // Context for passing updatingRows state to column cells
 export interface ColumnsContext {
   updatingRows?: Set<string>;
-  onActionStart?: (appointmentId: string) => void;
+  updatingActions?: Map<string, string>; // appointmentId -> action name
+  onActionStart?: (appointmentId: string, action: string) => void;
   onActionEnd?: (appointmentId: string) => void;
 }
 
@@ -211,12 +212,18 @@ export const createColumns = (context?: ColumnsContext): ColumnDef<AppointmentRo
       const status = row.original.status;
       const appointmentId = row.original.id;
       const isUpdating = appointmentId && context?.updatingRows?.has(appointmentId);
+      const currentAction = appointmentId ? context?.updatingActions?.get(appointmentId) : undefined;
 
-      if (isUpdating) {
+      // Show spinner only for actions that change appointment status
+      const showSpinner = isUpdating && currentAction && [
+        'confirm', 'cancel', 'mark-arrived', 'complete-encounter'
+      ].includes(currentAction);
+
+      if (showSpinner) {
         return (
           <div className="flex items-center h-6 pl-6">
             <div className="w-6 h-6 flex items-center justify-center">
-              <LoadingSpinner size="sm" className="scale-[0.45]" />
+              <LoadingSpinner size="sm" className="scale-[0.4]" />
             </div>
           </div>
         );
@@ -247,10 +254,31 @@ export const createColumns = (context?: ColumnsContext): ColumnDef<AppointmentRo
     },
     cell: ({ row }) => {
       const encounter = row.original.encounter;
+      const appointmentId = row.original.id;
+      const isUpdating = appointmentId && context?.updatingRows?.has(appointmentId);
+      const currentAction = appointmentId ? context?.updatingActions?.get(appointmentId) : undefined;
+
+      // Show spinner only for actions that change encounter status
+      const showSpinner = isUpdating && currentAction && [
+        'start-in-10-min', 'start-encounter', 'complete-encounter'
+      ].includes(currentAction);
+
+      if (showSpinner) {
+        return (
+          <div className="flex items-center h-6 pl-6">
+            <div className="w-6 h-6 flex items-center justify-center">
+              <LoadingSpinner size="sm" className="scale-[0.4]" />
+            </div>
+          </div>
+        );
+      }
+
+      // Show "-" if no encounter exists
       if (!encounter) {
         return <span className="text-gray-400 text-[13px]">-</span>;
       }
 
+      // Show encounter status badge
       return (
         <Badge variant={getEncounterBadgeVariant(encounter.status)} className="capitalize text-[13px] font-normal">
           {encounter.status}
@@ -278,8 +306,8 @@ export const createColumns = (context?: ColumnsContext): ColumnDef<AppointmentRo
         const appointmentId = appointment.id!;
 
         try {
-          // Mark row as updating
-          context?.onActionStart?.(appointmentId);
+          // Mark row as updating with action name
+          context?.onActionStart?.(appointmentId, action);
 
           const result = await executeAction(
             action,

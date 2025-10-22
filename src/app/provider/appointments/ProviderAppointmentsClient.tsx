@@ -41,6 +41,7 @@ export default function ProviderAppointmentsClient() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [updatingRows, setUpdatingRows] = useState<Set<string>>(new Set()); // Track rows being updated
+  const [updatingActions, setUpdatingActions] = useState<Map<string, string>>(new Map()); // Track which action is running
   const [searchId, setSearchId] = useState(''); // Search input state
   const [activeSearchId, setActiveSearchId] = useState(''); // Active search filter
 
@@ -349,8 +350,9 @@ export default function ProviderAppointmentsClient() {
   }, []); // Empty deps - event listener only registered once
 
   // Handlers for tracking updating rows (for spinner display)
-  const handleActionStart = useCallback((appointmentId: string) => {
+  const handleActionStart = useCallback((appointmentId: string, action: string) => {
     setUpdatingRows(prev => new Set(prev).add(appointmentId));
+    setUpdatingActions(prev => new Map(prev).set(appointmentId, action));
   }, []);
 
   const handleActionEnd = useCallback((appointmentId: string) => {
@@ -359,14 +361,20 @@ export default function ProviderAppointmentsClient() {
       next.delete(appointmentId);
       return next;
     });
+    setUpdatingActions(prev => {
+      const next = new Map(prev);
+      next.delete(appointmentId);
+      return next;
+    });
   }, []);
 
   // Create columns with context for spinner display
   const columns = useMemo(() => createColumns({
     updatingRows,
+    updatingActions,
     onActionStart: handleActionStart,
     onActionEnd: handleActionEnd
-  }), [updatingRows, handleActionStart, handleActionEnd]);
+  }), [updatingRows, updatingActions, handleActionStart, handleActionEnd]);
 
   // Initialize table (following shadcn pattern exactly)
   const table = useReactTable({
