@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromCookies, validateRole, prepareToken } from '@/app/api/fhir/utils/auth';
 import { validatePractitionerData } from '@/app/api/fhir/utils/validation';
-import { searchPractitioners, createPractitioner } from '@/app/api/fhir/practitioners/operations';
+import { FHIRClient } from '@/app/api/fhir/client';
+import { createPractitioner } from '@/app/api/fhir/practitioners/operations';
 
 /**
  * GET /api/fhir/practitioners - Search practitioners
@@ -14,48 +15,35 @@ export async function GET(request: NextRequest) {
     // Extract session from middleware headers
     const session = await getSessionFromCookies();
 
-    // Parse query parameters - pass ALL to FHIR API
+    // Pass all query parameters directly to FHIR (preserves duplicate keys)
     const searchParams = request.nextUrl.searchParams;
 
-    // Convert URLSearchParams to plain object, passing ALL parameters to FHIR API
-    const allParams: Record<string, string> = {};
-    searchParams.forEach((value, key) => {
-      allParams[key] = value;
-    });
-
-    // Handle special parameters
-    const page = allParams.page;
-    const count = allParams.count;
-    const practitionerId = allParams.practitionerId; // Legacy parameter
-
-    // Prepare FHIR-compliant search options
-    const searchOptions: any = { ...allParams };
-
-    // Legacy support: Convert practitionerId to _id if needed
-    if (practitionerId && !searchOptions._id) {
-      searchOptions._id = practitionerId;
-      delete searchOptions.practitionerId;
+    // Handle legacy parameter conversion (practitionerId → _id)
+    if (searchParams.has('practitionerId') && !searchParams.has('_id')) {
+      searchParams.set('_id', searchParams.get('practitionerId')!);
+      searchParams.delete('practitionerId');
     }
 
-    // Handle pagination
-    if (count) {
-      searchOptions._count = parseInt(count);
-    }
-
-    // Use proper FHIR pagination with offset
+    // Handle pagination (page → _getpagesoffset)
+    const page = searchParams.get('page');
+    const count = searchParams.get('count') || searchParams.get('_count') || '10';
     if (page && parseInt(page) > 1) {
-      const offset = (parseInt(page) - 1) * (parseInt(count || '10') || 10);
-      searchOptions._getpagesoffset = offset;
-      delete searchOptions.page; // Don't send 'page' to FHIR, use _getpagesoffset
+      const offset = (parseInt(page) - 1) * parseInt(count);
+      searchParams.set('_getpagesoffset', offset.toString());
+      searchParams.delete('page');
     }
 
-    // Call FHIR operations
+    // Ensure _count is set
+    if (searchParams.has('count') && !searchParams.has('_count')) {
+      searchParams.set('_count', count);
+      searchParams.delete('count');
+    }
+
+    const fhirUrl = `${session.fhirBaseUrl}/Practitioner?${searchParams.toString()}`;
     const token = prepareToken(session.accessToken);
-    const fhirBundle = await searchPractitioners(
-      token,
-      session.fhirBaseUrl,
-      Object.keys(searchOptions).length > 0 ? searchOptions : undefined
-    );
+
+    const response = await FHIRClient.fetchWithAuth(fhirUrl, token);
+    const fhirBundle = await response.json();
 
     // Transform FHIR Bundle to expected format
     const practitioners = fhirBundle.entry?.map((entry: any) => entry.resource) || [];

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ColumnFiltersState,
@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search } from 'lucide-react';
-import { columns, AppointmentRow } from './columns';
+import { createColumns, AppointmentRow } from './columns';
 import type { Appointment, Encounter } from '@/types/fhir';
 
 type TimeFilter = 'all' | 'today' | 'upcoming-7' | 'upcoming' | 'past';
@@ -299,10 +299,10 @@ export default function ProviderAppointmentsClient() {
     updateURL(timeFilter, statusFilters);
   }, [timeFilter, statusFilters, updateURL]);
 
-  // Initial fetch and refetch when filters change
+  // Fetch on mount and when filters change (single call, not duplicate)
   useEffect(() => {
     fetchAppointments();
-  }, [fetchAppointments]);
+  }, [timeFilter, statusFilters, activeSearchId]);
 
   // Update a single appointment optimistically using data from PATCH response
   const updateSingleAppointment = useCallback((
@@ -312,38 +312,23 @@ export default function ProviderAppointmentsClient() {
   ) => {
     console.log('[APPOINTMENTS] Optimistic update for appointment:', appointmentId);
 
-    // Mark row as updating
-    setUpdatingRows(prev => new Set(prev).add(appointmentId));
-
-    // Use setTimeout to ensure visual feedback is shown
-    setTimeout(() => {
-      try {
-        // Update the appointment in the list with data from PATCH response
-        setAppointments(prev => prev.map(apt => {
-          if (apt.id === appointmentId) {
-            return {
-              ...(updatedAppointment || apt), // Use updated data if provided
-              patientName: apt.patientName, // Keep existing patient name
-              practitionerName: apt.practitionerName, // Keep existing practitioner name
-              encounter: updatedEncounter || apt.encounter // Use updated encounter if provided
-            } as AppointmentRow;
-          }
-          return apt;
-        }));
-
-        console.log('[APPOINTMENTS] ✅ Optimistic update completed for:', appointmentId);
-      } finally {
-        // Remove from updating set
-        setUpdatingRows(prev => {
-          const next = new Set(prev);
-          next.delete(appointmentId);
-          return next;
-        });
+    // Update the appointment in the list with data from PATCH response
+    setAppointments(prev => prev.map(apt => {
+      if (apt.id === appointmentId) {
+        return {
+          ...(updatedAppointment || apt), // Use updated data if provided
+          patientName: apt.patientName, // Keep existing patient name
+          practitionerName: apt.practitionerName, // Keep existing practitioner name
+          encounter: updatedEncounter || apt.encounter // Use updated encounter if provided
+        } as AppointmentRow;
       }
-    }, 100); // Small delay to show visual feedback
+      return apt;
+    }));
+
+    console.log('[APPOINTMENTS] ✅ Optimistic update completed for:', appointmentId);
   }, []);
 
-  // Listen for refresh events from actions
+  // Listen for refresh events from actions (event listener only registered once)
   useEffect(() => {
     const handleRefresh = (event: Event) => {
       const customEvent = event as CustomEvent;
@@ -354,13 +339,34 @@ export default function ProviderAppointmentsClient() {
         updateSingleAppointment(appointmentId, updatedAppointment, updatedEncounter);
       } else {
         // Full refresh if no appointment ID provided
+        // Call fetchAppointments directly without depending on the function reference
         fetchAppointments();
       }
     };
 
     window.addEventListener('refresh-appointments', handleRefresh);
     return () => window.removeEventListener('refresh-appointments', handleRefresh);
-  }, [fetchAppointments, updateSingleAppointment]);
+  }, []); // Empty deps - event listener only registered once
+
+  // Handlers for tracking updating rows (for spinner display)
+  const handleActionStart = useCallback((appointmentId: string) => {
+    setUpdatingRows(prev => new Set(prev).add(appointmentId));
+  }, []);
+
+  const handleActionEnd = useCallback((appointmentId: string) => {
+    setUpdatingRows(prev => {
+      const next = new Set(prev);
+      next.delete(appointmentId);
+      return next;
+    });
+  }, []);
+
+  // Create columns with context for spinner display
+  const columns = useMemo(() => createColumns({
+    updatingRows,
+    onActionStart: handleActionStart,
+    onActionEnd: handleActionEnd
+  }), [updatingRows, handleActionStart, handleActionEnd]);
 
   // Initialize table (following shadcn pattern exactly)
   const table = useReactTable({
@@ -541,24 +547,18 @@ export default function ProviderAppointmentsClient() {
                 </TableRow>
               ))
             ) : table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => {
-                const isUpdating = updatingRows.has(row.original.id || '');
-                return (
-                  <TableRow
-                    key={row.id}
-                    className={isUpdating ? 'opacity-60 pointer-events-none' : ''}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                );
-              })
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
             ) : (
               <TableRow>
                 <TableCell

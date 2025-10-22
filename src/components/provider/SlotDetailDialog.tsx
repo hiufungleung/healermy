@@ -166,7 +166,7 @@ export function SlotDetailDialog({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Slot Details</DialogTitle>
             <DialogDescription>

@@ -103,14 +103,13 @@ export async function getDashboardData(): Promise<{
 
     // Try to fetch appointments, but don't fail if this doesn't work
     try {
+      const queryParams = new URLSearchParams();
+      queryParams.append('patient', session.patient);
+
       const appointmentBundle = await searchAppointments(
         session.accessToken,
         session.fhirBaseUrl,
-        session.patient,
-        undefined, // practitionerId
-        undefined, // status
-        undefined, // dateFrom (will use default)
-        undefined  // dateTo (will use default)
+        queryParams
       );
 
       // Extract appointments from Bundle

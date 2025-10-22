@@ -4,76 +4,24 @@ import type { Appointment, Bundle } from '@/types/fhir';
 
 /**
  * Search appointments by various parameters
- * FHIR requires date parameters for appointment searches (except when using _id)
- *
- * _id parameter supports:
- * - Single ID: "131249"
- * - Multiple IDs (comma-separated): "131249,131305,131261"
+ * Simply passes all query parameters to FHIR API without processing
  */
 export async function searchAppointments(
   token: string,
   fhirBaseUrl: string,
-  patientId?: string,
-  practitionerId?: string,
-  options?: string | {
-    status?: string;
-    _count?: number;
-    date?: string | string[]; // FHIR date parameter: single value or array for ranges (e.g., ['ge2025-01-01', 'le2025-12-31'])
-    _id?: string; // Comma-separated list of IDs for batch fetch
-  },
-  dateFrom?: string,
-  dateTo?: string
+  queryParams: URLSearchParams
 ): Promise<Bundle<Appointment>> {
-  const queryParams = new URLSearchParams();
-
-  // Check if this is a batch fetch by IDs
-  let batchIds: string | undefined;
-  if (typeof options === 'object' && options._id) {
-    batchIds = options._id;
-  }
-
-  if (patientId) queryParams.append('patient', patientId);
-  if (practitionerId) queryParams.append('practitioner', practitionerId);
-
-  // Handle backward compatibility: options can be a string (old status param) or object
-  if (typeof options === 'string') {
-    // Legacy usage: third parameter is status string
-    queryParams.append('status', options);
-  } else if (options && typeof options === 'object') {
-    // Pass ALL parameters from options object directly to FHIR API
-    // This includes _sort, date, status, _count, _id, and any other FHIR params
-    // Backend does NOT add any additional parameters
-    Object.entries(options).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        // Skip special keys that are already handled (patient, practitioner)
-        if (key === 'patient' || key === 'practitioner') {
-          return;
-        }
-        // Handle array values (e.g., date: ['ge2025-01-01', 'le2025-12-31'])
-        if (Array.isArray(value)) {
-          value.forEach(v => queryParams.append(key, String(v)));
-        } else {
-          queryParams.append(key, String(value));
-        }
-      }
-    });
-  }
-
-  // If batch fetching by IDs, add _id parameter (FHIR supports comma-separated IDs)
-  if (batchIds) {
-    queryParams.append('_id', batchIds);
-  }
-  
+  // Pass all query parameters directly to FHIR API
+  // URLSearchParams preserves duplicate keys (e.g., multiple date parameters)
   const url = `${fhirBaseUrl}/Appointment?${queryParams.toString()}`;
   const response = await FHIRClient.fetchWithAuth(url, token);
   const bundle = await response.json();
-  
+
   // Return the full FHIR Bundle structure
-  // Some callers expect `result.entry`, others expect the resources directly
   if (bundle.resourceType === 'Bundle') {
     return bundle as Bundle<Appointment>;
   }
-  
+
   // Fallback to empty Bundle if no valid bundle structure
   return {
     resourceType: 'Bundle',

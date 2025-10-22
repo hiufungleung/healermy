@@ -17,28 +17,18 @@ export async function GET(request: NextRequest) {
     const session = await getSessionFromCookies();
     const token = prepareToken(session.accessToken);
 
-    // Convert URLSearchParams to plain object, passing ALL parameters to FHIR API
+    // Pass all query parameters directly to FHIR (preserves duplicate keys)
     const searchParams = request.nextUrl.searchParams;
-    const allParams: Record<string, string> = {};
-    searchParams.forEach((value, key) => {
-      allParams[key] = value;
-    });
 
     // Validate that at least one search parameter is provided
-    if (Object.keys(allParams).length === 0) {
+    if (searchParams.toString() === '') {
       return NextResponse.json(
         { error: 'Missing search parameters. Use ?_id=id1,id2,id3 for batch fetch or other FHIR search parameters' },
         { status: 400 }
       );
     }
 
-    // Build FHIR URL with all parameters
-    const queryParams = new URLSearchParams();
-    Object.entries(allParams).forEach(([key, value]) => {
-      queryParams.append(key, value);
-    });
-
-    const fhirUrl = `${session.fhirBaseUrl}/Patient?${queryParams.toString()}`;
+    const fhirUrl = `${session.fhirBaseUrl}/Patient?${searchParams.toString()}`;
 
     // Fetch from FHIR
     const response = await FHIRClient.fetchWithAuth(fhirUrl, token);

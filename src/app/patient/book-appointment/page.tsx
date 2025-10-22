@@ -2213,7 +2213,7 @@ function NewBookingFlow() {
             setAccordionValue(undefined);
           }
         }}>
-        <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Complete Your Selection</DialogTitle>
             <DialogDescription>

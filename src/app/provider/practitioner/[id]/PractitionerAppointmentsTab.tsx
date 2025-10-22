@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ColumnFiltersState,
@@ -23,7 +23,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { columns, AppointmentRow } from '../../appointments/columns';
+import { createColumns, AppointmentRow } from '../../appointments/columns';
 import type { Appointment, Encounter } from '@/types/fhir';
 
 type TimeFilter = 'all' | 'today' | 'upcoming-7' | 'upcoming' | 'past';
@@ -41,7 +41,10 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
   const [loading, setLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+    practitionerName: false  // Hide practitioner column on practitioner-specific page
+  });
+  const [updatingRows, setUpdatingRows] = useState<Set<string>>(new Set());
 
   // Initialize filter state from URL params (default: today, no status)
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('today');
@@ -239,20 +242,58 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
     }
   }, [practitionerId, timeFilter, statusFilters]);
 
-  // Initial fetch and refetch when filters change
+  // Fetch on mount and when filters change (single call, not duplicate)
   useEffect(() => {
     fetchAppointments();
-  }, [fetchAppointments]);
+  }, [practitionerId, timeFilter, statusFilters]);
 
-  // Listen for refresh events from actions
+  // Listen for refresh events from actions - update only changed appointment
   useEffect(() => {
-    const handleRefresh = () => {
-      fetchAppointments();
+    const handleRefresh = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { appointmentId, updatedAppointment, updatedEncounter } = customEvent.detail || {};
+
+      if (appointmentId && updatedAppointment) {
+        // Update only the changed appointment in state (optimistic update)
+        setAppointments(prev => prev.map(apt => {
+          if (apt.id === appointmentId) {
+            return {
+              ...apt,
+              ...updatedAppointment,
+              encounter: updatedEncounter || apt.encounter
+            };
+          }
+          return apt;
+        }));
+      } else {
+        // Fallback to full refetch if no detail provided
+        fetchAppointments();
+      }
     };
 
     window.addEventListener('refresh-appointments', handleRefresh);
     return () => window.removeEventListener('refresh-appointments', handleRefresh);
-  }, [fetchAppointments]);
+  }, [fetchAppointments]); // Include fetchAppointments for fallback
+
+  // Handlers for tracking updating rows
+  const handleActionStart = useCallback((appointmentId: string) => {
+    setUpdatingRows(prev => new Set(prev).add(appointmentId));
+  }, []);
+
+  const handleActionEnd = useCallback((appointmentId: string) => {
+    setUpdatingRows(prev => {
+      const next = new Set(prev);
+      next.delete(appointmentId);
+      return next;
+    });
+  }, []);
+
+  // Create columns with context for spinner display
+  const columns = useMemo(() => createColumns({
+    updatingRows,
+    onActionStart: handleActionStart,
+    onActionEnd: handleActionEnd
+  }), [updatingRows, handleActionStart, handleActionEnd]);
 
   // Initialize table (following shadcn pattern exactly)
   const table = useReactTable({
@@ -356,7 +397,7 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
                 ))}
               </TableHeader>
               <TableBody>
-                {Array.from({ length: 5 }).map((_, index) => (
+                {Array.from({ length: 20 }).map((_, index) => (
                   <TableRow key={index}>
                     {table.getAllColumns().map((column) => (
                       <TableCell key={column.id}>

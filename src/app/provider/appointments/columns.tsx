@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/common/Badge';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { formatAppointmentDateTime } from '@/library/timezone';
 import { getAvailableActions, getActionLabel, executeAction } from '@/lib/appointmentFlowUtils';
 import type { Appointment, Encounter } from '@/types/fhir';
@@ -21,6 +22,13 @@ export interface AppointmentRow extends Appointment {
   patientName?: string;
   practitionerName?: string;
   encounter?: Encounter;
+}
+
+// Context for passing updatingRows state to column cells
+export interface ColumnsContext {
+  updatingRows?: Set<string>;
+  onActionStart?: (appointmentId: string) => void;
+  onActionEnd?: (appointmentId: string) => void;
 }
 
 // Get status badge variant
@@ -65,7 +73,7 @@ function getEncounterBadgeVariant(status: string): 'success' | 'warning' | 'dang
   }
 }
 
-export const columns: ColumnDef<AppointmentRow>[] = [
+export const createColumns = (context?: ColumnsContext): ColumnDef<AppointmentRow>[] => [
   {
     accessorKey: 'id',
     header: ({ column }) => {
@@ -201,6 +209,19 @@ export const columns: ColumnDef<AppointmentRow>[] = [
     },
     cell: ({ row }) => {
       const status = row.original.status;
+      const appointmentId = row.original.id;
+      const isUpdating = appointmentId && context?.updatingRows?.has(appointmentId);
+
+      if (isUpdating) {
+        return (
+          <div className="flex items-center h-6 pl-6">
+            <div className="w-6 h-6 flex items-center justify-center">
+              <LoadingSpinner size="sm" className="scale-[0.45]" />
+            </div>
+          </div>
+        );
+      }
+
       return (
         <Badge variant={getStatusBadgeVariant(status)} className="capitalize text-[13px] font-normal">
           {status}
@@ -254,17 +275,22 @@ export const columns: ColumnDef<AppointmentRow>[] = [
       }
 
       const handleAction = async (action: string) => {
+        const appointmentId = appointment.id!;
+
         try {
+          // Mark row as updating
+          context?.onActionStart?.(appointmentId);
+
           const result = await executeAction(
             action,
-            appointment.id!,
+            appointmentId,
             appointment.encounter?.id
           );
 
           // Dispatch event with updated data from PATCH response
           window.dispatchEvent(new CustomEvent('refresh-appointments', {
             detail: {
-              appointmentId: appointment.id,
+              appointmentId: appointmentId,
               updatedAppointment: result.appointment,
               updatedEncounter: result.encounter
             }
@@ -272,6 +298,9 @@ export const columns: ColumnDef<AppointmentRow>[] = [
         } catch (error) {
           console.error('Error executing action:', error);
           alert(`Failed to ${getActionLabel(action).toLowerCase()}. Please try again.`);
+        } finally {
+          // Mark row as no longer updating
+          context?.onActionEnd?.(appointmentId);
         }
       };
 
@@ -301,3 +330,6 @@ export const columns: ColumnDef<AppointmentRow>[] = [
     size: 60,
   },
 ];
+
+// Backward compatibility: export columns without context
+export const columns = createColumns();

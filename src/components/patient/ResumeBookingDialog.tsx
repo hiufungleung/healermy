@@ -29,7 +29,7 @@ export function ResumeBookingDialog({
 }: ResumeBookingDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md md:max-w-2xl lg:max-w-3xl xl:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Resume Previous Booking?</DialogTitle>
           <DialogDescription>

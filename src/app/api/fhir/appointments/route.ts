@@ -18,30 +18,20 @@ export async function GET(request: NextRequest) {
     // Get ALL query parameters as-is (don't parse individually)
     const searchParams = request.nextUrl.searchParams;
 
-    // Convert URLSearchParams to plain object, passing ALL parameters to FHIR API
-    const allParams: Record<string, string> = {};
-    searchParams.forEach((value, key) => {
-      allParams[key] = value;
-    });
-
     // Auto-filter by patient based on session role (security enforcement)
     // Patients can only see their own appointments
-    if (session.role === 'patient' && !allParams.patient) {
-      allParams.patient = session.patient || '';
+    if (session.role === 'patient' && !searchParams.has('patient')) {
+      searchParams.append('patient', session.patient || '');
     }
 
-    // Call FHIR API with ALL query parameters
-    // This passes through _sort, start, _count, status, date, _id, and any other params
+    // Call FHIR API with ALL query parameters passed through as URLSearchParams
+    // This preserves duplicate keys like multiple date parameters
     const token = prepareToken(session.accessToken);
 
     const result = await searchAppointments(
       token,
       session.fhirBaseUrl,
-      allParams.patient,
-      allParams.practitioner,
-      allParams, // Pass ALL params as options
-      undefined, // Let options handle date params
-      undefined
+      searchParams // Pass URLSearchParams directly without conversion
     );
 
     // Extract appointments from FHIR Bundle structure

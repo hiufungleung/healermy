@@ -192,7 +192,7 @@ export function CreateScheduleForm({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl lg:max-w-4xl xl:max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Schedule</DialogTitle>
           <DialogDescription>
@@ -208,10 +208,32 @@ export function CreateScheduleForm({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            
+            {/* Specialty */}
+            <div className="space-y-2">
+              <Label htmlFor="specialty">Specialty <span className="text-destructive">*</span></Label>
+              <Select
+                value={formData.specialty}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, specialty: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select specialty" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getAllSpecialties().map((specialty) => (
+                    <SelectItem key={specialty.value} value={specialty.value}>
+                      {specialty.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+
             {/* Service Category */}
             <div className="space-y-2">
-              <Label htmlFor="serviceCategory">Service Category</Label>
+              <Label htmlFor="serviceCategory">Service Category <span className="text-destructive">*</span></Label>
               <Select
                 value={formData.serviceCategory}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, serviceCategory: value }))}
@@ -238,7 +260,7 @@ export function CreateScheduleForm({
 
             {/* Service Type */}
             <div className="space-y-2">
-              <Label htmlFor="serviceType">Service Type</Label>
+              <Label htmlFor="serviceType">Service Type <span className="text-destructive">*</span></Label>
               <Select
                 value={formData.serviceType}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, serviceType: value }))}
@@ -261,26 +283,6 @@ export function CreateScheduleForm({
                   ✓ {availableServiceTypes.length} service types available for {formData.serviceCategory}
                 </p>
               )}
-            </div>
-
-            {/* Specialty */}
-            <div className="space-y-2">
-              <Label htmlFor="specialty">Specialty</Label>
-              <Select
-                value={formData.specialty}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, specialty: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select specialty" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getAllSpecialties().map((specialty) => (
-                    <SelectItem key={specialty.value} value={specialty.value}>
-                      {specialty.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             {/* Planning Horizon Start */}

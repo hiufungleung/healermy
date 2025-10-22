@@ -43,7 +43,7 @@ const DialogContent = React.forwardRef<
         // Mobile: full width with minimal margin, minimal border radius
         "w-[calc(100%-2rem)] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-md",
         // Tablet and up: constrained width with rounded corners
-        "sm:w-full sm:max-w-lg sm:rounded-lg",
+        "sm:w-full sm:max-w-lg md:max-w-2xl lg:max-w-4xl xl:max-w-5xl sm:rounded-lg",
         // Spacing and styling
         "gap-4 border bg-background p-4 sm:p-6 shadow-lg",
         // Animations

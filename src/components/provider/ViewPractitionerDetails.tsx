@@ -69,7 +69,7 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl lg:max-w-5xl xl:max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Practitioner Details</DialogTitle>
           <DialogDescription>

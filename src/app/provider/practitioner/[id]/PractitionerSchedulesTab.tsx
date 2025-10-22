@@ -70,7 +70,7 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
   // Filter states - all single choice
-  const [scheduleFilterValid, setScheduleFilterValid] = useState<'valid' | 'expired'>('valid');
+  const [scheduleFilterValid, setScheduleFilterValid] = useState<'all' | 'valid' | 'expired'>('all');
   const [activeStatus, setActiveStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategoryCode | ''>('');
   const [selectedServiceType, setSelectedServiceType] = useState<ServiceTypeCode | ''>('');
@@ -119,12 +119,27 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
         params.append('_id', activeSearchId);
       }
 
-      // Add date filter based on valid/expired selection
+      // Add date filter - custom date range takes priority over valid/expired
       const today = new Date().toISOString().split('T')[0];
-      if (scheduleFilterValid === 'valid') {
-        params.append('date', `ge${today}`);
+
+      if (dateRange.from || dateRange.to) {
+        // Use custom date range if specified
+        if (dateRange.from) {
+          const startDateStr = dateRange.from.toISOString().split('T')[0];
+          params.append('date', `ge${startDateStr}`);
+        }
+        if (dateRange.to) {
+          const endDateStr = dateRange.to.toISOString().split('T')[0];
+          params.append('date', `le${endDateStr}`);
+        }
       } else {
-        params.append('date', `lt${today}`);
+        // Use valid/expired filter only if no custom date range and not 'all'
+        if (scheduleFilterValid === 'valid') {
+          params.append('date', `ge${today}`);
+        } else if (scheduleFilterValid === 'expired') {
+          params.append('date', `lt${today}`);
+        }
+        // If 'all', don't add date parameter
       }
 
       // Add active status filter
@@ -148,16 +163,6 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
       // Add specialty filter
       if (selectedSpecialty) {
         params.append('specialty', selectedSpecialty);
-      }
-
-      // Add custom date range filters (in addition to valid/expired)
-      if (dateRange.from) {
-        const startDateStr = dateRange.from.toISOString().split('T')[0];
-        params.append('date', `ge${startDateStr}`);
-      }
-      if (dateRange.to) {
-        const endDateStr = dateRange.to.toISOString().split('T')[0];
-        params.append('date', `le${endDateStr}`);
       }
 
       console.log('[SCHEDULES] Fetching with filters:', params.toString());
@@ -460,7 +465,7 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
 
       {/* Filters Above Table */}
       <div className="mb-6">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
           
           {/* Specialty Filter */}
           <div>
@@ -529,11 +534,12 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
           {/* Date Status Filter */}
           <div>
             <label className="text-sm font-medium text-gray-700 mb-2 block">Date Status</label>
-            <Select value={scheduleFilterValid} onValueChange={(value) => setScheduleFilterValid(value as 'valid' | 'expired')}>
+            <Select value={scheduleFilterValid} onValueChange={(value) => setScheduleFilterValid(value as 'all' | 'valid' | 'expired')}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select date status" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="valid">Not Expired</SelectItem>
                 <SelectItem value="expired">Expired</SelectItem>
               </SelectContent>

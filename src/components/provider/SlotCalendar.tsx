@@ -106,6 +106,9 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
     const viewParam = newView === 'dayGridMonth' ? 'month' : 'week';
     params.set('view', viewParam);
 
+    // Always ensure tab is set to 'slots' when in SlotCalendar
+    params.set('tab', 'slots');
+
     router.replace(`?${params.toString()}`, { scroll: false });
   };
 
@@ -133,10 +136,21 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
     }
   };
 
-  // Initial load - use view from URL or default to week
+  // No initial load - FullCalendar's datesSet will handle the first load
+  // This prevents duplicate API calls on mount
+
+  // Sync calendar view with URL parameter when switching tabs
   useEffect(() => {
-    load(initialView, new Date());
-  }, []);
+    const urlView = searchParams.get('view');
+    const targetView = urlView === 'month' ? 'dayGridMonth' : 'timeGridWeek';
+
+    // Only update if view has actually changed and calendar is initialized
+    if (calendarRef.current && targetView !== view) {
+      const calendarApi = calendarRef.current.getApi();
+      calendarApi.changeView(targetView);
+      // Don't call load() here - datesSet will trigger it
+    }
+  }, [searchParams.get('view')]);
 
   // Auto refresh
   useEffect(() => {
@@ -144,11 +158,16 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
     return () => clearInterval(timer);
   }, [view, date]);
 
-  // Colors
+  // Colors - 8 pastel colors with corresponding darker versions
   const palette = [
-    '#86EFAC/#16A34A', '#93C5FD/#2563EB', '#FCA5A5/#DC2626',
-    '#FCD34D/#CA8A04', '#C4B5FD/#7C3AED', '#FDA4AF/#E11D48',
-    '#67E8F9/#0891B2', '#FBB6CE/#DB2777', '#A7F3D0/#059669', '#BFD3FA/#1D4ED8'
+    '#FFB3BA/#E85D68',  // Light pink / Darker pink
+    '#FFDAB3/#FFB366',  // Light peach / Darker peach
+    '#FFFFBA/#FFFF66',  // Light yellow / Darker yellow
+    '#BAFFC9/#66CC7A',  // Light green / Darker green
+    '#BAE1FF/#66B3FF',  // Light blue / Darker blue
+    '#C9C9FF/#7A7AFF',  // Light periwinkle / Darker periwinkle
+    '#E0BBE4/#C77FCC',  // Light lavender / Darker lavender
+    '#FFC6FF/#FF7FFF',  // Light magenta / Darker magenta
   ];
 
   const allRefs = Array.from(new Set([
@@ -162,22 +181,68 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
     return { light, dark };
   };
 
+  // Calculate schedules per day for month view
+  const schedulesPerDay = new Map<string, { schedules: Schedule[]; count: number }>();
+  if (view === 'dayGridMonth') {
+    schedules.forEach(s => {
+      if (s.planningHorizon?.start && s.planningHorizon?.end) {
+        const startDate = new Date(s.planningHorizon.start);
+        const endDate = new Date(s.planningHorizon.end);
+
+        // Iterate through each day in the schedule's range
+        for (let d = new Date(startDate); d < endDate; d.setDate(d.getDate() + 1)) {
+          const dayKey = d.toISOString().split('T')[0];
+
+          if (!schedulesPerDay.has(dayKey)) {
+            schedulesPerDay.set(dayKey, { schedules: [], count: 0 });
+          }
+
+          const dayData = schedulesPerDay.get(dayKey)!;
+          dayData.schedules.push(s);
+          dayData.count = dayData.schedules.length;
+        }
+      }
+    });
+  }
+
   // Events
   const events = view === 'dayGridMonth'
     ? schedules.flatMap(s => {
         const ref = `Schedule/${s.id}`;
         const color = getColor(ref);
         if (s.planningHorizon?.start && s.planningHorizon?.end) {
-          return [{
-            id: s.id,
-            title: s.id || '',
-            start: s.planningHorizon.start,
-            end: s.planningHorizon.end,
-            // display: 'background',  // Removed to allow multiple rows for overlapping schedules
-            backgroundColor: color.light,
-            borderColor: color.light,
-            classNames: hovered && hovered !== ref ? ['dim'] : [],
-          }];
+          const startDate = new Date(s.planningHorizon.start);
+          const endDate = new Date(s.planningHorizon.end);
+
+          // Generate events for each day
+          const dayEvents = [];
+          for (let d = new Date(startDate); d < endDate; d.setDate(d.getDate() + 1)) {
+            const dayKey = d.toISOString().split('T')[0];
+            const dayData = schedulesPerDay.get(dayKey);
+
+            if (dayData) {
+              // Find position of this schedule in the day
+              const position = dayData.schedules.findIndex(sch => sch.id === s.id);
+
+              dayEvents.push({
+                id: `${s.id}-${dayKey}`,
+                title: '',
+                start: dayKey,
+                end: dayKey,
+                display: 'background',
+                backgroundColor: color.light,
+                borderColor: color.light,
+                classNames: [
+                  hovered && hovered !== ref ? 'dim' : '',
+                  `schedule-row-${position}`,
+                  `schedule-count-${dayData.count}`
+                ].filter(Boolean),
+                extendedProps: { scheduleRef: ref, position, totalCount: dayData.count }
+              });
+            }
+          }
+
+          return dayEvents;
         }
         return [];
       })
@@ -283,21 +348,28 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
       <FullCalendar
         ref={calendarRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
+        initialView={initialView}
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
           right: 'dayGridMonth,timeGridWeek', // timeGridDay removed
         }}
         events={events}
-        eventContent={info => (
-          <div className="p-1 text-xs overflow-hidden">
-            <div className="font-medium truncate">{info.event.title}</div>
-            <div className="text-[10px] opacity-90">
-              {new Date(info.event.start!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        eventContent={info => {
+          // For month view (background events), don't render content
+          if (view === 'dayGridMonth') {
+            return null;
+          }
+          // For week view, show slot title and time
+          return (
+            <div className="p-1 text-xs overflow-hidden">
+              <div className="font-medium truncate">{info.event.title}</div>
+              <div className="text-[10px] opacity-90">
+                {new Date(info.event.start!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        }}
         slotMinTime="09:00:00"
         slotMaxTime="17:00:00"
         allDaySlot={false}
@@ -376,14 +448,132 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
         .fc .fc-col-header-cell { background: #F9FAFB; font-weight: 600; padding: 0.75rem 0.5rem; }
         .fc .fc-timegrid-slot { height: 3rem; }
 
-        /* Make each schedule bar fill half/third of cell height */
+        /* Day cell layout - fixed height */
         .fc-daygrid-day {
           height: 100px;
+          position: relative;
         }
-        .fc-daygrid-event {
-          height: 60px !important;
+
+        /* Day frame needs to be positioned to contain absolute children */
+        .fc-daygrid-day-frame {
+          position: relative;
+          height: 100%;
+        }
+
+        /* Day background layer */
+        .fc-daygrid-day-bg {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          height: 100%;
+          width: 100%;
+        }
+
+        /* Background event harness positioning */
+        .fc-daygrid-bg-harness {
+          position: absolute !important;
+          left: 0 !important;
+          right: 0 !important;
+          width: 100% !important;
+        }
+
+        /* Background events fill cell completely with 0 padding and margin */
+        .fc-bg-event {
           margin: 0 !important;
-          border-radius: 0px;
+          padding: 0 !important;
+          border: 0 !important;
+          border-radius: 0 !important;
+          position: absolute !important;
+          left: 0 !important;
+          right: 0 !important;
+          width: 100% !important;
+        }
+
+        /* Single schedule - fills 100% height */
+        .fc-daygrid-bg-harness.schedule-count-1.schedule-row-0,
+        .schedule-count-1.schedule-row-0 {
+          top: 0 !important;
+          height: 100% !important;
+        }
+
+        /* Two schedules - each takes 50% */
+        .fc-daygrid-bg-harness.schedule-count-2.schedule-row-0,
+        .schedule-count-2.schedule-row-0 {
+          top: 0 !important;
+          height: 50% !important;
+        }
+        .fc-daygrid-bg-harness.schedule-count-2.schedule-row-1,
+        .schedule-count-2.schedule-row-1 {
+          top: 50% !important;
+          height: 50% !important;
+        }
+
+        /* Three schedules - each takes 33.333% */
+        .fc-daygrid-bg-harness.schedule-count-3.schedule-row-0,
+        .schedule-count-3.schedule-row-0 {
+          top: 0 !important;
+          height: 33.333% !important;
+        }
+        .fc-daygrid-bg-harness.schedule-count-3.schedule-row-1,
+        .schedule-count-3.schedule-row-1 {
+          top: 33.333% !important;
+          height: 33.333% !important;
+        }
+        .fc-daygrid-bg-harness.schedule-count-3.schedule-row-2,
+        .schedule-count-3.schedule-row-2 {
+          top: 66.666% !important;
+          height: 33.333% !important;
+        }
+
+        /* Four schedules - each takes 25% */
+        .fc-daygrid-bg-harness.schedule-count-4.schedule-row-0,
+        .schedule-count-4.schedule-row-0 {
+          top: 0 !important;
+          height: 25% !important;
+        }
+        .fc-daygrid-bg-harness.schedule-count-4.schedule-row-1,
+        .schedule-count-4.schedule-row-1 {
+          top: 25% !important;
+          height: 25% !important;
+        }
+        .fc-daygrid-bg-harness.schedule-count-4.schedule-row-2,
+        .schedule-count-4.schedule-row-2 {
+          top: 50% !important;
+          height: 25% !important;
+        }
+        .fc-daygrid-bg-harness.schedule-count-4.schedule-row-3,
+        .schedule-count-4.schedule-row-3 {
+          top: 75% !important;
+          height: 25% !important;
+        }
+
+        /* Five schedules - each takes 20% */
+        .fc-daygrid-bg-harness.schedule-count-5.schedule-row-0,
+        .schedule-count-5.schedule-row-0 {
+          top: 0 !important;
+          height: 20% !important;
+        }
+        .fc-daygrid-bg-harness.schedule-count-5.schedule-row-1,
+        .schedule-count-5.schedule-row-1 {
+          top: 20% !important;
+          height: 20% !important;
+        }
+        .fc-daygrid-bg-harness.schedule-count-5.schedule-row-2,
+        .schedule-count-5.schedule-row-2 {
+          top: 40% !important;
+          height: 20% !important;
+        }
+        .fc-daygrid-bg-harness.schedule-count-5.schedule-row-3,
+        .schedule-count-5.schedule-row-3 {
+          top: 60% !important;
+          height: 20% !important;
+        }
+        .fc-daygrid-bg-harness.schedule-count-5.schedule-row-4,
+        .schedule-count-5.schedule-row-4 {
+          top: 80% !important;
+          height: 20% !important;
         }
 
         .fc-event { cursor: pointer; border-radius: 0px; padding: 0px; }

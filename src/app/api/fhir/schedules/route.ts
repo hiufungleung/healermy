@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromCookies, validateRole, prepareToken } from '../utils/auth';
-import { searchSchedules, createSchedule } from './operations';
+import { FHIRClient } from '../client';
+import { createSchedule } from './operations';
 
 /**
  * GET /api/fhir/schedules - Search schedules
@@ -17,24 +18,12 @@ export async function GET(request: NextRequest) {
     // Providers: to manage their schedules
     // Patients: to find available slots for booking
 
-    const { searchParams } = request.nextUrl;
-
-    // Convert URLSearchParams to plain object, passing ALL parameters to FHIR API
-    const allParams: Record<string, string> = {};
-    searchParams.forEach((value, key) => {
-      allParams[key] = value;
-    });
-
-    // Prepare search options with all parameters
-    const searchOptions: any = { ...allParams };
-
-    // Handle numeric parameters
-    if (searchOptions._count) {
-      searchOptions._count = parseInt(searchOptions._count);
-    }
-
+    // Pass all query parameters directly to FHIR (preserves duplicate keys)
+    const fhirUrl = `${session.fhirBaseUrl}/Schedule?${request.nextUrl.searchParams.toString()}`;
     const token = prepareToken(session.accessToken);
-    const fhirBundle = await searchSchedules(token, session.fhirBaseUrl, searchOptions);
+
+    const response = await FHIRClient.fetchWithAuth(fhirUrl, token);
+    const fhirBundle = await response.json();
     
     // Transform FHIR Bundle to expected format
     const schedules = fhirBundle.entry?.map((entry: any) => entry.resource) || [];
