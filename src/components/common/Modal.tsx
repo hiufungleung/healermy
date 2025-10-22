@@ -33,7 +33,7 @@ export const Modal: React.FC<ModalProps> = ({
     md: 'max-w-2xl',
     lg: 'max-w-4xl',
     xl: 'max-w-6xl',
-    full: 'max-w-7xl'
+    full: 'max-w-8xl'
   };
 
   return (

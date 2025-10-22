@@ -766,7 +766,7 @@ export default function ProviderNotificationsClient() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto py-8">
+    <div className="max-w-8xl mx-auto py-8">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="pl-0 sm:pl-32 lg:pl-36 pr-0 sm:pr-32 lg:pr-36">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">

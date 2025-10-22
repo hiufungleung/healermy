@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/common/ContentSkeleton';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { CreateScheduleForm } from '@/components/provider/CreateScheduleForm';
 import { GenerateSlotsForm } from '@/components/provider/GenerateSlotsForm';
-import { SlotCalendar } from '@/components/provider/SlotCalendarNew';
+import { SlotCalendar } from '@/components/provider/SlotCalendar';
 import { ScheduleFilters } from '@/components/provider/ScheduleFilters';
 import PractitionerSchedulesTab from './PractitionerSchedulesTab';
 import PractitionerAppointmentsTab from './PractitionerAppointmentsTab';

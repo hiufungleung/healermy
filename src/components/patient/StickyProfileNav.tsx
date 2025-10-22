@@ -83,7 +83,7 @@ export const StickyProfileNav: React.FC<StickyProfileNavProps> = ({
       role="navigation"
       aria-label="Profile sections"
     >
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto max-w-8xl">
         <div className="flex items-center gap-2 overflow-x-auto px-4 py-3 scrollbar-hide">
           {sections.map((section) => {
             const isActive = activeSection === section.id;

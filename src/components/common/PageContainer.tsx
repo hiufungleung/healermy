@@ -19,7 +19,7 @@ export function PageContainer({ children, maxWidth = 'xl', className }: PageCont
     lg: 'max-w-screen-lg',   // ~1024px - for most content
     xl: 'max-w-screen-xl',   // ~1280px - for wider layouts
     '2xl': 'max-w-screen-2xl', // ~1536px - for very wide content
-    '3xl': 'max-w-7xl',      // ~1280px+ - for maximum width
+    '3xl': 'max-w-8xl',      // ~1280px+ - for maximum width
     full: 'max-w-full'       // no max width
   };
 

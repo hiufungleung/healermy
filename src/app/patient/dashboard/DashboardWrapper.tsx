@@ -17,7 +17,7 @@ export default function DashboardWrapper({
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <DashboardClient
           patientName={userName || undefined}
           session={session}

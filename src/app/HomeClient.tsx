@@ -15,7 +15,7 @@ export default function HomeClient({ fhirServerUrl }: HomeClientProps) {
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
       <div className="bg-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-8 md:py-10">
+        <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-8 md:py-10">
           <div className="text-center">
             <h1 className="typo-display-lg text-text-primary">
               Welcome to <span className="text-primary">healerMy</span>
@@ -28,7 +28,7 @@ export default function HomeClient({ fhirServerUrl }: HomeClientProps) {
       </div>
 
       {/* Launch Section */}
-      <div className="bg-background max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-1 md:py-1">
+      <div className="bg-background max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-1 md:py-1">
         <div className="max-w-2xl mx-auto text-center">
           <Card className="text-center p-6 sm:p-8">
             <div className="w-20 h-20 sm:w-24 sm:h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
@@ -63,7 +63,7 @@ export default function HomeClient({ fhirServerUrl }: HomeClientProps) {
 
       {/* Features Section */}
       <div className="bg-background py-8 sm:py-10 md:py-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-3 gap-3 sm:gap-6 md:gap-8">
             <div className="text-center">
               <div className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3 md:mb-4">
@@ -106,7 +106,7 @@ export default function HomeClient({ fhirServerUrl }: HomeClientProps) {
 
       {/* Footer */}
       <footer className="bg-gray-50 py-6 sm:py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center text-text-secondary">
             <p className="typo-caption">&copy; 2025 healerMy. All rights reserved.</p>
             <p className="typo-caption mt-2">A SMART on FHIR Healthcare Platform</p>

@@ -219,7 +219,7 @@ export default function PractitionerManagement() {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
           <div className="flex justify-between items-center">
             <h1 className="text-xl sm:text-2xl sm:text-2xl font-bold text-text-primary">

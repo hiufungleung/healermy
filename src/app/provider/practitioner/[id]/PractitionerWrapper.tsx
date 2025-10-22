@@ -35,7 +35,7 @@ export default function PractitionerWrapper({
 
   return (
     <Layout providerName={practitionerName}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back button */}
         <div className="mb-4">
           <Button
