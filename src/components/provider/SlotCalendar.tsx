@@ -354,6 +354,44 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
           center: 'title',
           right: 'dayGridMonth,timeGridWeek', // timeGridDay removed
         }}
+        titleFormat={(args) => {
+          if (args.date.marker) {
+            const calendarApi = calendarRef.current?.getApi();
+            const currentView = calendarApi?.view.type || view;
+
+            if (currentView === 'timeGridWeek' && args.start && args.end) {
+              // For weekly view: "dd - dd MMM, yyyy"
+              const start = new Date(args.start.marker);
+              const end = new Date(args.end.marker);
+              end.setDate(end.getDate() - 1); // Adjust end date to last day of week
+
+              const startDay = start.getDate();
+              const endDay = end.getDate();
+              const month = end.toLocaleDateString('en-US', { month: 'short' });
+              const year = end.getFullYear();
+
+              return `${startDay} - ${endDay} ${month}, ${year}`;
+            }
+          }
+          // Default formatting for other views
+          return args.date.marker.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }}
+        dayHeaderFormat={(args) => {
+          const calendarApi = calendarRef.current?.getApi();
+          const currentView = calendarApi?.view.type || view;
+
+          if (currentView === 'timeGridWeek') {
+            // For weekly view: "Thu dd/mm"
+            const date = new Date(args.date.marker);
+            const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+
+            return `${dayName} ${day}/${month}`;
+          }
+          // Default formatting for other views
+          return args.date.marker.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+        }}
         events={events}
         eventContent={info => {
           // For month view (background events), don't render content
@@ -395,6 +433,13 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
 
       <style jsx global>{`
         .fc { font-size: 0.875rem; }
+
+        /* Calendar title (e.g., "19 - 25 Oct, 2025") */
+        .fc-toolbar-title {
+          font-size: 1.2rem !important;
+          font-weight: 500 !important;
+        }
+
         .fc-bg-event { opacity: 1 !important; z-index: 1; }
         .fc-event.dim, .fc-bg-event.dim { opacity: 0.3 !important; z-index: 0; }
         .fc-bg-event:not(.dim) { opacity: 1 !important; z-index: 2 !important; }

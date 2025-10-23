@@ -691,7 +691,7 @@ function NewBookingFlow() {
 
       // Add service category filter (using category ID directly)
       if (selectedServiceCategory) {
-        params.append('serviceCategory', selectedServiceCategory);
+        params.append('service-category', selectedServiceCategory);
       }
 
       // Add service type filter (using FHIR code)
@@ -1065,7 +1065,7 @@ function NewBookingFlow() {
 
           // Add service category filter
           if (selectedServiceCategory) {
-            scheduleParams.append('serviceCategory', selectedServiceCategory);
+            scheduleParams.append('service-category', selectedServiceCategory);
           }
 
           // Add the name search params to schedule query

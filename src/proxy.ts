@@ -5,9 +5,9 @@ import { refreshAccessToken } from '@/library/auth/tokenRefresh';
 import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
 import { getPublicBaseUrl } from '@/library/request-utils';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  console.log(`🚀 [MIDDLEWARE START] ${new Date().toISOString()} - ${pathname}`);
+  console.log(`🚀 [PROXY START] ${new Date().toISOString()} - ${pathname}`);
 
   // Skip middleware for public routes and API routes that don't need auth
   const isPublicRoute = [
@@ -19,7 +19,7 @@ export async function middleware(request: NextRequest) {
     ].some(path => request.nextUrl.pathname.startsWith(path));
 
   if (isPublicRoute) {
-    console.log(`✅ [MIDDLEWARE] Public route, skipping: ${pathname}`);
+    console.log(`✅ [PROXY] Public route, skipping: ${pathname}`);
     return NextResponse.next();
   }
 
@@ -35,17 +35,17 @@ export async function middleware(request: NextRequest) {
 
         const baseUrl = getPublicBaseUrl(request);
         if (sessionData.role === 'provider') {
-          console.log(`🔀 [MIDDLEWARE] Authenticated provider accessing /, redirecting to provider dashboard`);
+          console.log(`🔀 [PROXY] Authenticated provider accessing /, redirecting to provider dashboard`);
           return NextResponse.redirect(new URL('/provider/dashboard', baseUrl));
         } else if (sessionData.role === 'patient') {
-          console.log(`🔀 [MIDDLEWARE] Authenticated patient accessing /, redirecting to patient dashboard`);
+          console.log(`🔀 [PROXY] Authenticated patient accessing /, redirecting to patient dashboard`);
           return NextResponse.redirect(new URL('/patient/dashboard', baseUrl));
         } else if (sessionData.role === 'practitioner') {
-          console.log(`🔀 [MIDDLEWARE] Authenticated practitioner accessing /, redirecting to practitioner dashboard`);
+          console.log(`🔀 [PROXY] Authenticated practitioner accessing /, redirecting to practitioner dashboard`);
           return NextResponse.redirect(new URL('/practitioner/dashboard', baseUrl));
         }
       } catch (error) {
-        console.error('❌ [MIDDLEWARE] Failed to decrypt session for index page:', error);
+        console.error('❌ [PROXY] Failed to decrypt session for index page:', error);
         // If decryption fails, clear cookie and let user see index page
         const response = NextResponse.next();
         response.cookies.delete(TOKEN_COOKIE_NAME);
@@ -54,7 +54,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // No valid session, show index page
-    console.log(`✅ [MIDDLEWARE] Anonymous user on index page, allowing access`);
+    console.log(`✅ [PROXY] Anonymous user on index page, allowing access`);
     return NextResponse.next();
   }
 
@@ -62,16 +62,16 @@ export async function middleware(request: NextRequest) {
   const tokenCookie = request.cookies.get(TOKEN_COOKIE_NAME);
 
   if (!tokenCookie) {
-    console.log(`❌ [MIDDLEWARE] Missing session cookie for: ${pathname}`);
+    console.log(`❌ [PROXY] Missing session cookie for: ${pathname}`);
 
     // For API routes, return 401 Unauthorized instead of redirect
     if (pathname.startsWith('/api/')) {
-      console.log(`🔐 [MIDDLEWARE] API route authentication required, returning 401: ${pathname}`);
+      console.log(`🔐 [PROXY] API route authentication required, returning 401: ${pathname}`);
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     // For page routes, redirect to home
-    console.log(`🏠 [MIDDLEWARE] Page route redirecting to home: ${pathname}`);
+    console.log(`🏠 [PROXY] Page route redirecting to home: ${pathname}`);
     const baseUrl = getPublicBaseUrl(request);
     return NextResponse.redirect(new URL('/', baseUrl));
   }
@@ -89,12 +89,12 @@ export async function middleware(request: NextRequest) {
     const refreshBufferSeconds = 300; // 5 minutes buffer before token expiry
     const refreshThreshold = Date.now() + (refreshBufferSeconds * 1000);
     if (sessionData.expiresAt && sessionData.expiresAt <= refreshThreshold) {
-      console.log(`⏰ [MIDDLEWARE] Session expires in ${Math.round((sessionData.expiresAt - Date.now()) / 1000)}s (buffer: ${refreshBufferSeconds}s), attempting token refresh: ${pathname}`);
+      console.log(`⏰ [PROXY] Session expires in ${Math.round((sessionData.expiresAt - Date.now()) / 1000)}s (buffer: ${refreshBufferSeconds}s), attempting token refresh: ${pathname}`);
 
       // If we have a refresh token, try to refresh the access token
       if (sessionData.refreshToken && sessionData.tokenUrl) {
         try {
-          console.log('🔄 [MIDDLEWARE] Attempting to refresh access token...');
+          console.log('🔄 [PROXY] Attempting to refresh access token...');
 
           // Use library function for token refresh (clientId/clientSecret retrieved from env based on role)
           const newTokenData = await refreshAccessToken(
@@ -103,7 +103,7 @@ export async function middleware(request: NextRequest) {
             sessionData.role
           );
 
-          console.log('✅ [MIDDLEWARE] Token refresh successful');
+          console.log('✅ [PROXY] Token refresh successful');
 
           // Update session data with new tokens
           const refreshedSessionData: SessionData = {
@@ -146,15 +146,15 @@ export async function middleware(request: NextRequest) {
 
           response.cookies.set(TOKEN_COOKIE_NAME, encryptedRefreshedSessionData, cookieOptions);
 
-          console.log(`✅ [MIDDLEWARE] Session refreshed for ${refreshedSessionData.role}, allowing: ${pathname}`);
+          console.log(`✅ [PROXY] Session refreshed for ${refreshedSessionData.role}, allowing: ${pathname}`);
           return response;
         } catch (refreshError) {
-          console.error('❌ [MIDDLEWARE] Token refresh error:', refreshError);
+          console.error('❌ [PROXY] Token refresh error:', refreshError);
         }
       }
       
       // If refresh failed or no refresh token, redirect to home
-      console.log(`❌ [MIDDLEWARE] Session expired and refresh failed, redirecting to home: ${pathname}`);
+      console.log(`❌ [PROXY] Session expired and refresh failed, redirecting to home: ${pathname}`);
       const baseUrl = getPublicBaseUrl(request);
       const response = NextResponse.redirect(new URL('/', baseUrl));
       response.cookies.delete(TOKEN_COOKIE_NAME);
@@ -164,28 +164,28 @@ export async function middleware(request: NextRequest) {
     // Validate role-based access
     const baseUrl = getPublicBaseUrl(request);
     if (pathname.startsWith('/patient/') && sessionData.role !== 'patient') {
-      console.log(`❌ [MIDDLEWARE] Patient route access denied for role: ${sessionData.role}`);
+      console.log(`❌ [PROXY] Patient route access denied for role: ${sessionData.role}`);
       return NextResponse.redirect(new URL('/', baseUrl));
     }
 
     if (pathname.startsWith('/provider/') && sessionData.role !== 'provider') {
-      console.log(`❌ [MIDDLEWARE] Provider route access denied for role: ${sessionData.role}`);
+      console.log(`❌ [PROXY] Provider route access denied for role: ${sessionData.role}`);
       return NextResponse.redirect(new URL('/', baseUrl));
     }
 
     if (pathname.startsWith('/practitioner/') && sessionData.role !== 'practitioner') {
-      console.log(`❌ [MIDDLEWARE] Practitioner route access denied for role: ${sessionData.role}`);
+      console.log(`❌ [PROXY] Practitioner route access denied for role: ${sessionData.role}`);
       return NextResponse.redirect(new URL('/', baseUrl));
     }
 
     // Session validated - cookies remain encrypted and HTTP-only for security
     const response = NextResponse.next();
 
-    console.log(`✅ [MIDDLEWARE] Valid session for ${sessionData.role}, allowing: ${pathname}`);
+    console.log(`✅ [PROXY] Valid session for ${sessionData.role}, allowing: ${pathname}`);
     return response;
     
   } catch (error) {
-    console.error('❌ [MIDDLEWARE] Session decryption failed:', error);
+    console.error('❌ [PROXY] Session decryption failed:', error);
     const baseUrl = getPublicBaseUrl(request);
     const response = NextResponse.redirect(new URL('/', baseUrl));
     response.cookies.delete(TOKEN_COOKIE_NAME);
