@@ -8,6 +8,7 @@ import { Badge } from '@/components/common/Badge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { SessionData } from '@/types/auth';
 import type { Appointment, Encounter, Patient } from '@/types/fhir';
+import { getNowInAppTimezone } from '@/library/timezone';
 
 interface PractitionerWorkstationClientProps {
   session: SessionData;
@@ -39,14 +40,14 @@ export default function PractitionerWorkstationClient({
   const fetchWorkstationData = async () => {
     setLoading(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const endOfDay = new Date();
+      const now = getNowInAppTimezone();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfDay = new Date(today);
       endOfDay.setHours(23, 59, 59, 999);
-      const endOfDayISO = endOfDay.toISOString();
 
       // Fetch today's appointments for this practitioner
       const appointmentsResponse = await fetch(
-        `/api/fhir/appointments?practitioner=${practitionerId}&date=ge${today}&date=le${endOfDayISO}`,
+        `/api/fhir/appointments?practitioner=${practitionerId}&slot.start=ge${today.toISOString()}&slot.start=lt${endOfDay.toISOString()}`,
         { credentials: 'include' }
       );
 

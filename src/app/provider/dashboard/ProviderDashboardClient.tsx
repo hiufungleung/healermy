@@ -8,6 +8,7 @@ import { Badge } from '@/components/common/Badge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { SessionData } from '@/types/auth';
 import type { Practitioner, Appointment } from '@/types/fhir';
+import { getNowInAppTimezone } from '@/library/timezone';
 
 interface AppointmentSummary {
   total: number;
@@ -55,20 +56,22 @@ export default function ProviderDashboardClient({
   const fetchAppointmentData = async () => {
     setLoading(true);
     try {
-      // Fetch all appointments to get real statistics
-      const today = new Date().toISOString().split('T')[0];
-      const weekFromNow = new Date();
+      // Fetch all appointments to get real statistics using centralized timezone utilities
+      const now = getNowInAppTimezone();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayEnd = new Date(today);
+      todayEnd.setDate(todayEnd.getDate() + 1);
+      const weekFromNow = new Date(today);
       weekFromNow.setDate(weekFromNow.getDate() + 7);
-      const weekEnd = weekFromNow.toISOString().split('T')[0];
 
       const [allAppointmentsResponse, pendingAppointmentsResponse, todayAppointmentsResponse] = await Promise.all([
-        fetch(`/api/fhir/appointments?date=ge${today}&date=le${weekEnd}`, {
+        fetch(`/api/fhir/appointments?slot.start=ge${today.toISOString()}&slot.start=lt${weekFromNow.toISOString()}`, {
           credentials: 'include',
         }),
         fetch(`/api/fhir/appointments?status=pending&_count=5`, {
           credentials: 'include',
         }),
-        fetch(`/api/fhir/appointments?date=${today}&_count=20`, {
+        fetch(`/api/fhir/appointments?slot.start=ge${today.toISOString()}&slot.start=lt${todayEnd.toISOString()}&_count=20`, {
           credentials: 'include',
         })
       ]);
@@ -76,15 +79,16 @@ export default function ProviderDashboardClient({
       if (allAppointmentsResponse.ok) {
         const allData = await allAppointmentsResponse.json();
         const allAppointments = allData.appointments?.entry?.map((entry: any) => entry.resource) || [];
-        
+
         // Calculate statistics
-        const todayCount = allAppointments.filter((apt: Appointment) => 
-          apt.start?.startsWith(today)
+        const todayStr = today.toISOString().split('T')[0];
+        const todayCount = allAppointments.filter((apt: Appointment) =>
+          apt.start?.startsWith(todayStr)
         ).length;
-        
+
         const upcomingCount = allAppointments.filter((apt: Appointment) => {
           const aptDate = apt.start?.split('T')[0];
-          return aptDate && aptDate > today;
+          return aptDate && aptDate > todayStr;
         }).length;
 
         setAppointments({

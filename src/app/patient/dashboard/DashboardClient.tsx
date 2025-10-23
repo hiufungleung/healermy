@@ -56,8 +56,10 @@ export default function DashboardClient({
       try {
         setAppointmentsError(null); // Clear previous errors
         const now = getNowInAppTimezone();
-        // Only fetch future appointments, sorted by date (ascending = earliest first)
-        const response = await fetch(`/api/fhir/appointments?patient=${session.patient}&date=ge${now.toISOString()}&_sort=date`, {
+        const todayStart = new Date(now);
+        todayStart.setHours(0, 0, 0, 0);
+        // Fetch appointments from today onwards using slot.start (real appointment time)
+        const response = await fetch(`/api/fhir/appointments?patient=${session.patient}&slot.start=ge${todayStart.toISOString()}&_sort=date`, {
           credentials: 'include'
         });
 
@@ -88,7 +90,10 @@ export default function DashboardClient({
   // Refresh appointments after update
   const refreshAppointments = async () => {
     try {
-      const refreshResponse = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
+      const now = getNowInAppTimezone();
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      const refreshResponse = await fetch(`/api/fhir/appointments?patient=${session.patient}&slot.start=ge${todayStart.toISOString()}&_sort=date`, {
         credentials: 'include'
       });
       if (refreshResponse.ok) {
@@ -105,40 +110,68 @@ export default function DashboardClient({
     }
   };
 
-  // Filter appointments for upcoming section: confirmed/pending within next 3 days
+  // Filter appointments for upcoming section: all appointments from today onwards (not cancelled, not fulfilled)
   const nowLocal = getNowInAppTimezone();
-  const threeDaysFromNow = new Date(nowLocal);
-  threeDaysFromNow.setDate(nowLocal.getDate() + 3);
-  threeDaysFromNow.setHours(23, 59, 59, 999); // End of the 3rd day
+  const todayLocal = new Date(nowLocal);
+  todayLocal.setHours(0, 0, 0, 0); // Start of today
 
   const displayAppointments = (Array.isArray(appointments) ? appointments : []).filter((appointment) => {
-    // Only show confirmed (booked) and pending appointments
-    if (appointment.status !== 'booked' && appointment.status !== 'pending') {
+    // Exclude cancelled and fulfilled appointments
+    if (appointment.status === 'cancelled' || appointment.status === 'fulfilled') {
       return false;
     }
 
-    // Only show appointments within next 3 days (using local timezone)
+    // Show all appointments from today onwards (no date limit)
     const appointmentDate = appointment.start ? new Date(appointment.start) : null;
-    if (!appointmentDate || appointmentDate < nowLocal || appointmentDate > threeDaysFromNow) {
+    if (!appointmentDate || appointmentDate < todayLocal) {
       return false;
     }
 
     return true;
   });
   
-  // Calculate next upcoming appointment from real appointments
+  // Calculate next appointment for today's status
   const now = new Date();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-  // Filter for all future appointments (not just today)
-  const futureAppointments = appointments?.filter(apt => {
+  // Filter for today's and future appointments that are not fulfilled, cancelled, or booked
+  // For today: includes appointments whose time has passed but haven't been completed yet
+  // For future: includes all appointments in the future
+  const activeAppointments = appointments?.filter(apt => {
     if (!apt.start) return false;
     const aptDateTime = new Date(apt.start);
-    return aptDateTime > now && (apt.status === 'booked' || apt.status === 'pending');
+
+    // Must be today or in the future
+    if (aptDateTime < today) return false;
+
+    // Exclude fulfilled, cancelled, and booked appointments
+    // (we want pending, arrived, etc. - appointments that are in progress or waiting)
+    return apt.status !== 'booked' && apt.status !== 'fulfilled' && apt.status !== 'cancelled';
   }) || [];
 
-  // Find the next upcoming appointment (could be today, tomorrow, or any future date)
-  const nextTodayAppointment = futureAppointments
+  console.log('[DASHBOARD] Active appointments (today or future, not booked/fulfilled/cancelled):', activeAppointments.length);
+  if (activeAppointments.length > 0) {
+    console.log('[DASHBOARD] Active appointments:', activeAppointments.map(apt => ({
+      id: apt.id,
+      status: apt.status,
+      start: apt.start,
+      isPast: new Date(apt.start!) < now,
+      isToday: new Date(apt.start!) >= today && new Date(apt.start!) < new Date(today.getTime() + 24 * 60 * 60 * 1000)
+    })));
+  }
+
+  // Find the next appointment (sorted by time, earliest first)
+  const nextTodayAppointment = activeAppointments
     .sort((a, b) => new Date(a.start!).getTime() - new Date(b.start!).getTime())[0];
+
+  console.log('[DASHBOARD] Next appointment:', nextTodayAppointment ? {
+    id: nextTodayAppointment.id,
+    status: nextTodayAppointment.status,
+    start: nextTodayAppointment.start,
+    isPast: new Date(nextTodayAppointment.start!) < now,
+    isToday: new Date(nextTodayAppointment.start!) >= today && new Date(nextTodayAppointment.start!) < new Date(today.getTime() + 24 * 60 * 60 * 1000)
+  } : 'None');
 
   const todayStatus = {
     nextAppointment: nextTodayAppointment ?
@@ -324,8 +357,8 @@ export default function DashboardClient({
     // Initial calculation
     calculateQueuePosition();
 
-    // Set up polling every 10 seconds
-    const intervalId = setInterval(calculateQueuePosition, 10000);
+    // Set up polling every 5 seconds
+    const intervalId = setInterval(calculateQueuePosition, 5000);
 
     // Cleanup interval on unmount
     return () => clearInterval(intervalId);
@@ -485,26 +518,24 @@ export default function DashboardClient({
                   )}
 
                   {/* Show queue info only if patient has arrived */}
-                  {isPatientArrived && (
-                    <>
-                      {queuePosition !== null && queuePosition !== undefined ? (
-                        <div>
-                          <p className="text-sm text-text-secondary mb-1">Patients Ahead of You</p>
-                          <p className="text-base sm:text-lg md:text-xl font-semibold text-amber-600">
-                            {queuePosition === 0 ? "You're first! 🎉" : queuePosition}
-                          </p>
-                        </div>
-                      ) : null}
+                  {isPatientArrived && queuePosition !== null && queuePosition !== undefined && estimatedWaitTime !== null && estimatedWaitTime !== undefined && (
+                    <div className="space-y-3">
+                      {/* Header Row */}
+                      <div className="grid grid-cols-2 gap-4 text-sm text-text-secondary pb-2">
+                        <div>Patients Ahead of You</div>
+                        <div>Estimated Wait Time</div>
+                      </div>
 
-                      {estimatedWaitTime !== null && estimatedWaitTime !== undefined && (
-                        <div>
-                          <p className="text-sm text-text-secondary mb-1">Estimated Wait Time</p>
-                          <p className="text-base sm:text-lg md:text-xl font-semibold text-primary">
-                            {isEncounterPlanned ? '< 10 minutes' : `${estimatedWaitTime} mins`}
-                          </p>
+                      {/* Data Row */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-3xl sm:text-4xl font-bold text-amber-600 pl-10">
+                          {queuePosition}
                         </div>
-                      )}
-                    </>
+                        <div className="text-3xl sm:text-4xl font-bold text-primary">
+                          {isEncounterPlanned ? '< 10 mins' : `${estimatedWaitTime} mins`}
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </>
               ) : (

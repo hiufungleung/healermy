@@ -62,6 +62,7 @@ export default function NotificationsClient({
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
   const [locallyReadIds, setLocallyReadIds] = useState<Set<string>>(new Set()); // Track locally read messages for immediate blue bar removal
   const [displayCount, setDisplayCount] = useState(10); // Show 10 notifications initially
+  const [unreadTabSnapshot, setUnreadTabSnapshot] = useState<Set<string>>(new Set()); // Track messages that were unread when unread tab was opened
 
   // Appointment dialog states
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
@@ -135,6 +136,22 @@ export default function NotificationsClient({
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Capture unread message IDs when switching to unread tab
+  // ONLY capture when user switches to unread tab, not on every communication update
+  useEffect(() => {
+    if (activeFilter === 'unread') {
+      const unreadIds = new Set(
+        localCommunications
+          .filter(comm => !isMessageRead(comm))
+          .map(comm => comm.id)
+      );
+      setUnreadTabSnapshot(unreadIds);
+    } else {
+      // Clear snapshot when leaving unread tab
+      setUnreadTabSnapshot(new Set());
+    }
+  }, [activeFilter]); // Only depend on activeFilter, NOT localCommunications
 
   // Function to check if message is read
   const isMessageRead = (comm: Communication): boolean => {
@@ -505,7 +522,9 @@ export default function NotificationsClient({
 
     switch (activeFilter) {
       case 'unread':
-        return !isMessageRead(comm);
+        // Include messages that are either currently unread OR were in the unread tab when it was opened
+        // This keeps read messages in the unread tab until the page is refreshed or filter is changed
+        return !isMessageRead(comm) || unreadTabSnapshot.has(comm.id);
       case 'action_required':
         // Communications don't have actionRequired flag, so return false for now
         return false;
@@ -1115,13 +1134,23 @@ export default function NotificationsClient({
 
               <DialogFooter className="flex flex-row gap-2 justify-end">
                 <Button
-                  variant="danger"
-                  onClick={() => setIsCancelDialogOpen(true)}
-                  disabled={selectedAppointment.status === 'cancelled' || selectedAppointment.status === 'fulfilled' || isProcessing}
+                  variant="outline"
+                  onClick={() => setIsDetailDialogOpen(false)}
+                  disabled={isProcessing}
                   className="min-w-[110px]"
                 >
-                  Cancel
+                  Close
                 </Button>
+                {selectedAppointment.status === 'booked' && (
+                  <Button
+                    variant="danger"
+                    onClick={() => setIsCancelDialogOpen(true)}
+                    disabled={isProcessing}
+                    className="min-w-[110px]"
+                  >
+                    Cancel Appointment
+                  </Button>
+                )}
               </DialogFooter>
             </>
           ) : null}

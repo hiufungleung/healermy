@@ -8,6 +8,7 @@ import { Badge } from '@/components/common/Badge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { SessionData } from '@/types/auth';
 import type { Appointment, Schedule, Slot } from '@/types/fhir';
+import { getNowInAppTimezone } from '@/library/timezone';
 
 interface PractitionerDashboardClientProps {
   session: SessionData;
@@ -54,14 +55,14 @@ export default function PractitionerDashboardClient({
   const fetchAppointmentData = async () => {
     setLoading(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const weekFromNow = new Date();
+      const now = getNowInAppTimezone();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const weekFromNow = new Date(today);
       weekFromNow.setDate(weekFromNow.getDate() + 7);
-      const weekEnd = weekFromNow.toISOString().split('T')[0];
 
       // Fetch appointments for this practitioner only
       const response = await fetch(
-        `/api/fhir/appointments?practitioner=${practitionerId}&date=ge${today}&date=le${weekEnd}`,
+        `/api/fhir/appointments?practitioner=${practitionerId}&slot.start=ge${today.toISOString()}&slot.start=lt${weekFromNow.toISOString()}`,
         { credentials: 'include' }
       );
 
@@ -70,13 +71,14 @@ export default function PractitionerDashboardClient({
         const allAppointments = data.appointments || [];
 
         // Calculate statistics
+        const todayStr = today.toISOString().split('T')[0];
         const todayCount = allAppointments.filter((apt: Appointment) =>
-          apt.start?.startsWith(today)
+          apt.start?.startsWith(todayStr)
         ).length;
 
         const upcomingCount = allAppointments.filter((apt: Appointment) => {
           const aptDate = apt.start?.split('T')[0];
-          return aptDate && aptDate > today;
+          return aptDate && aptDate > todayStr;
         }).length;
 
         const completedCount = allAppointments.filter((apt: Appointment) =>
@@ -92,7 +94,7 @@ export default function PractitionerDashboardClient({
 
         // Set today's appointments
         const todayAppts = allAppointments
-          .filter((apt: Appointment) => apt.start?.startsWith(today))
+          .filter((apt: Appointment) => apt.start?.startsWith(todayStr))
           .sort((a: Appointment, b: Appointment) =>
             new Date(a.start!).getTime() - new Date(b.start!).getTime()
           );

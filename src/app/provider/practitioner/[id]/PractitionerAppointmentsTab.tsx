@@ -26,6 +26,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { createColumns, AppointmentRow } from '../../appointments/columns';
 import { ProviderAppointmentDialog } from '@/components/provider/ProviderAppointmentDialog';
 import type { Appointment, Encounter } from '@/types/fhir';
+import { getNowInAppTimezone } from '@/library/timezone';
 
 type TimeFilter = 'all' | 'today' | 'upcoming-7' | 'upcoming' | 'past';
 type StatusFilter = 'pending' | 'booked' | 'fulfilled' | 'cancelled';
@@ -67,7 +68,7 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
       appointmentParams.append('practitioner', `Practitioner/${practitionerId}`);
 
       // Add time filter
-      const now = new Date();
+      const now = getNowInAppTimezone();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const todayEnd = new Date(today);
       todayEnd.setDate(todayEnd.getDate() + 1);
@@ -76,20 +77,20 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
         case 'all':
           break;
         case 'today':
-          appointmentParams.append('date', `ge${today.toISOString()}`);
-          appointmentParams.append('date', `lt${todayEnd.toISOString()}`);
+          appointmentParams.append('slot.start', `ge${today.toISOString()}`);
+          appointmentParams.append('slot.start', `lt${todayEnd.toISOString()}`);
           break;
         case 'upcoming-7':
           const next7Days = new Date(today);
           next7Days.setDate(next7Days.getDate() + 7);
-          appointmentParams.append('date', `ge${today.toISOString()}`);
-          appointmentParams.append('date', `lt${next7Days.toISOString()}`);
+          appointmentParams.append('slot.start', `ge${today.toISOString()}`);
+          appointmentParams.append('slot.start', `lt${next7Days.toISOString()}`);
           break;
         case 'upcoming':
-          appointmentParams.append('date', `ge${today.toISOString()}`);
+          appointmentParams.append('slot.start', `ge${today.toISOString()}`);
           break;
         case 'past':
-          appointmentParams.append('date', `lt${today.toISOString()}`);
+          appointmentParams.append('slot.start', `lt${today.toISOString()}`);
           break;
       }
 

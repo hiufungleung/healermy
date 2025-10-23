@@ -247,8 +247,8 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
     // Initial fetch
     fetchNotificationCount();
 
-    // Poll every 30 seconds
-    const interval = setInterval(fetchNotificationCount, 30000);
+    // Poll every 5 seconds
+    const interval = setInterval(fetchNotificationCount, 5000);
 
     // Listen for manual refresh events
     const handleMessageUpdate = () => {

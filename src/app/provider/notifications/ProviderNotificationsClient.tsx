@@ -37,6 +37,7 @@ export default function ProviderNotificationsClient() {
   const [appointmentStatuses, setAppointmentStatuses] = useState<Record<string, string>>({});
   const [deletedAppointments, setDeletedAppointments] = useState<Set<string>>(new Set()); // Cache deleted appointments
   const [loadingStatuses, setLoadingStatuses] = useState(false); // Track if we're loading appointment statuses
+  const [unreadTabSnapshot, setUnreadTabSnapshot] = useState<Set<string>>(new Set()); // Track messages that were unread when unread tab was opened
 
   // Function to check if appointment needs handling (is pending)
   const needsHandling = (comm: Communication): boolean => {
@@ -386,6 +387,22 @@ export default function ProviderNotificationsClient() {
     }
   }, [searchParams]);
 
+  // Capture unread message IDs when switching to unread tab
+  // ONLY capture when user switches to unread tab, not on every communication update
+  useEffect(() => {
+    if (activeFilter === 'unread') {
+      const unreadIds = new Set(
+        localCommunications
+          .filter(comm => !isMessageRead(comm))
+          .map(comm => comm.id)
+      );
+      setUnreadTabSnapshot(unreadIds);
+    } else {
+      // Clear snapshot when leaving unread tab
+      setUnreadTabSnapshot(new Set());
+    }
+  }, [activeFilter]); // Only depend on activeFilter, NOT localCommunications
+
   // Refresh appointment statuses when returning to notifications page
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -627,7 +644,9 @@ export default function ProviderNotificationsClient() {
     // Apply filter logic
     switch (activeFilter) {
       case 'unread':
-        return !isMessageRead(comm);
+        // Include messages that are either currently unread OR were in the unread tab when it was opened
+        // This keeps read messages in the unread tab until the page is refreshed or filter is changed
+        return !isMessageRead(comm) || unreadTabSnapshot.has(comm.id);
       case 'action_required':
         // Communications that need handling (pending appointments) are action required
         return needsHandling(comm);
