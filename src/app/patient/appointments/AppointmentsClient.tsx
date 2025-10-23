@@ -12,7 +12,7 @@ interface AppointmentsClientProps {
   session: SessionData;
 }
 
-type FilterStatus = 'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled';
+type FilterStatus = 'all' | 'pending' | 'confirmed' | 'arrived' | 'completed' | 'cancelled';
 
 export default function AppointmentsClient({ session }: AppointmentsClientProps) {
   const router = useRouter();
@@ -21,42 +21,56 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Get filter status from URL params, default to 'confirmed'
+  // Get filter status from URL params, default to 'all'
   const urlStatus = searchParams.get('status') as FilterStatus | null;
   const [filterStatus, setFilterStatus] = useState<FilterStatus>(
-    urlStatus && ['all', 'pending', 'confirmed', 'completed', 'cancelled'].includes(urlStatus)
+    urlStatus && ['all', 'pending', 'confirmed', 'arrived', 'completed', 'cancelled'].includes(urlStatus)
       ? urlStatus
-      : 'confirmed'
+      : 'all'
   );
 
   // Update URL when filter status changes
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set('status', filterStatus);
-    router.replace(`/patient/appointments?${params.toString()}`, { scroll: false });
-  }, [filterStatus, router, searchParams]);
+
+    // Only update URL if the status actually changed
+    const currentStatus = params.get('status');
+    if (currentStatus !== filterStatus) {
+      params.set('status', filterStatus);
+      router.replace(`/patient/appointments?${params.toString()}`, { scroll: false });
+    }
+  }, [filterStatus, router]);
 
   // Fetch appointments
   useEffect(() => {
     const fetchAppointments = async () => {
+      console.log('[APPOINTMENTS] Fetching appointments for patient:', session.patient);
+      setLoading(true);
+
       try {
         const response = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
           credentials: 'include'
         });
+
+        console.log('[APPOINTMENTS] API response status:', response.status);
+
         if (response.ok) {
           const data = await response.json();
           const appointments = data.appointments || [];
+          console.log('[APPOINTMENTS] Fetched', appointments.length, 'appointments');
 
           // Use the reusable appointment enhancement utility
           const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');
           const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
+          console.log('[APPOINTMENTS] Enhanced appointments:', enhancedAppointments.length);
           setAppointments(enhancedAppointments);
         } else {
-          console.error('Failed to fetch appointments:', response.status, response.statusText);
+          const errorText = await response.text();
+          console.error('[APPOINTMENTS] Failed to fetch:', response.status, response.statusText, errorText);
           setAppointments([]);
         }
       } catch (error) {
-        console.error('Error fetching appointments:', error);
+        console.error('[APPOINTMENTS] Error fetching appointments:', error);
         setAppointments([]);
       } finally {
         setLoading(false);
@@ -71,6 +85,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
     // Status filter mapping
     // 'confirmed' = upcoming booked appointments
     // 'pending' = upcoming pending appointments
+    // 'arrived' = arrived appointments (patient has checked in)
     // 'completed' = fulfilled appointments
     // 'cancelled' = cancelled appointments
     // 'all' = all appointments
@@ -88,6 +103,11 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
       } else if (filterStatus === 'pending') {
         // Pending = upcoming pending appointments
         if (appointment.status !== 'pending' || !isUpcoming) {
+          return false;
+        }
+      } else if (filterStatus === 'arrived') {
+        // Arrived = appointments where patient has arrived
+        if (appointment.status !== 'arrived') {
           return false;
         }
       } else if (filterStatus === 'completed') {
@@ -118,6 +138,30 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
 
     return true;
   });
+
+  // Log filtering results for debugging
+  useEffect(() => {
+    console.log('[APPOINTMENTS] Filter status:', filterStatus);
+    console.log('[APPOINTMENTS] Total appointments:', appointments.length);
+    console.log('[APPOINTMENTS] Filtered appointments:', filteredAppointments.length);
+    if (filteredAppointments.length > 0) {
+      console.log('[APPOINTMENTS] Sample filtered appointment:', filteredAppointments[0]);
+    }
+    if (filterStatus === 'pending' && appointments.length > 0) {
+      const pendingAppts = appointments.filter(a => a.status === 'pending');
+      console.log('[APPOINTMENTS] Appointments with "pending" status:', pendingAppts.length);
+      if (pendingAppts.length > 0) {
+        console.log('[APPOINTMENTS] Sample pending appointment:', pendingAppts[0]);
+      }
+    }
+    if (filterStatus === 'arrived' && appointments.length > 0) {
+      const arrivedAppts = appointments.filter(a => a.status === 'arrived');
+      console.log('[APPOINTMENTS] Appointments with "arrived" status:', arrivedAppts.length);
+      if (arrivedAppts.length > 0) {
+        console.log('[APPOINTMENTS] Sample arrived appointment:', arrivedAppts[0]);
+      }
+    }
+  }, [filteredAppointments, filterStatus, appointments]);
 
   // Refresh appointments after update
   const refreshAppointments = async () => {
@@ -186,6 +230,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
             <div className="flex flex-wrap gap-2">
               {[
                 { key: 'confirmed', label: 'Confirmed' },
+                { key: 'arrived', label: 'Arrived' },
                 { key: 'pending', label: 'Pending' },
                 { key: 'completed', label: 'Completed' },
                 { key: 'cancelled', label: 'Cancelled' },

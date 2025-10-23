@@ -184,7 +184,6 @@ function NewBookingFlow() {
   const [monthSlots, setMonthSlots] = useState<Slot[]>([]); // Store full month of slots
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [datesWithSlots, setDatesWithSlots] = useState<Set<string>>(new Set());
-  const [practitionerSchedules, setPractitionerSchedules] = useState<Schedule[]>([]); // Cache schedules for service-type lookup
 
   // Step 3: Visit Information - Initialize from bookingDraft
   const [reasonForVisit, setReasonForVisit] = useState<string>(bookingDraft.reasonForVisit || '');
@@ -216,7 +215,7 @@ function NewBookingFlow() {
   // Real-time slot update interval
   const slotUpdateInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // Month slot cache
+  // Month slot cache (stores slots by month)
   const monthSlotCache = useRef<Map<string, Slot[]>>(new Map());
 
   // Auto-proceed when both dialog selections are made
@@ -297,12 +296,12 @@ function NewBookingFlow() {
 
     // Handle practitioner data
     if (bookingDraft.practitionerId && (!selectedPractitioner || selectedPractitioner.id !== bookingDraft.practitionerId)) {
-      console.log('[SYNC] Need to fetch practitioner:', bookingDraft.practitionerId);
+      console.log('[SYNC] Restoring practitioner from draft:', bookingDraft.practitionerId);
 
-      // Create a temporary practitioner object with the name from localStorage
-      // This prevents the "Selected Doctor" section from being empty during fetch
+      // Create practitioner object from bookingDraft (no API call needed)
+      // Step 1 already passed the practitioner name, so we don't need to fetch full details
       if (bookingDraft.practitionerName) {
-        const tempPractitioner: Practitioner = {
+        const practitioner: Practitioner = {
           resourceType: 'Practitioner',
           id: bookingDraft.practitionerId,
           name: [{
@@ -312,12 +311,9 @@ function NewBookingFlow() {
           }],
           active: true
         };
-        setSelectedPractitioner(tempPractitioner);
-        console.log('[SYNC] Set temp practitioner:', tempPractitioner);
+        setSelectedPractitioner(practitioner);
+        console.log('[SYNC] Set practitioner from draft:', practitioner);
       }
-
-      // Fetch full practitioner details (will overwrite temp object)
-      fetchPractitionerById(bookingDraft.practitionerId);
     }
   }, [bookingDraft, isInitialized]);
 
@@ -329,7 +325,38 @@ function NewBookingFlow() {
     }
   }, []);
 
-  // Fetch month slots when entering Step 2 or month changes or practitioner is set
+  // Helper: Get month start date (first day of month) for any date
+  const getMonthStart = (date: Date): Date => {
+    const d = new Date(date);
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  };
+
+  // Helper: Get month key for caching
+  const getMonthKey = (date: Date): string => {
+    const monthStart = getMonthStart(date);
+    return `${monthStart.getFullYear()}-${monthStart.getMonth() + 1}-${selectedSpecialty || 'any'}-${selectedServiceCategory || 'any'}`;
+  };
+
+  // Detect when selected date changes to a different month
+  useEffect(() => {
+    if (currentStep === 2 && selectedPractitioner && selectedDate) {
+      const selectedDateObj = new Date(selectedDate);
+      const selectedMonthStart = getMonthStart(selectedDateObj);
+      const currentMonthStart = getMonthStart(currentMonth);
+
+      // Check if month changed
+      if (selectedMonthStart.getTime() !== currentMonthStart.getTime()) {
+        console.log('[MONTH CHANGE] Detected month change, fetching new month:', {
+          from: currentMonthStart.toISOString().split('T')[0],
+          to: selectedMonthStart.toISOString().split('T')[0]
+        });
+        setCurrentMonth(selectedMonthStart);
+        fetchMonthSlots(selectedMonthStart);
+      }
+    }
+  }, [selectedDate, currentStep, selectedPractitioner]);
+
+  // Fetch month slots when entering Step 2 or practitioner is set
   useEffect(() => {
     if (currentStep === 2 && selectedPractitioner) {
       console.log('[MONTH FETCH] Triggering month fetch:', {
@@ -341,9 +368,9 @@ function NewBookingFlow() {
       });
       fetchMonthSlots(currentMonth);
     }
-  }, [currentStep, selectedPractitioner, currentMonth]);
+  }, [currentStep, selectedPractitioner]);
 
-  // Filter slots when selected date changes
+  // Filter slots when selected date changes (within same month)
   useEffect(() => {
     if (currentStep === 2 && monthSlots.length > 0) {
       filterSlotsForSelectedDate(monthSlots);
@@ -597,29 +624,6 @@ function NewBookingFlow() {
     previousFilterCount.current = currentFilterCount;
   }, [currentStep, selectedSpecialty, selectedServiceCategory, selectedServiceType]);
 
-  // Fetch practitioner by ID (for page refresh with URL params)
-  const fetchPractitionerById = async (practitionerId: string) => {
-    try {
-      console.log('[PRACTITIONER] Fetching by ID:', practitionerId);
-      const response = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        console.error('[PRACTITIONER] Failed to fetch:', response.status);
-        return;
-      }
-
-      const data = await response.json();
-      if (data.practitioner) {
-        console.log('[PRACTITIONER] Fetched:', data.practitioner.name);
-        setSelectedPractitioner(data.practitioner);
-      }
-    } catch (error) {
-      console.error('[PRACTITIONER] Error fetching by ID:', error);
-    }
-  };
-
   // Fetch all practitioners (no server-side pagination)
   const fetchAllPractitioners = async () => {
     setLoading(true);
@@ -788,18 +792,13 @@ function NewBookingFlow() {
     }
   };
 
-  // REMOVED: Old fetchAvailableSlots function
-  // Now using fetchMonthSlots which:
-  // 1. Fetches entire month at once (more efficient)
-  // 2. No need to fetch schedules separately
-  // 3. Direct slot query with specialty and service-category filters
 
-  // Fetch slots for entire month with caching
-  const fetchMonthSlots = async (month: Date, skipCache: boolean = false) => {
+  // Fetch slots for entire month in two halves (1-15 and 16-end) with caching
+  const fetchMonthSlots = async (monthStart: Date, skipCache: boolean = false) => {
     if (!selectedPractitioner || currentStep !== 2) return;
 
-    // Include specialty and service category in cache key for proper filtering
-    const monthKey = `${month.getFullYear()}-${month.getMonth()}-${selectedSpecialty || 'any'}-${selectedServiceCategory || 'any'}`;
+    // Get month key for caching
+    const monthKey = getMonthKey(monthStart);
 
     // Check cache first (unless skipCache is true for auto-updates)
     if (!skipCache && monthSlotCache.current.has(monthKey)) {
@@ -814,108 +813,92 @@ function NewBookingFlow() {
     console.log(`[MONTH SLOTS] ${skipCache ? 'Auto-update:' : 'Initial fetch:'} Fetching fresh data for ${monthKey}`);
 
     try {
-      // Calculate month boundaries in local timezone, then convert to UTC for FHIR query
-      const year = month.getFullYear();
-      const monthIndex = month.getMonth();
+      // Calculate month boundaries
+      const year = monthStart.getFullYear();
+      const month = monthStart.getMonth();
 
-      // First day of month at 00:00:00 local time
-      const monthStartLocal = `${year}-${String(monthIndex + 1).padStart(2, '0')}-01T00:00:00`;
-      const monthStart = new Date(monthStartLocal);
+      // First day of month at 00:00:00
+      const firstDay = new Date(year, month, 1);
+      firstDay.setHours(0, 0, 0, 0);
 
-      // First day of next month at 00:00:00 local time
-      const nextMonthIndex = monthIndex + 1;
-      const nextYear = nextMonthIndex > 11 ? year + 1 : year;
-      const nextMonthNum = nextMonthIndex > 11 ? 1 : nextMonthIndex + 1;
-      const nextMonthLocal = `${nextYear}-${String(nextMonthNum).padStart(2, '0')}-01T00:00:00`;
-      const nextMonthStart = new Date(nextMonthLocal);
+      // 16th day of month at 00:00:00 (start of second half)
+      const sixteenthDay = new Date(year, month, 16);
+      sixteenthDay.setHours(0, 0, 0, 0);
 
-      const startParam = monthStart.toISOString();
-      const endParam = nextMonthStart.toISOString();
+      // First day of next month at 00:00:00
+      const nextMonthFirst = new Date(year, month + 1, 1);
+      nextMonthFirst.setHours(0, 0, 0, 0);
 
-      console.log(`[MONTH SLOTS] Fetching for ${monthKey}:`);
-      console.log(`[MONTH SLOTS]   Local month: ${year}-${monthIndex + 1}`);
-      console.log(`[MONTH SLOTS]   UTC range: ${startParam} to ${endParam}`);
+      console.log(`[MONTH SLOTS] Fetching for ${year}-${month + 1}:`);
+      console.log(`[MONTH SLOTS]   First half: ${firstDay.toISOString().split('T')[0]} to ${sixteenthDay.toISOString().split('T')[0]}`);
+      console.log(`[MONTH SLOTS]   Second half: ${sixteenthDay.toISOString().split('T')[0]} to ${nextMonthFirst.toISOString().split('T')[0]}`);
 
-      // STEP 1: Fetch schedules on initial load (not during auto-updates)
-      // This is needed to get service-type info that is not in slot results
-      if (!skipCache && practitionerSchedules.length === 0) {
-        console.log('[MONTH SLOTS] Fetching practitioner schedules for service-type lookup');
-
-        const scheduleParams = new URLSearchParams({
-          'actor': `Practitioner/${selectedPractitioner.id}`,
-          'active': 'true',
-          '_count': '50'
-        });
-
-        if (selectedSpecialty) {
-          const specialtyCode = getSpecialtyCode(selectedSpecialty);
-          if (specialtyCode) {
-            scheduleParams.append('specialty', specialtyCode);
-          }
-        }
-
-        if (selectedServiceCategory) {
-          scheduleParams.append('service-category', selectedServiceCategory);
-        }
-
-        try {
-          const scheduleResponse = await fetch(`/api/fhir/schedules?${scheduleParams.toString()}`, {
-            credentials: 'include'
-          });
-
-          if (scheduleResponse.ok) {
-            const scheduleData = await scheduleResponse.json();
-            const schedules = scheduleData.schedules || [];
-            console.log(`[MONTH SLOTS] Fetched ${schedules.length} schedules`);
-            setPractitionerSchedules(schedules);
-          }
-        } catch (error) {
-          console.error('[MONTH SLOTS] Failed to fetch schedules:', error);
-        }
-      }
-
-      // STEP 2: Fetch slots (always - both initial and auto-update)
-      const params = new URLSearchParams({
+      // Prepare slot API parameters for first half (1-15)
+      const firstHalfParams = new URLSearchParams({
         'schedule.actor': `Practitioner/${selectedPractitioner.id}`,
-        'status': 'free',
-        '_count': '200'
+        'status': 'free'
+      });
+
+      // Prepare slot API parameters for second half (16-end)
+      const secondHalfParams = new URLSearchParams({
+        'schedule.actor': `Practitioner/${selectedPractitioner.id}`,
+        'status': 'free'
       });
 
       // Add specialty filter if selected
       if (selectedSpecialty) {
-        const specialtyCodeForMonth = getSpecialtyCode(selectedSpecialty);
-        if (specialtyCodeForMonth) {
-          params.append('schedule.specialty', specialtyCodeForMonth);
+        const specialtyCode = getSpecialtyCode(selectedSpecialty);
+        if (specialtyCode) {
+          firstHalfParams.append('schedule.specialty', specialtyCode);
+          secondHalfParams.append('schedule.specialty', specialtyCode);
         }
       }
 
       // Add service category filter if selected
       if (selectedServiceCategory) {
-        params.append('schedule.service-category', selectedServiceCategory);
+        firstHalfParams.append('schedule.service-category', selectedServiceCategory);
+        secondHalfParams.append('schedule.service-category', selectedServiceCategory);
       }
 
-      // Add date range
-      params.append('start', `ge${startParam}`);
-      params.append('start', `lt${endParam}`);
+      // Add date ranges for both halves
+      firstHalfParams.append('start', `ge${firstDay.toISOString()}`);
+      firstHalfParams.append('start', `lt${sixteenthDay.toISOString()}`);
 
-      const response = await fetch(`/api/fhir/slots?${params.toString()}`, {
-        credentials: 'include'
-      });
+      secondHalfParams.append('start', `ge${sixteenthDay.toISOString()}`);
+      secondHalfParams.append('start', `lt${nextMonthFirst.toISOString()}`);
 
-      if (!response.ok) {
-        console.error('[MONTH SLOTS] Failed to fetch:', response.status);
+      // Fetch both halves in parallel
+      console.log('[MONTH SLOTS] Fetching both halves in parallel...');
+      const [firstHalfResponse, secondHalfResponse] = await Promise.all([
+        fetch(`/api/fhir/slots?${firstHalfParams.toString()}`, { credentials: 'include' }),
+        fetch(`/api/fhir/slots?${secondHalfParams.toString()}`, { credentials: 'include' })
+      ]);
+
+      if (!firstHalfResponse.ok || !secondHalfResponse.ok) {
+        console.error('[MONTH SLOTS] Failed to fetch:', {
+          firstHalf: firstHalfResponse.status,
+          secondHalf: secondHalfResponse.status
+        });
         // Don't clear slots on error - keep existing slots displayed
         return;
       }
 
-      const data = await response.json();
-      const slots = data.slots || [];
+      const firstHalfData = await firstHalfResponse.json();
+      const secondHalfData = await secondHalfResponse.json();
 
-      console.log(`[MONTH SLOTS] Fetched ${slots.length} slots for ${monthKey}`);
-      console.log(`[MONTH SLOTS] First slot sample:`, slots[0]);
+      const firstHalfSlots = firstHalfData.slots || [];
+      const secondHalfSlots = secondHalfData.slots || [];
 
-      // Cache the results
-      monthSlotCache.current.set(monthKey, slots);
+      // Combine both halves
+      const allSlots = [...firstHalfSlots, ...secondHalfSlots];
+
+      console.log(`[MONTH SLOTS] Fetched ${allSlots.length} total slots (first half: ${firstHalfSlots.length}, second half: ${secondHalfSlots.length})`);
+      if (allSlots.length > 0) {
+        console.log(`[MONTH SLOTS] First slot sample:`, allSlots[0]);
+      }
+
+      // Cache the combined results
+      monthSlotCache.current.set(monthKey, allSlots);
 
       // Preserve scroll position during auto-updates
       let scrollY = 0;
@@ -923,12 +906,11 @@ function NewBookingFlow() {
         scrollY = window.scrollY;
       }
 
-      console.log(`[MONTH SLOTS] Setting monthSlots state to ${slots.length} slots`);
-      setMonthSlots(slots);
-      console.log(`[MONTH SLOTS] Calling updateDatesWithSlots`);
-      updateDatesWithSlots(slots);
+      console.log(`[MONTH SLOTS] Setting monthSlots state to ${allSlots.length} slots`);
+      setMonthSlots(allSlots);
+      updateDatesWithSlots(allSlots);
       console.log(`[MONTH SLOTS] Calling filterSlotsForSelectedDate for date:`, selectedDate);
-      filterSlotsForSelectedDate(slots);
+      filterSlotsForSelectedDate(allSlots);
 
       // Restore scroll position after state update (on next tick)
       if (skipCache && typeof window !== 'undefined') {
@@ -972,6 +954,18 @@ function NewBookingFlow() {
       return;
     }
 
+    // Get current time to filter out past slots on today
+    const now = new Date();
+
+    // Check if selected date is today
+    const todayStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: APP_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(now);
+    const isToday = selectedDate === todayStr;
+
     const filtered = slots.filter(slot => {
       if (!slot.start) return false;
 
@@ -984,14 +978,24 @@ function NewBookingFlow() {
         day: '2-digit'
       }).format(slotDate);
 
-      const matches = slotDateStr === selectedDate;
+      const matchesDate = slotDateStr === selectedDate;
 
-      if (slots.indexOf(slot) < 3) {
-        // Log first 3 slots for debugging
-        console.log('[FILTER SLOTS] Sample slot:', slot.id, 'start:', slot.start, 'extracted date:', slotDateStr, 'matches:', matches);
+      if (!matchesDate) return false;
+
+      // If selected date is today, filter out past slots
+      if (isToday) {
+        const slotTime = new Date(slot.start).getTime();
+        const isPastSlot = slotTime <= now.getTime();
+
+        if (slots.indexOf(slot) < 3) {
+          // Log first 3 slots for debugging
+          console.log('[FILTER SLOTS] Sample slot:', slot.id, 'start:', slot.start, 'extracted date:', slotDateStr, 'is past:', isPastSlot);
+        }
+
+        return !isPastSlot;
       }
 
-      return matches;
+      return true;
     });
 
     // Sort filtered slots chronologically by start time
@@ -1000,7 +1004,7 @@ function NewBookingFlow() {
       return new Date(a.start).getTime() - new Date(b.start).getTime();
     });
 
-    console.log('[FILTER SLOTS] Filtered to', sorted.length, 'slots for', selectedDate);
+    console.log('[FILTER SLOTS] Filtered to', sorted.length, 'slots for', selectedDate, isToday ? '(today - past slots excluded)' : '');
     console.log('[FILTER SLOTS] Setting availableSlots to', sorted.length, 'sorted slots');
     setAvailableSlots(sorted);
   };
@@ -1826,19 +1830,28 @@ function NewBookingFlow() {
                         }
                       }}
                       onMonthChange={(month) => {
-                        setCurrentMonth(month);
+                        // Fetch slots for the new month (both halves in parallel)
+                        const monthStart = getMonthStart(month);
+                        fetchMonthSlots(monthStart);
                       }}
-                      minDate={new Date()}
+                      minDate={(() => {
+                        // Set minDate to today at midnight (allows selecting today)
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        return today;
+                      })()}
                       placeholder="Pick a date"
                       className="w-full"
                       modifiers={{
                         available: (date) => {
-                          // Only highlight dates with slots that are NOT in the past
+                          // Only highlight dates with slots that are today or in the future
                           const today = new Date();
                           today.setHours(0, 0, 0, 0);
-                          const isPast = date < today;
+                          const checkDate = new Date(date);
+                          checkDate.setHours(0, 0, 0, 0);
+                          const isNotPast = checkDate >= today;
                           const dateStr = date.toISOString().split('T')[0];
-                          return !isPast && datesWithSlots.has(dateStr);
+                          return isNotPast && datesWithSlots.has(dateStr);
                         }
                       }}
                       modifiersClassNames={{
@@ -1866,22 +1879,28 @@ function NewBookingFlow() {
                           }
                         }}
                         onMonthChange={(month) => {
-                          setCurrentMonth(month);
+                          // Fetch slots for the new month (both halves in parallel)
+                          const monthStart = getMonthStart(month);
+                          fetchMonthSlots(monthStart);
                         }}
                         disabled={(date) => {
-                          // Disable past dates
+                          // Disable only past dates (today is allowed)
                           const today = new Date();
                           today.setHours(0, 0, 0, 0);
-                          return date < today;
+                          const checkDate = new Date(date);
+                          checkDate.setHours(0, 0, 0, 0);
+                          return checkDate < today;
                         }}
                         modifiers={{
                           available: (date) => {
-                            // Only highlight dates with slots that are NOT in the past
+                            // Only highlight dates with slots that are today or in the future
                             const today = new Date();
                             today.setHours(0, 0, 0, 0);
-                            const isPast = date < today;
+                            const checkDate = new Date(date);
+                            checkDate.setHours(0, 0, 0, 0);
+                            const isNotPast = checkDate >= today;
                             const dateStr = date.toISOString().split('T')[0];
-                            return !isPast && datesWithSlots.has(dateStr);
+                            return isNotPast && datesWithSlots.has(dateStr);
                           }
                         }}
                         modifiersClassNames={{
@@ -1897,57 +1916,6 @@ function NewBookingFlow() {
                 <div className='sm:col-span-1 md:col-span-3'>
                 <h3 className="font-semibold mb-4 sm:mb-10">Available Times</h3>
 
-                {/* Service Type Color Legend - Compact */}
-                {availableSlots.length > 0 && practitionerSchedules.length > 0 && (
-                  <div className="mb-3 flex flex-wrap gap-3 text-xs text-gray-600">
-                    {(() => {
-                      const serviceTypesMap = new Map<string, string>();
-
-                      // Get schedule IDs from current slots
-                      const scheduleIdsInSlots = new Set(
-                        availableSlots
-                          .map(slot => slot.schedule?.reference?.replace('Schedule/', ''))
-                          .filter(Boolean)
-                      );
-
-                      // Find matching schedules and extract service types
-                      practitionerSchedules.forEach(schedule => {
-                        if (scheduleIdsInSlots.has(schedule.id)) {
-                          const code = schedule.serviceType?.[0]?.coding?.[0]?.code;
-                          const display = schedule.serviceType?.[0]?.coding?.[0]?.display;
-                          if (code && display) {
-                            serviceTypesMap.set(code, display);
-                          }
-                        }
-                      });
-
-                      // Dynamic color palette - assigns colors based on order
-                      const colorPalette = [
-                        'bg-blue-500',
-                        'bg-green-500',
-                        'bg-red-500',
-                        'bg-purple-500',
-                        'bg-indigo-500',
-                        'bg-yellow-500',
-                        'bg-pink-500',
-                        'bg-teal-500',
-                        'bg-orange-500',
-                        'bg-cyan-500',
-                      ];
-
-                      return Array.from(serviceTypesMap.entries()).map(([code, display], index) => {
-                        const color = colorPalette[index % colorPalette.length];
-                        return (
-                          <div key={code} className="flex items-center gap-1.5">
-                            <div className={`w-4 h-0.5 ${color}`}></div>
-                            <span>{display}</span>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                )}
-
                 {loading ? (
                   <div className="text-center py-8">
                     <LoadingSpinner size="sm" />
@@ -1957,7 +1925,6 @@ function NewBookingFlow() {
                   <SlotSelectionGrid
                     slots={availableSlots}
                     selectedSlotId={selectedSlotId}
-                    schedules={practitionerSchedules}
                     onSlotSelect={(slot) => {
                       const time = formatTimeForDisplay(slot.start);
                       const slotId = slot.id;
@@ -1967,39 +1934,14 @@ function NewBookingFlow() {
                       // Slots are already filtered for selectedDate, so they match
                       const slotDate = selectedDate;
 
-                      // Get service type from schedule reference (not from slot directly)
-                      let serviceType = 'general'; // Default fallback
-
-                      // Extract schedule ID from slot.schedule.reference (e.g., "Schedule/133109")
-                      const scheduleRef = slot.schedule?.reference;
-                      if (scheduleRef && practitionerSchedules.length > 0) {
-                        const scheduleId = scheduleRef.replace('Schedule/', '');
-
-                        // Find the matching schedule in cached schedules
-                        const matchingSchedule = practitionerSchedules.find(s => s.id === scheduleId);
-
-                        if (matchingSchedule) {
-                          // Extract service type from schedule
-                          serviceType = matchingSchedule.serviceType?.[0]?.coding?.[0]?.code ||
-                                      matchingSchedule.serviceType?.[0]?.coding?.[0]?.display ||
-                                      'general';
-
-                          console.log('[SLOT SELECT] Found schedule:', {
-                            scheduleId,
-                            serviceType,
-                            scheduleData: matchingSchedule.serviceType
-                          });
-                        } else {
-                          console.warn('[SLOT SELECT] Schedule not found in cache:', scheduleId);
-                        }
-                      }
+                      // Use default service type since we no longer fetch schedules
+                      const serviceType = 'general';
 
                       console.log('[SLOT SELECT]', {
                         time,
                         slotId,
                         date: slotDate,
-                        serviceType,
-                        scheduleRef
+                        serviceType
                       });
 
                       // Update state
