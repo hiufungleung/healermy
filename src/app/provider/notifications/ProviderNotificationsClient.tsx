@@ -32,6 +32,7 @@ export default function ProviderNotificationsClient() {
   const [localCommunications, setLocalCommunications] = useState<Communication[]>([]);
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
   const [selectedMessage, setSelectedMessage] = useState<Communication | null>(null);
+  const [locallyReadIds, setLocallyReadIds] = useState<Set<string>>(new Set()); // Track locally read messages for immediate blue bar removal
   const [displayCount, setDisplayCount] = useState(10); // Show 10 notifications initially
   const [appointmentStatuses, setAppointmentStatuses] = useState<Record<string, string>>({});
   const [deletedAppointments, setDeletedAppointments] = useState<Set<string>>(new Set()); // Cache deleted appointments
@@ -523,6 +524,9 @@ export default function ProviderNotificationsClient() {
     setSelectedMessage(selectedMessage?.id === comm.id ? null : comm);
 
     if (comm.id && !isMessageRead(comm)) {
+      // Add to locally read IDs for immediate blue bar removal
+      setLocallyReadIds(prev => new Set([...prev, comm.id]));
+
       setLocalCommunications(prev =>
         prev.map(localComm =>
           localComm.id === comm.id
@@ -867,12 +871,13 @@ export default function ProviderNotificationsClient() {
             // Communication item (from FHIR API)
             const comm = item.data;
               const isExpanded = selectedMessage?.id === comm.id;
+              const isUnread = !isMessageRead(comm) && !locallyReadIds.has(comm.id);
 
               return (
                 <Card
                   key={comm.id}
                   className={`hover:shadow-md transition-shadow ${
-                    !isMessageRead(comm) ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
+                    isUnread ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
                   } ${isExpanded ? 'ring-2 ring-primary/20' : ''}`}
                 >
                   <div
@@ -890,7 +895,7 @@ export default function ProviderNotificationsClient() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <h3 className={`font-semibold mb-2 ${!isMessageRead(comm) ? 'text-text-primary' : 'text-text-secondary'}`}>
+                          <h3 className={`font-semibold mb-2 ${isUnread ? 'text-text-primary' : 'text-text-secondary'}`}>
                             {/* Get appointment status to determine notification type */}
                             {(() => {
                               const appointmentRef = comm.about?.[0]?.reference;
@@ -922,7 +927,7 @@ export default function ProviderNotificationsClient() {
                                 <>
                                   {title}
                                   {statusBadge}
-                                  {!isMessageRead(comm) && (
+                                  {isUnread && (
                                     <div className="w-2 h-2 bg-primary rounded-full inline-block ml-2"></div>
                                   )}
                                 </>
@@ -970,11 +975,12 @@ export default function ProviderNotificationsClient() {
                         </div>
 
                         <div className="flex flex-col space-y-1 ml-4">
-                          {!isMessageRead(comm) && (
+                          {isUnread && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (comm.id) {
+                                  setLocallyReadIds(prev => new Set([...prev, comm.id]));
                                   setLocalCommunications(prev =>
                                     prev.map(localComm =>
                                       localComm.id === comm.id
@@ -1046,6 +1052,8 @@ export default function ProviderNotificationsClient() {
                                     e.stopPropagation();
                                     // Always mark as read when handling appointment (regardless of current read status)
                                     if (comm.id) {
+                                      // Add to locally read IDs for immediate blue bar removal
+                                      setLocallyReadIds(prev => new Set([...prev, comm.id]));
                                       // Update local state immediately for instant UI feedback
                                       setLocalCommunications(prev =>
                                         prev.map(localComm =>
