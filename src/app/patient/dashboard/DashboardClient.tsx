@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { PatientAppointmentCard } from '@/components/patient/PatientAppointmentCard';
 import { AppointmentSkeleton } from '@/components/common/ContentSkeleton';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { FancyLoader } from '@/components/common/FancyLoader';
 import { getNowInAppTimezone, formatAppointmentDateTime } from '@/library/timezone';
 import type { SessionData } from '@/types/auth';
 import type { AppointmentWithPractitionerDetails } from '@/library/appointmentDetailInfo';
@@ -498,7 +498,7 @@ export default function DashboardClient({
             <div className="space-y-4 transition-all duration-300 ease-in-out">
               {loadingAppointments ? (
                 <div className="flex flex-col items-center justify-center py-1">
-                  <LoadingSpinner size="sm" />
+                  <FancyLoader size="sm" />
                 </div>
               ) : todayStatus.nextAppointment ? (
                 <>

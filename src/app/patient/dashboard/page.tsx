@@ -1,6 +1,6 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
-import { getSessionOnly } from './actions';
+import { getSessionOnly, getDashboardData } from './actions';
 import DashboardWrapper from './DashboardWrapper';
 import type { Metadata } from 'next';
 
@@ -12,16 +12,25 @@ export const metadata: Metadata = {
 };
 
 export default async function PatientDashboard() {
-  const { session, error } = await getSessionOnly();
+  const { session, error, patient } = await getDashboardData();
 
   // If no session or error, redirect to login
   if (error || !session) {
     redirect('/');
   }
 
+  // Extract patient name from FHIR Patient resource (server-side to prevent hydration mismatch)
+  let patientName = '';
+  if (patient?.name?.[0]) {
+    const given = patient.name[0].given?.join(' ') || '';
+    const family = patient.name[0].family || '';
+    patientName = `${given} ${family}`.trim();
+  }
+
   return (
     <DashboardWrapper
       session={session}
+      patientName={patientName}
     />
   );
 }

@@ -110,8 +110,8 @@ export async function PATCH(
           );
         }
       }
-    } else if (session.role === 'provider' || session.role === 'practitioner') {
-      // Providers and practitioners can perform any appointment operations
+    } else if (session.role === 'provider') {
+      // Providers can perform any appointment operations
     } else {
       return NextResponse.json(
         { error: 'Invalid user role for appointment updates' },

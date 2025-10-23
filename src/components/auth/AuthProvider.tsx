@@ -4,6 +4,23 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useRouter, usePathname } from 'next/navigation';
 import { SessionData } from '@/types/auth';
 
+interface Communication {
+  id: string;
+  status: string;
+  category?: Array<{ text?: string }>;
+  subject?: { reference?: string };
+  about?: Array<{ reference?: string }>;
+  recipient?: Array<{ reference?: string; display?: string }>;
+  sender?: { reference?: string; display?: string };
+  sent?: string;
+  payload?: Array<{ contentString?: string }>;
+  received?: string;
+  extension?: Array<{
+    url?: string;
+    valueDateTime?: string;
+  }>;
+}
+
 interface AuthContextType {
   session: SessionData | null;
   logout: () => void;
@@ -11,6 +28,7 @@ interface AuthContextType {
   userName: string | null;
   isLoadingUserName: boolean;
   unreadCount: number;
+  communications: Communication[];
   refreshNotifications: () => void;
 }
 
@@ -27,6 +45,7 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
   const [userName, setUserName] = useState<string | null>(null);
   const [isLoadingUserName, setIsLoadingUserName] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [communications, setCommunications] = useState<Communication[]>([]);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -71,8 +90,8 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
               }
             }
           }
-        } else if (session.role === 'provider' || session.role === 'practitioner') {
-          // For provider/practitioner, fetch name from FHIR API using practitioner ID
+        } else if (session.role === 'provider') {
+          // For provider, fetch name from FHIR API using practitioner ID
           if (!session.practitioner) return;
 
           const response = await fetch(`/api/fhir/practitioners/${session.practitioner}`, {
@@ -108,6 +127,7 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
   const fetchNotificationCount = async () => {
     if (!session) {
       setUnreadCount(0);
+      setCommunications([]);
       return;
     }
 
@@ -122,6 +142,9 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
 
       const commData = await response.json();
       const allCommunications = (commData.entry || []).map((entry: any) => entry.resource);
+
+      // Store full communications data
+      setCommunications(allCommunications);
 
       if (session.role === 'patient') {
         // Patient logic - count unread messages
@@ -212,10 +235,6 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
         console.log('🔔 [AuthProvider] Provider unread count (communications only):', count);
 
         setUnreadCount(count);
-      } else if (session.role === 'practitioner') {
-        // Practitioner: For now, no separate notification system
-        // Could be extended in the future to show urgent patient updates
-        setUnreadCount(0);
       }
     } catch (error) {
       // Silently fail - don't show errors for background polling
@@ -295,6 +314,7 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
       userName,
       isLoadingUserName,
       unreadCount,
+      communications,
       refreshNotifications: fetchNotificationCount
     }}>
       {children}

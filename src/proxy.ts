@@ -40,9 +40,6 @@ export async function proxy(request: NextRequest) {
         } else if (sessionData.role === 'patient') {
           console.log(`🔀 [PROXY] Authenticated patient accessing /, redirecting to patient dashboard`);
           return NextResponse.redirect(new URL('/patient/dashboard', baseUrl));
-        } else if (sessionData.role === 'practitioner') {
-          console.log(`🔀 [PROXY] Authenticated practitioner accessing /, redirecting to practitioner dashboard`);
-          return NextResponse.redirect(new URL('/practitioner/dashboard', baseUrl));
         }
       } catch (error) {
         console.error('❌ [PROXY] Failed to decrypt session for index page:', error);
@@ -173,11 +170,6 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/', baseUrl));
     }
 
-    if (pathname.startsWith('/practitioner/') && sessionData.role !== 'practitioner') {
-      console.log(`❌ [PROXY] Practitioner route access denied for role: ${sessionData.role}`);
-      return NextResponse.redirect(new URL('/', baseUrl));
-    }
-
     // Session validated - cookies remain encrypted and HTTP-only for security
     const response = NextResponse.next();
 
@@ -198,7 +190,6 @@ export const config = {
     '/',
     '/patient/:path*',
     '/provider/:path*',
-    '/practitioner/:path*',
     '/api/fhir/:path*'
   ],
 };

@@ -4,8 +4,29 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
+import { Badge } from '@/components/common/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { FancyLoader } from '@/components/common/FancyLoader';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { formatAppointmentDateTime } from '@/library/timezone';
+import { toast } from 'sonner';
 
 interface Communication {
   id: string;
@@ -24,12 +45,18 @@ interface Communication {
   }>;
 }
 
-export default function ProviderNotificationsClient() {
+interface ProviderNotificationsClientProps {
+  initialCommunications: Communication[];
+}
+
+export default function ProviderNotificationsClient({
+  initialCommunications
+}: ProviderNotificationsClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'action_required' | 'urgent'>('all');
-  const [localCommunications, setLocalCommunications] = useState<Communication[]>([]);
+  const [localCommunications, setLocalCommunications] = useState<Communication[]>(initialCommunications);
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
   const [selectedMessage, setSelectedMessage] = useState<Communication | null>(null);
   const [locallyReadIds, setLocallyReadIds] = useState<Set<string>>(new Set()); // Track locally read messages for immediate blue bar removal
@@ -38,6 +65,16 @@ export default function ProviderNotificationsClient() {
   const [deletedAppointments, setDeletedAppointments] = useState<Set<string>>(new Set()); // Cache deleted appointments
   const [loadingStatuses, setLoadingStatuses] = useState(false); // Track if we're loading appointment statuses
   const [unreadTabSnapshot, setUnreadTabSnapshot] = useState<Set<string>>(new Set()); // Track messages that were unread when unread tab was opened
+  const snapshotCapturedRef = React.useRef(false); // Track if snapshot was captured for current unread tab session
+  const [locallyModifiedIds, setLocallyModifiedIds] = useState<Map<string, Communication>>(new Map()); // Track locally modified communications to preserve across prop updates
+
+  // Appointment dialog states
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [appointmentLoading, setAppointmentLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Function to check if appointment needs handling (is pending)
   const needsHandling = (comm: Communication): boolean => {
@@ -74,7 +111,7 @@ export default function ProviderNotificationsClient() {
   const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
 
   // Loading state for better UX
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
 
 
@@ -241,71 +278,52 @@ export default function ProviderNotificationsClient() {
     }
   }, [localCommunications, deletedAppointments]); // Run when communications or deleted appointments change
 
-  // Fetch communications (which already includes appointment-related notifications)
-  // Communications API has better filtering and prevents data overload
+  // Update local communications when prop changes (from AuthProvider polling every 5s)
+  // Intelligent merging: preserve locally modified versions until API confirms the change
   useEffect(() => {
-    const fetchCommunicationNotifications = async () => {
-      try {
-        setIsLoading(true);
+    if (initialCommunications.length === 0) return;
 
-        console.log('[ProviderNotifications] Fetching Communications data...');
-        // Fetch communications (clinic-wide view for providers, with reasonable limits)
-        const response = await fetch('/api/fhir/communications', {
-          method: 'GET',
-          credentials: 'include',
-        });
+    console.log('[ProviderNotifications] Updating communications from prop:', initialCommunications.length, 'items');
 
-        if (response.ok) {
-          const data = await response.json();
-          console.log('[ProviderNotifications] Communications data received:', data);
-          const communications = (data.entry || []).map((entry: any) => entry.resource);
-          console.log('[ProviderNotifications] Setting localCommunications:', communications.length, 'items');
-          setLocalCommunications(communications);
-          setIsLoading(false);
-        } else {
-          console.error('Failed to fetch communications:', response.status);
-          setIsLoading(false);
+    setLocalCommunications(prevLocal => {
+      const incomingMap = new Map(initialCommunications.map(comm => [comm.id, comm]));
+
+      // Use locally modified version if exists, otherwise use incoming
+      const merged = initialCommunications.map(comm => {
+        const localMod = locallyModifiedIds.get(comm.id);
+        if (localMod) {
+          console.log('[ProviderNotifications] Using locally modified version for:', comm.id);
+          return localMod;
         }
-      } catch (error) {
-        console.error('Error fetching communications:', error);
-        setIsLoading(false);
-      }
-    };
+        return comm;
+      });
 
-    fetchCommunicationNotifications();
-  }, []); // Run only once on mount - removing readNotifications dependency to prevent infinite loop
+      // Clean up locallyModifiedIds when API update propagates
+      // (i.e., when incoming now has the read extension we added locally)
+      const cleanedModified = new Map(locallyModifiedIds);
+      locallyModifiedIds.forEach((localComm, id) => {
+        const incomingComm = incomingMap.get(id);
+        if (incomingComm) {
+          const hasReadExtension = incomingComm.extension?.find(ext =>
+            ext.url === 'http://hl7.org/fhir/StructureDefinition/communication-read-status'
+          )?.valueDateTime;
 
-  // Optimized periodic refresh - less frequent updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const fetchUpdatedCommunications = async () => {
-        try {
-          const response = await fetch('/api/fhir/communications', {
-            method: 'GET',
-            credentials: 'include',
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            const communications = (data.entry || []).map((entry: any) => entry.resource);
-
-            // Quick check - only update if count changed significantly
-            const significantChange = Math.abs(communications.length - localCommunications.length) > 2;
-
-            if (significantChange) {
-              setLocalCommunications(communications);
-            }
+          if (hasReadExtension) {
+            console.log('[ProviderNotifications] API confirmed read status for:', id);
+            cleanedModified.delete(id);
           }
-        } catch (error) {
-          console.error('Error refreshing communications:', error);
         }
-      };
+      });
 
-      fetchUpdatedCommunications();
-    }, 60000); // Check every 60 seconds (less frequent)
+      if (cleanedModified.size !== locallyModifiedIds.size) {
+        setLocallyModifiedIds(cleanedModified);
+      }
 
-    return () => clearInterval(interval);
-  }, [localCommunications.length]); // Only depend on communications length to prevent infinite loops
+      return merged;
+    });
+
+    setIsLoading(false);
+  }, [initialCommunications, locallyModifiedIds]);
 
   // Fetch patient names when communications change (using batch fetching for better performance)
   useEffect(() => {
@@ -388,20 +406,29 @@ export default function ProviderNotificationsClient() {
   }, [searchParams]);
 
   // Capture unread message IDs when switching to unread tab
-  // ONLY capture when user switches to unread tab, not on every communication update
+  // ONLY capture ONCE when user switches to unread tab, not on every communication update
   useEffect(() => {
     if (activeFilter === 'unread') {
-      const unreadIds = new Set(
-        localCommunications
-          .filter(comm => !isMessageRead(comm))
-          .map(comm => comm.id)
-      );
-      setUnreadTabSnapshot(unreadIds);
+      // Only capture snapshot if we haven't captured one yet for this tab session
+      if (!snapshotCapturedRef.current && localCommunications.length > 0) {
+        const unreadIds = new Set(
+          localCommunications
+            .filter(comm => !isMessageRead(comm))
+            .map(comm => comm.id)
+        );
+        console.log('[Provider Unread Tab] Capturing snapshot:', Array.from(unreadIds));
+        setUnreadTabSnapshot(unreadIds);
+        snapshotCapturedRef.current = true;
+      }
     } else {
-      // Clear snapshot when leaving unread tab
-      setUnreadTabSnapshot(new Set());
+      // Clear snapshot and reset flag when leaving unread tab
+      if (snapshotCapturedRef.current) {
+        console.log('[Provider Unread Tab] Clearing snapshot');
+        setUnreadTabSnapshot(new Set());
+        snapshotCapturedRef.current = false;
+      }
     }
-  }, [activeFilter]); // Only depend on activeFilter, NOT localCommunications
+  }, [activeFilter, localCommunications.length]); // Only depend on filter change and data availability
 
   // Refresh appointment statuses when returning to notifications page
   useEffect(() => {
@@ -537,31 +564,109 @@ export default function ProviderNotificationsClient() {
     }
   };
 
-  const handleMessageClick = (comm: Communication) => {
-    setSelectedMessage(selectedMessage?.id === comm.id ? null : comm);
+  const handleMessageClick = async (comm: Communication) => {
+    // Extract appointment ID from communication
+    const aboutRef = comm.about?.[0]?.reference;
+    if (aboutRef?.startsWith('Appointment/')) {
+      const appointmentId = aboutRef.replace('Appointment/', '');
 
+      // Fetch appointment details
+      setAppointmentLoading(true);
+      setIsDetailDialogOpen(true);
+
+      try {
+        const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const appointment = await response.json();
+
+          // Fetch patient details
+          const patientParticipant = appointment.participant?.find((p: any) =>
+            p.actor?.reference?.startsWith('Patient/')
+          );
+
+          if (patientParticipant?.actor?.reference) {
+            const patientId = patientParticipant.actor.reference.replace('Patient/', '');
+            const patientResponse = await fetch(`/api/fhir/patients/${patientId}`, {
+              credentials: 'include'
+            });
+
+            if (patientResponse.ok) {
+              const patient = await patientResponse.json();
+              appointment.patientDetails = {
+                name: patient.name?.[0]?.text ||
+                      `${patient.name?.[0]?.given?.join(' ') || ''} ${patient.name?.[0]?.family || ''}`.trim() ||
+                      'Patient',
+                phone: patient.telecom?.find((t: any) => t.system === 'phone')?.value || 'N/A',
+                email: patient.telecom?.find((t: any) => t.system === 'email')?.value || 'N/A'
+              };
+            }
+          }
+
+          // Fetch practitioner details
+          const practitionerParticipant = appointment.participant?.find((p: any) =>
+            p.actor?.reference?.startsWith('Practitioner/')
+          );
+
+          if (practitionerParticipant?.actor?.reference) {
+            const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
+            const practitionerResponse = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
+              credentials: 'include'
+            });
+
+            if (practitionerResponse.ok) {
+              const practitioner = await practitionerResponse.json();
+              appointment.practitionerDetails = {
+                name: practitioner.name?.[0]?.text ||
+                      `${practitioner.name?.[0]?.given?.join(' ') || ''} ${practitioner.name?.[0]?.family || ''}`.trim() ||
+                      'Provider'
+              };
+            }
+          }
+
+          setSelectedAppointment(appointment);
+        }
+      } catch (error) {
+        console.error('Error fetching appointment details:', error);
+        toast.error('Failed to load appointment details');
+        setIsDetailDialogOpen(false);
+      } finally {
+        setAppointmentLoading(false);
+      }
+    }
+
+    // Mark as read
     if (comm.id && !isMessageRead(comm)) {
       // Add to locally read IDs for immediate blue bar removal
       setLocallyReadIds(prev => new Set([...prev, comm.id]));
 
+      // Create updated communication with read extension
+      const updatedComm = {
+        ...comm,
+        extension: [
+          ...(comm.extension || []),
+          {
+            url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
+            valueDateTime: new Date().toISOString()
+          }
+        ]
+      };
+
+      // Track as locally modified to preserve across prop updates
+      setLocallyModifiedIds(prev => new Map(prev).set(comm.id, updatedComm));
+
       setLocalCommunications(prev =>
         prev.map(localComm =>
-          localComm.id === comm.id
-            ? {
-                ...localComm,
-                extension: [
-                  ...(localComm.extension || []),
-                  {
-                    url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
-                    valueDateTime: new Date().toISOString()
-                  }
-                ]
-              }
-            : localComm
+          localComm.id === comm.id ? updatedComm : localComm
         )
       );
 
       markAsRead(comm.id);
+
+      // Dispatch event to update notification bell
+      window.dispatchEvent(new CustomEvent('messageUpdate'));
     }
   };
 
@@ -812,36 +917,6 @@ export default function ProviderNotificationsClient() {
         )}
       </div>
 
-      {/* Summary Cards - 2x2 grid on mobile, 4 columns on desktop */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-6">
-        <Card padding="sm">
-          <div className="text-center py-1 md:py-2">
-            <div className="text-lg md:text-base sm:text-lg md:text-xl font-bold text-primary">{unreadCount}</div>
-            <div className="text-xs text-text-secondary">Unread</div>
-          </div>
-        </Card>
-
-        <Card padding="sm">
-          <div className="text-center py-1 md:py-2">
-            <div className="text-lg md:text-base sm:text-lg md:text-xl font-bold text-red-500">{urgentCount}</div>
-            <div className="text-xs text-text-secondary">Urgent</div>
-          </div>
-        </Card>
-
-        <Card padding="sm">
-          <div className="text-center py-1 md:py-2">
-            <div className="text-lg md:text-base sm:text-lg md:text-xl font-bold text-orange-500">{actionRequiredCount}</div>
-            <div className="text-xs text-text-secondary">Action Required</div>
-          </div>
-        </Card>
-
-        <Card padding="sm">
-          <div className="text-center py-1 md:py-2">
-            <div className="text-lg md:text-base sm:text-lg md:text-xl font-bold text-text-primary">{totalCount}</div>
-            <div className="text-xs text-text-secondary">Total</div>
-          </div>
-        </Card>
-      </div>
 
       {/* Filter Tabs */}
       <Tabs
@@ -875,7 +950,7 @@ export default function ProviderNotificationsClient() {
         {isLoading ? (
           // Loading state with spinner
           <div className="flex flex-col items-center justify-center py-12">
-            <LoadingSpinner size="lg" />
+            <FancyLoader size="lg" />
             <p className="text-text-secondary text-sm mt-4">Loading notifications...</p>
           </div>
         ) : allFilteredItems.length === 0 ? (
@@ -889,15 +964,14 @@ export default function ProviderNotificationsClient() {
           displayedItems.map((item) => {
             // Communication item (from FHIR API)
             const comm = item.data;
-              const isExpanded = selectedMessage?.id === comm.id;
               const isUnread = !isMessageRead(comm) && !locallyReadIds.has(comm.id);
 
               return (
                 <Card
                   key={comm.id}
-                  className={`hover:shadow-md transition-shadow ${
+                  className={`hover:shadow-md transition-shadow cursor-pointer ${
                     isUnread ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
-                  } ${isExpanded ? 'ring-2 ring-primary/20' : ''}`}
+                  }`}
                 >
                   <div
                     className="flex items-start space-x-4 cursor-pointer"
@@ -1000,20 +1074,25 @@ export default function ProviderNotificationsClient() {
                                 e.stopPropagation();
                                 if (comm.id) {
                                   setLocallyReadIds(prev => new Set([...prev, comm.id]));
+
+                                  // Create updated communication with read extension
+                                  const updatedComm = {
+                                    ...comm,
+                                    extension: [
+                                      ...(comm.extension || []),
+                                      {
+                                        url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
+                                        valueDateTime: new Date().toISOString()
+                                      }
+                                    ]
+                                  };
+
+                                  // Track as locally modified to preserve across prop updates
+                                  setLocallyModifiedIds(prev => new Map(prev).set(comm.id, updatedComm));
+
                                   setLocalCommunications(prev =>
                                     prev.map(localComm =>
-                                      localComm.id === comm.id
-                                        ? {
-                                            ...localComm,
-                                            extension: [
-                                              ...(localComm.extension || []),
-                                              {
-                                                url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
-                                                valueDateTime: new Date().toISOString()
-                                              }
-                                            ]
-                                          }
-                                        : localComm
+                                      localComm.id === comm.id ? updatedComm : localComm
                                     )
                                   );
                                   markAsRead(comm.id);
@@ -1035,79 +1114,6 @@ export default function ProviderNotificationsClient() {
                           </button>
                         </div>
                       </div>
-
-                      {/* Handle Appointment Button for Communications that need handling */}
-                      {(() => {
-                        const appointmentRef = comm.about?.[0]?.reference;
-                        if (!appointmentRef?.startsWith('Appointment/')) return null;
-
-                        const appointmentId = appointmentRef.replace('Appointment/', '');
-                        const status = appointmentStatuses[appointmentId];
-
-                        // Show loading state if we don't have status yet and are loading
-                        if (!status && loadingStatuses) {
-                          return (
-                            <div className="pt-3 border-t border-gray-100 mt-3">
-                              <div className="flex justify-center items-center text-text-secondary text-sm">
-                                <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Loading status...
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        // Show button only if status is pending or we don't have status yet
-                        if (status === 'pending' || (!status && needsHandling(comm))) {
-                          return (
-                            <div className="pt-3 border-t border-gray-100 mt-3">
-                              <div className="flex justify-center">
-                                <Button
-                                  variant="primary"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Always mark as read when handling appointment (regardless of current read status)
-                                    if (comm.id) {
-                                      // Add to locally read IDs for immediate blue bar removal
-                                      setLocallyReadIds(prev => new Set([...prev, comm.id]));
-                                      // Update local state immediately for instant UI feedback
-                                      setLocalCommunications(prev =>
-                                        prev.map(localComm =>
-                                          localComm.id === comm.id
-                                            ? {
-                                                ...localComm,
-                                                extension: [
-                                                  ...(localComm.extension?.filter(ext =>
-                                                    ext.url !== 'http://hl7.org/fhir/StructureDefinition/communication-read-status'
-                                                  ) || []),
-                                                  {
-                                                    url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
-                                                    valueDateTime: new Date().toISOString()
-                                                  }
-                                                ]
-                                              }
-                                            : localComm
-                                        )
-                                      );
-                                      // Mark as read (this will update localStorage and call API)
-                                      markAsRead(comm.id);
-                                    }
-                                    // Navigate to appointments page with focus on specific appointment
-                                    window.location.href = `/provider/appointments?highlight=${appointmentId}`;
-                                  }}
-                                >
-                                  Handle Appointment
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        return null;
-                      })()}
                     </div>
                   </div>
                 </Card>
@@ -1128,6 +1134,258 @@ export default function ProviderNotificationsClient() {
         )}
         </TabsContent>
       </Tabs>
+
+      {/* Appointment Detail Dialog */}
+      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Appointment Details</DialogTitle>
+            <DialogDescription>
+              View and manage appointment request
+            </DialogDescription>
+          </DialogHeader>
+
+          {appointmentLoading ? (
+            <div className="py-8 flex justify-center">
+              <FancyLoader size="sm" />
+            </div>
+          ) : selectedAppointment ? (
+            <>
+              <div className="space-y-4">
+                {/* Status Badge */}
+                <div>
+                  <Badge
+                    variant={
+                      selectedAppointment.status === 'booked' || selectedAppointment.status === 'fulfilled' ? 'success' :
+                      selectedAppointment.status === 'cancelled' ? 'danger' :
+                      selectedAppointment.status === 'pending' ? 'warning' : 'info'
+                    }
+                    size="sm"
+                  >
+                    {selectedAppointment.status === 'booked' ? 'Confirmed' :
+                     selectedAppointment.status === 'pending' ? 'Pending Approval' :
+                     selectedAppointment.status === 'fulfilled' ? 'Completed' :
+                     selectedAppointment.status === 'cancelled' ? 'Cancelled' :
+                     selectedAppointment.status}
+                  </Badge>
+                </div>
+
+                {/* Patient Name */}
+                <div>
+                  <p className="text-sm font-medium text-text-secondary">Patient</p>
+                  <p className="text-sm">{selectedAppointment.patientDetails?.name || 'Patient'}</p>
+                </div>
+
+                {/* Date & Time */}
+                <div>
+                  <p className="text-sm font-medium text-text-secondary">Date & Time</p>
+                  <p className="text-sm">
+                    {selectedAppointment.start ? formatAppointmentDateTime(selectedAppointment.start) : 'TBD'}
+                  </p>
+                </div>
+
+                {/* Practitioner */}
+                <div>
+                  <p className="text-sm font-medium text-text-secondary">Practitioner</p>
+                  <p className="text-sm">{selectedAppointment.practitionerDetails?.name || 'Provider'}</p>
+                </div>
+
+                {/* Reason for Visit */}
+                <div>
+                  <p className="text-sm font-medium text-text-secondary">Reason for Visit</p>
+                  <p className="text-sm">{selectedAppointment.reasonCode?.[0]?.text || 'General Consultation'}</p>
+                </div>
+
+                {/* Notes */}
+                {selectedAppointment.description && (
+                  <div>
+                    <p className="text-sm font-medium text-text-secondary">Notes</p>
+                    <p className="text-sm">{selectedAppointment.description}</p>
+                  </div>
+                )}
+
+                {/* Patient Contact */}
+                <div>
+                  <p className="text-sm font-medium text-text-secondary">Patient Contact</p>
+                  <p className="text-sm">Phone: {selectedAppointment.patientDetails?.phone || 'N/A'}</p>
+                  <p className="text-sm">Email: {selectedAppointment.patientDetails?.email || 'N/A'}</p>
+                </div>
+              </div>
+
+              <DialogFooter className="flex flex-row gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsDetailDialogOpen(false)}
+                  disabled={isProcessing}
+                  className="min-w-[110px]"
+                >
+                  Close
+                </Button>
+                {selectedAppointment.status === 'pending' && (
+                  <>
+                    <Button
+                      variant="danger"
+                      onClick={() => {
+                        setIsDetailDialogOpen(false);
+                        setIsRejectDialogOpen(true);
+                      }}
+                      disabled={isProcessing}
+                      className="min-w-[110px]"
+                    >
+                      Reject
+                    </Button>
+                    <Button
+                      variant="success"
+                      onClick={() => {
+                        setIsDetailDialogOpen(false);
+                        setIsApproveDialogOpen(true);
+                      }}
+                      disabled={isProcessing}
+                      className="min-w-[110px]"
+                    >
+                      Approve
+                    </Button>
+                  </>
+                )}
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Approve Confirmation Dialog */}
+      <AlertDialog open={isApproveDialogOpen} onOpenChange={setIsApproveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Approve Appointment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to approve this appointment? The patient will be notified.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex flex-row gap-2 justify-end">
+            <AlertDialogCancel disabled={isProcessing} className="mt-0">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!selectedAppointment?.id) return;
+
+                setIsProcessing(true);
+                try {
+                  const response = await fetch(`/api/fhir/appointments/${selectedAppointment.id}`, {
+                    method: 'PATCH',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json-patch+json' },
+                    body: JSON.stringify([
+                      {
+                        op: 'replace',
+                        path: '/status',
+                        value: 'booked',
+                      },
+                    ]),
+                  });
+
+                  if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to approve appointment');
+                  }
+
+                  toast.success('Appointment Approved', {
+                    description: 'The appointment has been successfully approved.',
+                  });
+
+                  setIsApproveDialogOpen(false);
+
+                  // Refresh communications
+                  const communicationsResponse = await fetch(`/api/fhir/communications`, {
+                    credentials: 'include',
+                  });
+                  if (communicationsResponse.ok) {
+                    const communicationsData = await communicationsResponse.json();
+                    const communications = (communicationsData.entry || []).map((entry: any) => entry.resource);
+                    setLocalCommunications(communications);
+                  }
+                } catch (error) {
+                  toast.error('Error', {
+                    description: error instanceof Error ? error.message : 'Failed to approve appointment',
+                  });
+                } finally {
+                  setIsProcessing(false);
+                }
+              }}
+              disabled={isProcessing}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {isProcessing ? 'Approving...' : 'Yes, Approve'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reject Confirmation Dialog */}
+      <AlertDialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject Appointment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to reject this appointment? The patient will be notified.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex flex-row gap-2 justify-end">
+            <AlertDialogCancel disabled={isProcessing} className="mt-0">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!selectedAppointment?.id) return;
+
+                setIsProcessing(true);
+                try {
+                  const response = await fetch(`/api/fhir/appointments/${selectedAppointment.id}`, {
+                    method: 'PATCH',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json-patch+json' },
+                    body: JSON.stringify([
+                      {
+                        op: 'replace',
+                        path: '/status',
+                        value: 'cancelled',
+                      },
+                    ]),
+                  });
+
+                  if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to reject appointment');
+                  }
+
+                  toast.success('Appointment Rejected', {
+                    description: 'The appointment has been rejected.',
+                  });
+
+                  setIsRejectDialogOpen(false);
+
+                  // Refresh communications
+                  const communicationsResponse = await fetch(`/api/fhir/communications`, {
+                    credentials: 'include',
+                  });
+                  if (communicationsResponse.ok) {
+                    const communicationsData = await communicationsResponse.json();
+                    const communications = (communicationsData.entry || []).map((entry: any) => entry.resource);
+                    setLocalCommunications(communications);
+                  }
+                } catch (error) {
+                  toast.error('Error', {
+                    description: error instanceof Error ? error.message : 'Failed to reject appointment',
+                  });
+                } finally {
+                  setIsProcessing(false);
+                }
+              }}
+              disabled={isProcessing}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isProcessing ? 'Rejecting...' : 'Yes, Reject'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
         </div>
       </div>
     </div>

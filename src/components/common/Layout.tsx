@@ -23,10 +23,9 @@ interface LayoutProps {
   children: React.ReactNode;
   patientName?: string;
   providerName?: string;
-  practitionerName?: string;
 }
 
-export function Layout({ children, patientName, providerName, practitionerName }: LayoutProps) {
+export function Layout({ children, patientName, providerName }: LayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { session, logout, isLoading, userName, isLoadingUserName } = useAuth();
@@ -36,10 +35,9 @@ export function Layout({ children, patientName, providerName, practitionerName }
 
   const isPatient = session?.role === 'patient';
   const isProvider = session?.role === 'provider';
-  const isPractitioner = session?.role === 'practitioner';
 
   // Use prop-based names first (no flicker), fallback to cached userName from AuthProvider
-  const displayName = (isPatient ? patientName : isPractitioner ? practitionerName : providerName) || userName;
+  const displayName = (isPatient ? patientName : providerName) || userName;
 
   // Close mobile menu when viewport changes to desktop size
   useEffect(() => {
@@ -84,7 +82,7 @@ export function Layout({ children, patientName, providerName, practitionerName }
   };
 
   const handleProfileClick = () => {
-    const profilePath = isPatient ? '/patient/profile' : isPractitioner ? '/practitioner/profile' : '/provider/profile';
+    const profilePath = isPatient ? '/patient/profile' : '/provider/profile';
     router.push(profilePath);
   };
 
@@ -99,12 +97,6 @@ export function Layout({ children, patientName, providerName, practitionerName }
         { href: '/provider/dashboard', label: 'Dashboard', icon: Home },
         { href: '/provider/practitioner', label: 'Practitioners', icon: Users },
         { href: '/provider/appointments', label: 'Appointments', icon: Calendar },
-      ]
-    : isPractitioner
-    ? [
-        { href: '/practitioner/dashboard', label: 'Dashboard', icon: Home },
-        { href: '/practitioner/appointments', label: 'Appointments', icon: Calendar },
-        { href: '/practitioner/workstation', label: 'Workstation', icon: Users },
       ]
     : [];
 
@@ -124,17 +116,6 @@ export function Layout({ children, patientName, providerName, practitionerName }
       }
       return 'P';
     } else if (session.role === 'provider') {
-      return 'HP';
-    } else if (session.role === 'practitioner') {
-      // Extract practitioner initials from displayName
-      if (displayName) {
-        const names = displayName.trim().split(' ');
-        if (names.length >= 2) {
-          return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
-        } else if (names.length === 1 && names[0].length > 0) {
-          return names[0][0].toUpperCase();
-        }
-      }
       return 'HP';
     }
 
@@ -238,7 +219,7 @@ export function Layout({ children, patientName, providerName, practitionerName }
                             )}
                           </p>
                           <p className="text-xs leading-none text-muted-foreground">
-                            {session.role === 'patient' ? 'Patient' : session.role === 'practitioner' ? 'Practitioner' : 'Provider'}
+                            {session.role === 'patient' ? 'Patient' : 'Provider'}
                           </p>
                         </div>
                       </DropdownMenuLabel>
@@ -325,10 +306,10 @@ export function Layout({ children, patientName, providerName, practitionerName }
               {/* Profile Link in Mobile Menu */}
               {session && (
                 <Link
-                  href={isPatient ? '/patient/profile' : isPractitioner ? '/practitioner/profile' : '/provider/profile'}
+                  href={isPatient ? '/patient/profile' : '/provider/profile'}
                   className={clsx(
                     'flex items-center gap-3 px-4 py-3 text-base font-medium rounded-md transition-colors',
-                    pathname === (isPatient ? '/patient/profile' : isPractitioner ? '/practitioner/profile' : '/provider/profile')
+                    pathname === (isPatient ? '/patient/profile' : '/provider/profile')
                       ? 'bg-blue-50 text-primary'
                       : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                   )}
@@ -349,7 +330,7 @@ export function Layout({ children, patientName, providerName, practitionerName }
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-900">{displayName}</p>
                       <p className="text-xs text-gray-500">
-                        {session.role === 'patient' ? 'Patient' : session.role === 'practitioner' ? 'Practitioner' : 'Provider'}
+                        {session.role === 'patient' ? 'Patient' : 'Provider'}
                       </p>
                     </div>
                   </div>

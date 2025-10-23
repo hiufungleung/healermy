@@ -12,7 +12,7 @@ function LaunchContent() {
   const [error, setError] = useState<string | null>(null);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [showRoleSelection, setShowRoleSelection] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<'patient' | 'provider' | 'practitioner' | null>(null);
+  const [selectedRole, setSelectedRole] = useState<'patient' | 'provider' | null>(null);
 
   useEffect(() => {
     const launch = async () => {
@@ -20,7 +20,7 @@ function LaunchContent() {
 
       const iss = searchParams.get('iss');
       const launchToken = searchParams.get('launch');
-      const requestedRole = searchParams.get('role') as 'patient' | 'provider' | 'practitioner' | null;
+      const requestedRole = searchParams.get('role') as 'patient' | 'provider' | null;
 
       // Detect standalone vs EHR launch
       const isStandaloneLaunch = !launchToken;
@@ -43,9 +43,9 @@ function LaunchContent() {
 
       // Always show role selection if no role selected yet
       // Role can come from: URL param (old bookmarks), sessionStorage (after OAuth redirect)
-      const storedRole = sessionStorage.getItem('auth_role') as 'patient' | 'provider' | 'practitioner' | null;
+      const storedRole = sessionStorage.getItem('auth_role') as 'patient' | 'provider' | null;
 
-      let currentRole: 'patient' | 'provider' | 'practitioner';
+      let currentRole: 'patient' | 'provider';
       if (!selectedRole) {
         // Check if role was already selected (stored from previous selection)
         if (storedRole) {
@@ -240,7 +240,7 @@ function LaunchContent() {
     launch();
   }, [searchParams, isAuthorizing, selectedRole]);
 
-  const handleRoleSelection = (role: 'patient' | 'provider' | 'practitioner') => {
+  const handleRoleSelection = (role: 'patient' | 'provider') => {
     setSelectedRole(role);
     setShowRoleSelection(false);
   };
@@ -314,25 +314,6 @@ function LaunchContent() {
                       </>
                     ) : (<></>)}
                   </div>
-                </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleRoleSelection('practitioner')}
-              className="w-full p-5 text-left border-2 border-gray-200 rounded-lg hover:border-purple-600 hover:bg-purple-50 transition-all hover:shadow-md group"
-            >
-              <div className="flex items-start">
-                <div className="text-4xl mr-4">👨‍⚕️</div>
-                <div className="flex-1">
-                  <div className="font-bold text-xl text-purple-600 mb-1">Practitioner</div>
-                  <div className="text-sm text-text-secondary">
-                    {!isEhrLaunch ? (
-                      <>
-                        Select any patient in the context picker.<br/> <strong>You will be loggin in as the practitioner you select.</strong>
-                      </>
-                    ) : (<></>)}
-                    </div>
                 </div>
               </div>
             </button>

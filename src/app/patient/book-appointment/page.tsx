@@ -13,7 +13,7 @@ import { Badge } from '@/components/common/Badge';
 import { ContentContainer } from '@/components/common/ContentContainer';
 import { ProgressSteps } from '@/components/common/ProgressSteps';
 import { SlotSelectionGrid } from '@/components/common/SlotDisplay';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { FancyLoader } from '@/components/common/FancyLoader';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -1661,7 +1661,7 @@ function NewBookingFlow() {
                 {/* Doctor List */}
                 {loading ? (
                   <div className="text-center py-12">
-                    <LoadingSpinner size="md" />
+                    <FancyLoader size="md" />
                     <p className="mt-2 text-gray-600">Loading doctors...</p>
                   </div>
                 ) : allPractitioners.length > 0 ? (
@@ -1918,7 +1918,7 @@ function NewBookingFlow() {
 
                 {loading ? (
                   <div className="text-center py-8">
-                    <LoadingSpinner size="sm" />
+                    <FancyLoader size="sm" />
                     <p className="mt-2 text-gray-600">Loading available times...</p>
                   </div>
                 ) : availableSlots.length > 0 ? (
@@ -2169,7 +2169,7 @@ function NewBookingFlow() {
           <div className="py-4">
             {isLoadingSchedules ? (
               <div className="flex items-center justify-center py-8">
-                <LoadingSpinner size="sm" />
+                <FancyLoader size="sm" />
                 <span className="ml-2">Loading available options...</span>
               </div>
             ) : (
@@ -2328,7 +2328,7 @@ export default function BookingPage() {
     <Suspense fallback={
       <Layout patientName="">
         <div className="flex items-center justify-center min-h-screen">
-          <LoadingSpinner size="lg" />
+          <FancyLoader size="lg" />
         </div>
       </Layout>
     }>

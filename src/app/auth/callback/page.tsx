@@ -230,14 +230,14 @@ export default function CallbackPage() {
 
         // Role already retrieved from server-side state
         const role = storedRole as UserRole;
-        if (!role || !['patient', 'provider', 'practitioner'].includes(role)) {
+        if (!role || !['patient', 'provider'].includes(role)) {
           throw new Error('Invalid or missing role selection from launch');
         }
         console.log(`🎯 Using selected role: ${role}`);
 
         // Validate role selection against token data
         if (role === 'patient' && !tokenData.patient) {
-          setError('You selected "Patient" role but no patient context was provided. This may happen when launching without patient context. Please try selecting "Healthcare Provider" or "Practitioner" instead.');
+          setError('You selected "Patient" role but no patient context was provided. This may happen when launching without patient context. Please try selecting "Healthcare Provider" instead.');
           return;
         }
 
@@ -252,74 +252,6 @@ export default function CallbackPage() {
           console.log('👤 fhirUser context available:', tokenData.fhirUser);
         }
 
-        // Extract practitioner ID from available token data for practitioner role
-        let practitionerId: string | undefined;
-        let practitionerName: string | undefined;
-
-        if (role === 'practitioner') {
-          // Try multiple sources for practitioner ID in order of preference:
-          // 1. ID token 'profile' claim (SMART on FHIR standard for user identity)
-          // 2. ID token 'fhirUser' claim (alternative)
-          // 3. Access token 'fhirUser' field
-          // 4. Access token 'user' field
-
-          // First, try ID token claims (most reliable for user identity)
-          if (idTokenClaims.profile) {
-            const match = idTokenClaims.profile.match(/Practitioner\/([^\/\?]+)/);
-            if (match) {
-              practitionerId = match[1];
-              console.log('✅ Practitioner ID extracted from ID token "profile" claim:', practitionerId);
-            }
-          }
-
-          // Fallback to ID token fhirUser
-          if (!practitionerId && idTokenClaims.fhirUser) {
-            const match = idTokenClaims.fhirUser.match(/Practitioner\/([^\/\?]+)/);
-            if (match) {
-              practitionerId = match[1];
-              console.log('✅ Practitioner ID extracted from ID token "fhirUser" claim:', practitionerId);
-            }
-          }
-
-          // Fallback to access token fhirUser field
-          if (!practitionerId && tokenData.fhirUser) {
-            const match = tokenData.fhirUser.match(/Practitioner\/([^\/\?]+)/);
-            if (match) {
-              practitionerId = match[1];
-              console.log('👨‍⚕️ Practitioner ID extracted from access token fhirUser field:', practitionerId);
-            }
-          }
-
-          // Last resort: check user field
-          if (!practitionerId && tokenData.user) {
-            console.log('🔍 Checking user field for practitioner reference:', tokenData.user);
-            if (tokenData.user.includes('Practitioner/')) {
-              const match = tokenData.user.match(/Practitioner\/([^\/\?]+)/);
-              if (match) {
-                practitionerId = match[1];
-                console.log('👨‍⚕️ Practitioner ID extracted from user field:', practitionerId);
-              }
-            } else {
-              practitionerId = tokenData.user;
-              console.log('👨‍⚕️ Using user field as practitioner ID:', practitionerId);
-            }
-          }
-
-          // Get practitioner name from ID token displayName
-          // Note: We use displayName from ID token rather than fetching from FHIR API
-          // because the session hasn't been created yet (needed for API endpoints)
-          if (idTokenClaims.displayName) {
-            practitionerName = idTokenClaims.displayName;
-            console.log('✅ Practitioner name from ID token displayName:', practitionerName);
-          } else {
-            console.warn('⚠️ No displayName in ID token. Practitioner name will use fallback.');
-          }
-
-          if (!practitionerId) {
-            console.warn('⚠️ No practitioner ID found in token data.');
-          }
-        }
-
         // Create complete session data - URLs stored in session cookie
         // Note: clientSecret is NOT included here - it's only used server-side for token refresh
         const sessionData = {
@@ -331,8 +263,6 @@ export default function CallbackPage() {
           clientId: clientId,
           patient: tokenData.patient,
           user: tokenData.user, // Store user field from token response
-          practitioner: practitionerId, // Store practitioner ID for practitioner role
-          practitionerName: practitionerName, // Store practitioner name for UI
           username: tokenData.username, // Store username from token response
           fhirUser: tokenData.fhirUser,
           fhirBaseUrl: iss,
@@ -368,9 +298,7 @@ export default function CallbackPage() {
 
         // Use window.location.href for full page redirect to prevent re-renders
         // This ensures the callback page doesn't run again with the same OAuth params
-        const dashboardPath = role === 'provider' ? '/provider/dashboard'
-                            : role === 'practitioner' ? '/practitioner/dashboard'
-                            : '/patient/dashboard';
+        const dashboardPath = role === 'provider' ? '/provider/dashboard' : '/patient/dashboard';
 
         console.log('[CALLBACK] 🔄 Full page redirect to:', dashboardPath);
         window.location.href = dashboardPath;

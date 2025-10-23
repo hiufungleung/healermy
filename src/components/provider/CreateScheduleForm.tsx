@@ -22,19 +22,15 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DatePicker } from '@/components/ui/date-picker';
-import { AlertCircle } from 'lucide-react';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Schedule } from '@/types/fhir';
 import {
   SERVICE_CATEGORIES,
   SERVICE_CATEGORY_LABELS,
   SERVICE_TYPES_BY_CATEGORY,
-  SPECIALTIES,
-  SPECIALTY_LABELS,
   getAllSpecialties,
   type ServiceCategoryCode,
-  type SpecialtyCode,
 } from '@/constants/fhir';
 
 interface CreateScheduleFormProps {
@@ -356,7 +352,7 @@ export function CreateScheduleForm({
             >
               {loading ? (
                 <>
-                  <LoadingSpinner size="sm" className="mr-2 inline-block" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Creating...
                 </>
               ) : (

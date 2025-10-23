@@ -10,13 +10,13 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const iss = searchParams.get('iss');
-    const role = searchParams.get('role') as 'patient' | 'provider' | 'practitioner' | null;
+    const role = searchParams.get('role') as 'patient' | 'provider' | null;
 
     if (!iss) {
       return NextResponse.json({ error: 'Missing iss parameter' }, { status: 400 });
     }
 
-    if (!role || !['patient', 'provider', 'practitioner'].includes(role)) {
+    if (!role || !['patient', 'provider'].includes(role)) {
       return NextResponse.json({ error: 'Missing or invalid role parameter' }, { status: 400 });
     }
 
@@ -35,7 +35,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Use role-specific scope
-    // Practitioner uses same credentials and scopes as provider
     const accessType = process.env.ACCESS_TYPE || 'offline';
     const scope = role === 'patient'
       ? (accessType === 'online' ? process.env.PATIENT_SCOPE_ONLINE : process.env.PATIENT_SCOPE_OFFLINE)

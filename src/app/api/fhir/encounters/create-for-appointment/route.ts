@@ -18,10 +18,10 @@ export async function POST(request: NextRequest) {
     const token = prepareToken(session.accessToken);
     const fhirBaseUrl = session.fhirBaseUrl;
 
-    // Only providers and practitioners can create encounters
-    if (session.role !== 'provider' && session.role !== 'practitioner') {
+    // Only providers can create encounters
+    if (session.role !== 'provider') {
       return NextResponse.json(
-        { error: 'Forbidden: Only providers and practitioners can create encounters' },
+        { error: 'Forbidden: Only providers can create encounters' },
         { status: 403 }
       );
     }

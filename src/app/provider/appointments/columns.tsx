@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/common/Badge';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { FancyLoader } from '@/components/common/FancyLoader';
 import { formatAppointmentDateTime } from '@/library/timezone';
 import { getAvailableActions, getActionLabel, executeAction } from '@/lib/appointmentFlowUtils';
 import type { Appointment, Encounter } from '@/types/fhir';
@@ -30,6 +30,11 @@ export interface ColumnsContext {
   updatingActions?: Map<string, string>; // appointmentId -> action name
   onActionStart?: (appointmentId: string, action: string) => void;
   onActionEnd?: (appointmentId: string) => void;
+}
+
+// Options for column configuration
+export interface ColumnsOptions {
+  includeReason?: boolean; // Default true - set to false to exclude reason column
 }
 
 // Get status badge variant
@@ -74,7 +79,10 @@ function getEncounterBadgeVariant(status: string): 'success' | 'warning' | 'dang
   }
 }
 
-export const createColumns = (context?: ColumnsContext): ColumnDef<AppointmentRow>[] => [
+export const createColumns = (context?: ColumnsContext, options?: ColumnsOptions): ColumnDef<AppointmentRow>[] => {
+  const includeReason = options?.includeReason !== false; // Default to true
+
+  const allColumns: ColumnDef<AppointmentRow>[] = [
   {
     accessorKey: 'id',
     header: ({ column }) => {
@@ -223,7 +231,7 @@ export const createColumns = (context?: ColumnsContext): ColumnDef<AppointmentRo
         return (
           <div className="flex items-center h-6 pl-6">
             <div className="w-6 h-6 flex items-center justify-center">
-              <LoadingSpinner size="sm" className="scale-[0.4]" />
+              <FancyLoader size="sm" className="scale-[0.4]" />
             </div>
           </div>
         );
@@ -267,7 +275,7 @@ export const createColumns = (context?: ColumnsContext): ColumnDef<AppointmentRo
         return (
           <div className="flex items-center h-6 pl-6">
             <div className="w-6 h-6 flex items-center justify-center">
-              <LoadingSpinner size="sm" className="scale-[0.4]" />
+              <FancyLoader size="sm" className="scale-[0.4]" />
             </div>
           </div>
         );
@@ -372,7 +380,15 @@ export const createColumns = (context?: ColumnsContext): ColumnDef<AppointmentRo
     },
     size: 60,
   },
-];
+  ];
+
+  // Filter out reason column if requested
+  if (!includeReason) {
+    return allColumns.filter(col => col.id !== 'reason');
+  }
+
+  return allColumns;
+};
 
 // Backward compatibility: export columns without context
 export const columns = createColumns();

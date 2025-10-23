@@ -6,7 +6,7 @@ import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { FancyLoader } from '@/components/common/FancyLoader';
 import {
   Dialog,
   DialogContent,
@@ -48,21 +48,25 @@ interface Communication {
 
 interface NotificationsClientProps {
   session: SessionData;
+  initialCommunications: Communication[];
 }
 
 export default function NotificationsClient({
-  session
+  session,
+  initialCommunications
 }: NotificationsClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'action_required'>('all');
-  const [localCommunications, setLocalCommunications] = useState<Communication[]>([]);
+  const [localCommunications, setLocalCommunications] = useState<Communication[]>(initialCommunications);
   // Removed patient state - use session.patient directly since we only need the ID
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
   const [locallyReadIds, setLocallyReadIds] = useState<Set<string>>(new Set()); // Track locally read messages for immediate blue bar removal
+  const [locallyModifiedIds, setLocallyModifiedIds] = useState<Map<string, Communication>>(new Map()); // Track locally modified messages
   const [displayCount, setDisplayCount] = useState(10); // Show 10 notifications initially
   const [unreadTabSnapshot, setUnreadTabSnapshot] = useState<Set<string>>(new Set()); // Track messages that were unread when unread tab was opened
+  const snapshotCapturedRef = React.useRef(false); // Track if snapshot was captured for current unread tab session
 
   // Appointment dialog states
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
@@ -71,47 +75,48 @@ export default function NotificationsClient({
   const [appointmentLoading, setAppointmentLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Track if we've already fetched to prevent duplicate calls
-  const hasFetchedRef = React.useRef(false);
-  const patientIdRef = React.useRef(session?.patient);
-
-  // Fetch communications only (patient data not needed - we have session.patient)
+  // Intelligently merge prop updates while preserving local modifications
   useEffect(() => {
-    if (!session?.patient) return;
+    if (initialCommunications.length === 0) return;
 
-    // Only fetch if patient ID actually changed or first mount
-    if (hasFetchedRef.current && patientIdRef.current === session.patient) {
-      return;
-    }
+    setLocalCommunications(prevLocal => {
+      // Create a map of incoming communications by ID
+      const incomingMap = new Map(initialCommunications.map(comm => [comm.id, comm]));
 
-    hasFetchedRef.current = true;
-    patientIdRef.current = session.patient;
-
-    async function fetchData() {
-      try {
-        setLoading(true);
-
-        // Only fetch communications (no need to fetch patient data)
-        const communicationsResponse = await fetch(`/api/fhir/communications`, {
-          credentials: 'include',
-        });
-
-        // Process communications data
-        if (communicationsResponse.ok) {
-          const communicationsData = await communicationsResponse.json();
-          // Extract communications from FHIR Bundle format
-          const communications = (communicationsData.entry || []).map((entry: any) => entry.resource);
-          setLocalCommunications(communications);
+      // Merge: use locally modified version if exists, otherwise use incoming
+      const merged = initialCommunications.map(comm => {
+        const localMod = locallyModifiedIds.get(comm.id);
+        if (localMod) {
+          // Use locally modified version (has read extension added immediately)
+          return localMod;
         }
-      } catch (error) {
-        console.error('Error fetching notifications data:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
+        return comm;
+      });
 
-    fetchData();
-  }, [session?.patient]);
+      // Clean up locallyModifiedIds - remove entries that now match incoming data
+      const cleanedModified = new Map(locallyModifiedIds);
+      locallyModifiedIds.forEach((localComm, id) => {
+        const incomingComm = incomingMap.get(id);
+        if (incomingComm) {
+          // Check if incoming now has the read extension we added locally
+          const hasReadExtension = incomingComm.extension?.find(ext =>
+            ext.url === 'http://hl7.org/fhir/StructureDefinition/communication-read-status'
+          )?.valueDateTime;
+
+          if (hasReadExtension) {
+            // API update has propagated, remove from local modifications
+            cleanedModified.delete(id);
+          }
+        }
+      });
+
+      if (cleanedModified.size !== locallyModifiedIds.size) {
+        setLocallyModifiedIds(cleanedModified);
+      }
+
+      return merged;
+    });
+  }, [initialCommunications]);
 
   // Check URL parameters on mount and set filter accordingly
   useEffect(() => {
@@ -138,20 +143,29 @@ export default function NotificationsClient({
   }, []);
 
   // Capture unread message IDs when switching to unread tab
-  // ONLY capture when user switches to unread tab, not on every communication update
+  // ONLY capture ONCE when user switches to unread tab, not on every communication update
   useEffect(() => {
     if (activeFilter === 'unread') {
-      const unreadIds = new Set(
-        localCommunications
-          .filter(comm => !isMessageRead(comm))
-          .map(comm => comm.id)
-      );
-      setUnreadTabSnapshot(unreadIds);
+      // Only capture snapshot if we haven't captured one yet for this tab session
+      if (!snapshotCapturedRef.current && localCommunications.length > 0) {
+        const unreadIds = new Set(
+          localCommunications
+            .filter(comm => !isMessageRead(comm))
+            .map(comm => comm.id)
+        );
+        console.log('[Unread Tab] Capturing snapshot:', Array.from(unreadIds));
+        setUnreadTabSnapshot(unreadIds);
+        snapshotCapturedRef.current = true;
+      }
     } else {
-      // Clear snapshot when leaving unread tab
-      setUnreadTabSnapshot(new Set());
+      // Clear snapshot and reset flag when leaving unread tab
+      if (snapshotCapturedRef.current) {
+        console.log('[Unread Tab] Clearing snapshot');
+        setUnreadTabSnapshot(new Set());
+        snapshotCapturedRef.current = false;
+      }
     }
-  }, [activeFilter]); // Only depend on activeFilter, NOT localCommunications
+  }, [activeFilter, localCommunications.length]); // Only depend on filter change and data availability
 
   // Function to check if message is read
   const isMessageRead = (comm: Communication): boolean => {
@@ -296,21 +310,25 @@ export default function NotificationsClient({
       // Add to locally read IDs for immediate blue bar removal
       setLocallyReadIds(prev => new Set([...prev, comm.id]));
 
+      // Create updated communication with read extension
+      const updatedComm = {
+        ...comm,
+        extension: [
+          ...(comm.extension || []),
+          {
+            url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
+            valueDateTime: new Date().toISOString()
+          }
+        ]
+      };
+
+      // Track as locally modified to preserve across prop updates
+      setLocallyModifiedIds(prev => new Map(prev).set(comm.id, updatedComm));
+
       // Immediately update local state for backend read status
       setLocalCommunications(prev =>
         prev.map(localComm =>
-          localComm.id === comm.id
-            ? {
-                ...localComm,
-                extension: [
-                  ...(localComm.extension || []),
-                  {
-                    url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
-                    valueDateTime: new Date().toISOString()
-                  }
-                ]
-              }
-            : localComm
+          localComm.id === comm.id ? updatedComm : localComm
         )
       );
 
@@ -654,7 +672,7 @@ export default function NotificationsClient({
         {loading ? (
           // Loading state with spinner
           <div className="flex flex-col items-center justify-center py-12">
-            <LoadingSpinner size="md" />
+            <FancyLoader size="md" />
             <p className="text-text-secondary text-sm mt-4">Loading notifications...</p>
           </div>
         ) : allFilteredItems.length === 0 ? (
@@ -790,7 +808,7 @@ export default function NotificationsClient({
         {loading ? (
           // Loading state with spinner
           <div className="flex flex-col items-center justify-center py-12">
-            <LoadingSpinner size="md" />
+            <FancyLoader size="md" />
             <p className="text-text-secondary text-sm mt-4">Loading notifications...</p>
           </div>
         ) : allFilteredItems.length === 0 ? (
@@ -926,7 +944,7 @@ export default function NotificationsClient({
         {loading ? (
           // Loading state with spinner
           <div className="flex flex-col items-center justify-center py-12">
-            <LoadingSpinner size="md" />
+            <FancyLoader size="md" />
             <p className="text-text-secondary text-sm mt-4">Loading notifications...</p>
           </div>
         ) : allFilteredItems.length === 0 ? (
@@ -1070,7 +1088,7 @@ export default function NotificationsClient({
 
           {appointmentLoading ? (
             <div className="py-8 flex justify-center">
-              <LoadingSpinner size="sm" />
+              <FancyLoader size="sm" />
             </div>
           ) : selectedAppointment ? (
             <>

@@ -23,9 +23,8 @@ export async function GET(request: NextRequest) {
     const count = parseInt(searchParams.get('_count') || '1000'); // Increased default to fetch all communications
     
     // Only providers have clinic-wide view
-    // Practitioners and patients see only their relevant communications
+    // Patients see only their relevant communications
     const isProvider = session.role === 'provider';
-    const isPractitioner = session.role === 'practitioner';
 
     if (unreadOnly) {
       // Return unread count
@@ -45,14 +44,6 @@ export async function GET(request: NextRequest) {
             }
           }
         }
-      } else if (isPractitioner) {
-        // For practitioners, get communications where they are recipient
-        const practitionerRef = `Practitioner/${session.practitioner}`;
-        unreadCount = await getUnreadCommunicationsCount(
-          token,
-          session.fhirBaseUrl,
-          practitionerRef
-        );
       } else {
         // For patients, get communications where they are recipient
         const patientRef = `Patient/${session.patient}`;
@@ -95,16 +86,6 @@ export async function GET(request: NextRequest) {
         );
         return !deletedExtension?.valueBoolean;
       });
-    } else if (isPractitioner) {
-      // For practitioners, ONLY get communications where practitioner is recipient
-      const practitionerRef = `Practitioner/${session.practitioner}`;
-
-      const result = await searchCommunications(token, session.fhirBaseUrl, {
-        ...searchOptions,
-        recipient: practitionerRef
-      });
-
-      allCommunications = result.entry || [];
     } else {
       // For patients, ONLY get communications where patient is recipient
       // This prevents patients from seeing appointment-request notifications they sent to providers

@@ -5,7 +5,7 @@ import styled from 'styled-components';
 import { cn } from '@/library/shadcn-utils';
 import { Skeleton } from '@/components/common/ContentSkeleton';
 
-interface LoadingSpinnerProps {
+interface FancyLoaderProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }
@@ -97,7 +97,7 @@ const StyledWrapper = styled.div<{ $size: 'sm' | 'md' | 'lg' }>`
   }
 `;
 
-export function LoadingSpinner({ size = 'md', className = '' }: LoadingSpinnerProps) {
+export function FancyLoader({ size = 'md', className = '' }: FancyLoaderProps) {
   return (
     <div className={cn('inline-block', className)}>
       <StyledLoader size={size} />
@@ -115,7 +115,7 @@ export function LoadingSection({ children, className = '' }: LoadingSectionProps
   return (
     <div className={cn('bg-white rounded-lg border border-border p-6', className)}>
       <div className="flex flex-col items-center justify-center py-8">
-        <LoadingSpinner size="lg" className="mb-4" />
+        <FancyLoader size="lg" className="mb-4" />
         <p className="text-text-secondary text-sm">{children}</p>
       </div>
     </div>

@@ -1,4 +1,4 @@
-export type UserRole = 'patient' | 'provider' | 'practitioner';
+export type UserRole = 'patient' | 'provider';
 
 export interface AuthConfig {
   clientId: string;

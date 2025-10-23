@@ -3,23 +3,22 @@
 import React from 'react';
 import { Layout } from '@/components/common/Layout';
 import DashboardClient from './DashboardClient';
-import { useAuth } from '@/components/auth/AuthProvider';
 import type { SessionData } from '@/types/auth';
 
 interface DashboardWrapperProps {
   session: SessionData;
+  patientName: string;
 }
 
 export default function DashboardWrapper({
-  session
+  session,
+  patientName
 }: DashboardWrapperProps) {
-  const { userName } = useAuth();
-
   return (
-    <Layout>
+    <Layout patientName={patientName}>
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <DashboardClient
-          patientName={userName || undefined}
+          patientName={patientName || undefined}
           session={session}
         />
       </div>

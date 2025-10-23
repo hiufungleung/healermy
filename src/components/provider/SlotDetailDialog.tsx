@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { FancyLoader } from '@/components/common/FancyLoader';
 import { formatDateForDisplay } from '@/library/timezone';
 import type { Slot, Appointment } from '@/types/fhir';
 
@@ -165,7 +165,7 @@ export function SlotDetailDialog({
 
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <LoadingSpinner />
+              <FancyLoader />
             </div>
           ) : (
             <div className="space-y-4">

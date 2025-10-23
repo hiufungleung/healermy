@@ -110,10 +110,10 @@ export async function PATCH(
     // Extract session from middleware headers
     const session = await getSessionFromCookies();
 
-    // Validate that user has provider or practitioner role
-    if (session.role !== 'provider' && session.role !== 'practitioner') {
+    // Validate that user has provider role
+    if (session.role !== 'provider') {
       return NextResponse.json(
-        { error: 'Forbidden: Only providers and practitioners can patch schedules' },
+        { error: 'Forbidden: Only providers can patch schedules' },
         { status: 403 }
       );
     }

@@ -34,7 +34,7 @@ export async function getSessionFromCookies(): Promise<SessionData> {
 /**
  * Check if user has required role
  */
-export function validateRole(session: SessionData, requiredRole: 'patient' | 'provider' | 'practitioner'): void {
+export function validateRole(session: SessionData, requiredRole: 'patient' | 'provider'): void {
   if (session.role !== requiredRole) {
     throw new Error(`Unauthorized: ${requiredRole} role required`);
   }
