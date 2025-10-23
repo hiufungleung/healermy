@@ -116,7 +116,7 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
           {/* Personal Information */}
           <div>
             <h3 className="text-sm sm:text-base font-semibold text-text-primary mb-4">Personal Information</h3>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-2">
               {/* Row 1: Given Name and Family Name */}
               {name?.given && (
                 <p className="text-sm">
@@ -143,8 +143,8 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
 
           {/* Contact Information */}
           <div>
-            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-4">Contact Information</h3>
-            <div className="space-y-2">
+            <h3 className="text-sm sm:text-base font-semibold text-text-primary mb-4">Contact Information</h3>
+            <div className="space-y-2 grid grid-cols-2 gap-x-8 gap-y-2">
               {/* Phone */}
               {phone && (
                 <p className="text-sm">
@@ -179,7 +179,7 @@ export function ViewPractitionerDetails({ practitioner, isOpen, onClose, onEdit 
 
           {/* Professional Information */}
           <div>
-            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-text-primary mb-4">Professional Information</h3>
+            <h3 className="text-sm sm:text-base font-semibold text-text-primary mb-4">Professional Information</h3>
             <div className="grid grid-cols-2 gap-x-8 gap-y-2">
               {/* Identifiers */}
               <div className="col-span-2">

@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search } from 'lucide-react';
 import { createColumns, AppointmentRow } from './columns';
+import { ProviderAppointmentDialog } from '@/components/provider/ProviderAppointmentDialog';
 import type { Appointment, Encounter } from '@/types/fhir';
 
 type TimeFilter = 'all' | 'today' | 'upcoming-7' | 'upcoming' | 'past';
@@ -44,6 +45,7 @@ export default function ProviderAppointmentsClient() {
   const [updatingActions, setUpdatingActions] = useState<Map<string, string>>(new Map()); // Track which action is running
   const [searchId, setSearchId] = useState(''); // Search input state
   const [activeSearchId, setActiveSearchId] = useState(''); // Active search filter
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null); // For detail dialog
 
   // Initialize filter state from URL params (default: today, no status)
   const [timeFilter, setTimeFilter] = useState<TimeFilter>(() => {
@@ -349,6 +351,21 @@ export default function ProviderAppointmentsClient() {
     return () => window.removeEventListener('refresh-appointments', handleRefresh);
   }, []); // Empty deps - event listener only registered once
 
+  // Listen for view detail events from table actions (event listener only registered once)
+  useEffect(() => {
+    const handleViewDetail = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { appointment } = customEvent.detail || {};
+
+      if (appointment) {
+        setSelectedAppointment(appointment);
+      }
+    };
+
+    window.addEventListener('view-appointment-detail', handleViewDetail);
+    return () => window.removeEventListener('view-appointment-detail', handleViewDetail);
+  }, []); // Empty deps - event listener only registered once
+
   // Handlers for tracking updating rows (for spinner display)
   const handleActionStart = useCallback((appointmentId: string, action: string) => {
     setUpdatingRows(prev => new Set(prev).add(appointmentId));
@@ -580,6 +597,13 @@ export default function ProviderAppointmentsClient() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Appointment Detail Dialog */}
+      <ProviderAppointmentDialog
+        appointment={selectedAppointment}
+        isOpen={!!selectedAppointment}
+        onClose={() => setSelectedAppointment(null)}
+      />
     </div>
   );
 }

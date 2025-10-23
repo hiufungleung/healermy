@@ -2176,7 +2176,6 @@ function NewBookingFlow() {
                 <ul className="text-sm text-green-900 space-y-1 list-disc list-inside">
                   <li>Please arrive 15 minutes early</li>
                   <li>Bring your ID and insurance card</li>
-                  <li>You can reschedule up to 24 hours before</li>
                   <li>Late cancellations may incur fees</li>
                 </ul>
               </div>

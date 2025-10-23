@@ -92,20 +92,20 @@ export async function PATCH(
     
     // Validate patch operations based on user role
     if (session.role === 'patient') {
-      // Patients can only reschedule or cancel their own appointments
-      const allowedPatientOperations = ['cancelled', 'proposed'];
-      
+      // Patients can only cancel their own appointments
+      const allowedPatientOperations = ['cancelled'];
+
       for (const op of patchOperations) {
         if (op.path === '/status' && !allowedPatientOperations.includes(op.value as string)) {
           return NextResponse.json(
-            { error: `Patients can only cancel appointments or propose reschedules. Status '${op.value}' not allowed.` },
+            { error: `Patients can only cancel appointments. Status '${op.value}' not allowed.` },
             { status: 403 }
           );
         }
-        // Patients can also modify start/end times for rescheduling
-        if (!['/status', '/start', '/end', '/reasonCode'].includes(op.path)) {
+        // Patients can only modify status and reason
+        if (!['/status', '/reasonCode'].includes(op.path)) {
           return NextResponse.json(
-            { error: `Patients can only modify status, start/end times, or reason. Path '${op.path}' not allowed.` },
+            { error: `Patients can only modify status or reason. Path '${op.path}' not allowed.` },
             { status: 403 }
           );
         }
@@ -223,9 +223,6 @@ export async function PATCH(
                 case 'cancelled':
                   statusMessage = 'The patient has cancelled their appointment.';
                   break;
-                case 'proposed':
-                  statusMessage = 'The patient has requested to reschedule their appointment. Please review the proposed time.';
-                  break;
                 default:
                   statusMessage = `The patient has updated their appointment status to ${newStatus}.`;
               }
@@ -249,7 +246,7 @@ export async function PATCH(
                   statusMessage = 'Your appointment has been completed. Thank you for your visit.';
                   break;
                 case 'noshow':
-                  statusMessage = 'You were marked as a no-show for your appointment. Please contact us to reschedule.';
+                  statusMessage = 'You were marked as a no-show for your appointment. Please contact us.';
                   break;
                 case 'waitlist':
                   statusMessage = 'You have been added to the waitlist. We will notify you if a slot becomes available.';
@@ -393,7 +390,7 @@ export async function PUT(
             statusMessage = 'Your appointment has been completed. Thank you for your visit.';
             break;
           case 'noshow':
-            statusMessage = 'You were marked as a no-show for your appointment. Please contact us to reschedule.';
+            statusMessage = 'You were marked as a no-show for your appointment. Please contact us.';
             break;
           case 'waitlist':
             statusMessage = 'You have been added to the waitlist. We will notify you if a slot becomes available.';

@@ -86,7 +86,8 @@ export async function GET(request: NextRequest) {
         encounters: [],
         practitioners: {},
         conditions: {},
-        accounts: {}
+        accounts: {},
+        organizations: {}
       }),
       coverage: extractData(coverageResult, 'coverage'),
       explanationOfBenefit: extractData(eobResult, 'explanationOfBenefit')

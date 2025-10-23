@@ -13,15 +13,13 @@ interface AppointmentDetailModalProps {
   onClose: () => void;
   appointmentId: string;
   onCancel?: (appointmentId: string) => void;
-  onReschedule?: (appointmentId: string) => void;
 }
 
 export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
   isOpen,
   onClose,
   appointmentId,
-  onCancel,
-  onReschedule
+  onCancel
 }) => {
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [practitioner, setPractitioner] = useState<Practitioner | null>(null);
@@ -85,13 +83,6 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
     }
   };
 
-  const handleReschedule = () => {
-    if (onReschedule && appointmentId) {
-      onReschedule(appointmentId);
-      onClose();
-    }
-  };
-
   // Extract appointment details
   const appointmentStatus = appointment?.status || 'unknown';
   const doctorName = practitioner?.name?.[0]?.text ||
@@ -121,10 +112,6 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
     : 'TBD';
 
   const canCancel = appointmentStatus !== 'cancelled' && appointmentStatus !== 'fulfilled';
-  const canReschedule = appointmentStatus !== 'cancelled' && appointmentStatus !== 'fulfilled';
-
-  // Debug: Log appointment status
-  console.log('🔍 Appointment Status:', appointmentStatus, 'canCancel:', canCancel, 'canReschedule:', canReschedule);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Appointment Details" size="lg">
@@ -250,15 +237,6 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
 
           {/* Action Buttons */}
           <div className="border-t pt-4 flex flex-col sm:flex-row gap-3">
-            {canReschedule && (
-              <Button
-                variant="primary"
-                onClick={handleReschedule}
-                className="flex-1"
-              >
-                Request Reschedule
-              </Button>
-            )}
             {canCancel && (
               <Button
                 variant="danger"
@@ -269,7 +247,7 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
               </Button>
             )}
             {/* Debug info */}
-            {!canReschedule && !canCancel && (
+            {!canCancel && (
               <p className="text-sm text-gray-500 italic">
                 Actions unavailable for {appointmentStatus} appointments
               </p>

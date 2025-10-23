@@ -185,6 +185,8 @@ export function ModernPatientProfile({
     defaultOpen?: boolean;
     skeletonVariant?: 'default' | 'list' | 'card' | 'timeline';
   }) => {
+    const [isOpen, setIsOpen] = React.useState(defaultOpen);
+
     // Determine what to render based on state
     const renderContent = () => {
       // State 1: Loading
@@ -220,17 +222,17 @@ export function ModernPatientProfile({
     };
 
     return (
-      <Collapsible defaultOpen={defaultOpen}>
-        <Card className="shadow-md border-gray-200 mb-6">
-          <CollapsibleTrigger className="w-full">
-            <CardHeader className="hover:bg-gray-50 transition-colors cursor-pointer p-5">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <Card className="shadow-md border-gray-200 mb-2">
+          <CollapsibleTrigger asChild>
+            <CardHeader className="hover:bg-gray-50 transition-colors cursor-pointer p-3">
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 flex items-center justify-center bg-blue-100 rounded-xl text-primary shadow-sm">
                     <Icon className="w-5 h-5" />
                   </div>
                   <div className="text-left">
-                    <CardTitle className="text-base sm:text-lg font-semibold">{title}</CardTitle>
+                    <CardTitle className="text-base">{title}</CardTitle>
                     {count !== undefined && !isLoading && (
                       <p className="text-sm text-gray-500 mt-1">
                         {count} {count === 1 ? 'record' : 'records'}
@@ -241,12 +243,16 @@ export function ModernPatientProfile({
                     )}
                   </div>
                 </div>
-                <ChevronDown className="w-6 h-6 text-gray-400 transition-transform" />
+                <ChevronDown
+                  className={`w-6 h-6 text-gray-400 transition-transform duration-200 ${
+                    isOpen ? 'rotate-180' : ''
+                  }`}
+                />
               </div>
             </CardHeader>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent className="pt-4 px-5 pb-5">
+            <CardContent className="p-3">
               {renderContent()}
             </CardContent>
           </CollapsibleContent>
@@ -263,12 +269,18 @@ export function ModernPatientProfile({
           // Show skeleton during patient data loading
           <Card className="mb-6 shadow-md border-gray-200">
             <CardContent className="p-6">
+              {/* Patient Name and ID Skeleton */}
+              <div className="mb-6">
+                <Skeleton className="h-8 w-56 mb-2" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+
+              {/* Other Info Skeleton */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
                 <div className="space-y-3">
-                  <Skeleton className="h-8 w-56" />
-                  <Skeleton className="h-4 w-32" />
                   <Skeleton className="h-4 w-28" />
                   <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-32" />
                 </div>
                 <div className="space-y-3">
                   <Skeleton className="h-4 w-40" />
@@ -281,17 +293,20 @@ export function ModernPatientProfile({
         ) : (
           <Card className="mb-6 shadow-md border-gray-200">
             <CardContent className="p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
+              {/* Patient Name and ID - Outside Grid */}
+              <div className="mb-6">
+                <h1 className="text-xl font-semibold text-gray-900 mb-1">{patientName}</h1>
+                {patient?.id && (
+                  <p className="text-xs text-gray-500 font-mono">
+                    Patient ID: {patient.id}
+                  </p>
+                )}
+              </div>
+
+              {/* Other Information - Inside Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                 {/* Left Column */}
                 <div className="space-y-3">
-                  <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{patientName}</h1>
-                    {patient?.id && (
-                      <p className="text-xs text-gray-500 font-mono">
-                        Patient ID: {patient.id}
-                      </p>
-                    )}
-                  </div>
                   {age && (
                     <div className="flex items-center gap-2">
                       <User className="w-4 h-4 text-gray-600" />
@@ -404,10 +419,10 @@ export function ModernPatientProfile({
 
         {/* Tab Navigation */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6 h-auto p-1.5 bg-gray-100 rounded-xl shadow-sm">
+          <TabsList className="grid w-full grid-cols-2 mb-6 h-auto p-0 bg-gray-100 rounded-xl shadow-sm">
             <TabsTrigger 
               value="overview" 
-              className="flex items-center justify-center gap-2 py-4 px-6 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 transition-all duration-200 hover:bg-gray-50 font-medium text-base"
+              className="flex items-center justify-center gap-2 py-2 px-6 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 transition-all duration-200 hover:bg-gray-50 font-medium text-sm"
             >
               <Heart className="w-5 h-5" />
               <span className="hidden sm:inline">Health Overview</span>
@@ -415,7 +430,7 @@ export function ModernPatientProfile({
             </TabsTrigger>
             <TabsTrigger 
               value="billing" 
-              className="flex items-center justify-center gap-2 py-4 px-6 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-green-600 transition-all duration-200 hover:bg-gray-50 font-medium text-base"
+              className="flex items-center justify-center gap-2 py-2 px-6 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-green-600 transition-all duration-200 hover:bg-gray-50 font-medium text-sm"
             >
               <DollarSign className="w-5 h-5" />
               <span className="hidden sm:inline">Insurance & Billing</span>

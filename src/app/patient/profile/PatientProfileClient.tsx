@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
-import type { Patient, Observation, Organization } from '@/types/fhir';
+import type { Patient, Observation } from '@/types/fhir';
 import { ModernPatientProfile } from './PatientProfileModern';
 
 // Extract contact information according to FHIR standard
@@ -138,6 +138,8 @@ export default function PatientProfileClient({ patientName }: PatientProfileClie
         setEncounterPractitioners(data.encounters.practitioners || {});
         setEncounterConditions(data.encounters.conditions || {});
         setEncounterAccounts(data.encounters.accounts || {});
+        // Organizations are now included in the bundle
+        setAccountOrganizations(data.encounters.organizations || {});
       }
 
       // Extract accounts from encounters
@@ -151,30 +153,6 @@ export default function PatientProfileClient({ patientName }: PatientProfileClie
         });
       });
       setAccounts(Object.values(accountsMap));
-
-      // Fetch organizations for accounts
-      const orgsMap: Record<string, Organization> = {};
-      for (const account of Object.values(accountsMap)) {
-        const typedAccount = account as any;
-        const ownerId = typedAccount.owner?.reference?.split('/').pop();
-        if (ownerId) {
-          try {
-            const orgResponse = await fetch(`/api/fhir/accounts/${typedAccount.id}`, {
-              method: 'GET',
-              credentials: 'include',
-            });
-            if (orgResponse.ok) {
-              const orgData = await orgResponse.json();
-              if (orgData.organization) {
-                orgsMap[ownerId] = orgData.organization;
-              }
-            }
-          } catch (error) {
-            console.error(`Failed to fetch organization ${ownerId}:`, error);
-          }
-        }
-      }
-      setAccountOrganizations(orgsMap);
 
     } catch (error) {
       console.error('❌ Error fetching profile data:', error);

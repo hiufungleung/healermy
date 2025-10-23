@@ -32,7 +32,6 @@ interface PatientAppointmentCardProps {
 
 export function PatientAppointmentCard({ appointment, onAppointmentUpdated }: PatientAppointmentCardProps) {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -66,39 +65,6 @@ export function PatientAppointmentCard({ appointment, onAppointmentUpdated }: Pa
 
   // Check if actions are disabled
   const actionsDisabled = appointmentStatus === 'cancelled' || appointmentStatus === 'fulfilled';
-
-  // Handle reschedule
-  const handleReschedule = async () => {
-    setIsProcessing(true);
-    try {
-      const response = await fetch(`/api/fhir/appointments/${appointment.id}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        body: JSON.stringify({
-          action: 'request-reschedule',
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to request reschedule');
-      }
-
-      toast.success('Reschedule Requested', {
-        description: 'The provider will review and contact you with available times.',
-      });
-
-      setIsRescheduleDialogOpen(false);
-      setIsDetailDialogOpen(false);
-      onAppointmentUpdated?.();
-    } catch (error) {
-      toast.error('Error', {
-        description: error instanceof Error ? error.message : 'Failed to request reschedule',
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   // Handle cancel
   const handleCancel = async () => {
@@ -242,14 +208,6 @@ export function PatientAppointmentCard({ appointment, onAppointmentUpdated }: Pa
 
           <DialogFooter className="flex flex-row gap-2 justify-end">
             <Button
-              variant="outline"
-              onClick={() => setIsRescheduleDialogOpen(true)}
-              disabled={actionsDisabled}
-              className="min-w-[110px]"
-            >
-              Reschedule
-            </Button>
-            <Button
               variant="danger"
               onClick={() => setIsCancelDialogOpen(true)}
               disabled={actionsDisabled}
@@ -260,24 +218,6 @@ export function PatientAppointmentCard({ appointment, onAppointmentUpdated }: Pa
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Reschedule Confirmation Dialog */}
-      <AlertDialog open={isRescheduleDialogOpen} onOpenChange={setIsRescheduleDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Request Reschedule?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Do you want to request a reschedule for this appointment? The provider will review your request and contact you with available times.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex flex-row gap-2 justify-end">
-            <AlertDialogCancel disabled={isProcessing} className="mt-0">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleReschedule} disabled={isProcessing}>
-              {isProcessing ? 'Requesting...' : 'Request Reschedule'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Cancel Confirmation Dialog */}
       <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>

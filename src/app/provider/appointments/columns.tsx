@@ -297,13 +297,16 @@ export const createColumns = (context?: ColumnsContext): ColumnDef<AppointmentRo
         appointment.encounter?.status
       );
 
-      // No actions available
-      if (actions.length === 0) {
-        return <span className="text-gray-400 text-[13px]">-</span>;
-      }
-
       const handleAction = async (action: string) => {
         const appointmentId = appointment.id!;
+
+        // Handle "View Detail" action separately (no API call needed)
+        if (action === 'view-detail') {
+          window.dispatchEvent(new CustomEvent('view-appointment-detail', {
+            detail: { appointment }
+          }));
+          return;
+        }
 
         try {
           // Mark row as updating with action name
@@ -343,14 +346,26 @@ export const createColumns = (context?: ColumnsContext): ColumnDef<AppointmentRo
           <DropdownMenuContent align="end">
             <DropdownMenuLabel className='text-[13px]'>Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {actions.map((action) => (
-              <DropdownMenuItem className='text-[13px]'
-                key={action}
-                onClick={() => handleAction(action)}
-              >
-                {getActionLabel(action)}
-              </DropdownMenuItem>
-            ))}
+            {/* Always show "View Detail" first */}
+            <DropdownMenuItem className='text-[13px]'
+              onClick={() => handleAction('view-detail')}
+            >
+              View Detail
+            </DropdownMenuItem>
+            {/* Show other available actions */}
+            {actions.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                {actions.map((action) => (
+                  <DropdownMenuItem className='text-[13px]'
+                    key={action}
+                    onClick={() => handleAction(action)}
+                  >
+                    {getActionLabel(action)}
+                  </DropdownMenuItem>
+                ))}
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       );

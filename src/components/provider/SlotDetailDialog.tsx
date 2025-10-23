@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -30,7 +30,6 @@ interface SlotDetailDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSlotDeleted?: () => void;
-  onAppointmentCancelled?: () => void;
 }
 
 export function SlotDetailDialog({
@@ -38,24 +37,39 @@ export function SlotDetailDialog({
   isOpen,
   onClose,
   onSlotDeleted,
-  onAppointmentCancelled,
 }: SlotDetailDialogProps) {
   const [loading, setLoading] = useState(false);
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [patientName, setPatientName] = useState<string>('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const fetchedSlotIdRef = useRef<string | null>(null);
+  const isFetchingRef = useRef(false);
 
   // Fetch appointment details if slot is booked
   useEffect(() => {
-    if (!slot || slot.status !== 'busy' || !slot.id) {
+    // Only fetch when dialog is open
+    if (!isOpen || !slot || slot.status !== 'busy' || !slot.id) {
       setAppointment(null);
       setPatientName('');
+      fetchedSlotIdRef.current = null;
+      isFetchingRef.current = false;
+      return;
+    }
+
+    // Prevent duplicate fetches for the same slot
+    if (fetchedSlotIdRef.current === slot.id) {
+      return;
+    }
+
+    // Prevent starting a new fetch if one is already in progress
+    if (isFetchingRef.current) {
       return;
     }
 
     const fetchAppointmentDetails = async () => {
+      isFetchingRef.current = true;
       setLoading(true);
+
       try {
         // Find appointment that references this slot
         const response = await fetch(`/api/fhir/appointments?slot=Slot/${slot.id}`, {
@@ -93,16 +107,20 @@ export function SlotDetailDialog({
               }
             }
           }
+
+          // Mark as fetched after successful completion
+          fetchedSlotIdRef.current = slot.id;
         }
       } catch (error) {
         console.error('Error fetching appointment details:', error);
       } finally {
         setLoading(false);
+        isFetchingRef.current = false;
       }
     };
 
     fetchAppointmentDetails();
-  }, [slot]);
+  }, [isOpen, slot?.id]);
 
   const handleDeleteSlot = async () => {
     if (!slot?.id) return;
@@ -126,35 +144,6 @@ export function SlotDetailDialog({
     } finally {
       setLoading(false);
       setShowDeleteConfirm(false);
-    }
-  };
-
-  const handleCancelAppointment = async () => {
-    if (!appointment?.id) return;
-
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/fhir/appointments/${appointment.id}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json-patch+json' },
-        body: JSON.stringify([
-          { op: 'replace', path: '/status', value: 'cancelled' }
-        ]),
-      });
-
-      if (response.ok) {
-        onAppointmentCancelled?.();
-        onClose();
-      } else {
-        throw new Error(`Failed to cancel appointment: ${response.status}`);
-      }
-    } catch (error) {
-      console.error('Error cancelling appointment:', error);
-      alert('Failed to cancel appointment');
-    } finally {
-      setLoading(false);
-      setShowCancelConfirm(false);
     }
   };
 
@@ -247,15 +236,6 @@ export function SlotDetailDialog({
           )}
 
           <DialogFooter>
-            {isBooked && appointment && (
-              <Button
-                variant="danger"
-                onClick={() => setShowCancelConfirm(true)}
-                disabled={loading}
-              >
-                Cancel Appointment
-              </Button>
-            )}
             {isFree && (
               <Button
                 variant="danger"
@@ -292,28 +272,6 @@ export function SlotDetailDialog({
               className="bg-danger hover:bg-danger-hover"
             >
               Delete Slot
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Cancel Appointment Confirmation */}
-      <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Appointment</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to cancel this appointment for {patientName}?
-              This will free up the slot for other patients.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep Appointment</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleCancelAppointment}
-              className="bg-danger hover:bg-danger-hover"
-            >
-              Cancel Appointment
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

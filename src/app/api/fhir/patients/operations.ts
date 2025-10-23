@@ -280,6 +280,9 @@ export async function getPatientEncountersWithRelated(
       'Encounter:diagnosis',
       'Encounter:reason-reference',
       'Encounter:account'
+    ],
+    '_include:iterate': [
+      'Account:owner'  // Include account owner organizations
     ]
   });
   const response = await FHIRClient.fetchWithAuth(
@@ -293,6 +296,7 @@ export async function getPatientEncountersWithRelated(
   const practitioners: Record<string, any> = {};
   const conditions: Record<string, any> = {};
   const accounts: Record<string, any> = {};
+  const organizations: Record<string, any> = {};
 
   bundle.entry?.forEach((entry: any) => {
     if (entry.resource.resourceType === 'Encounter') {
@@ -303,6 +307,8 @@ export async function getPatientEncountersWithRelated(
       conditions[entry.resource.id] = entry.resource;
     } else if (entry.resource.resourceType === 'Account' && entry.resource.id) {
       accounts[entry.resource.id] = entry.resource;
+    } else if (entry.resource.resourceType === 'Organization' && entry.resource.id) {
+      organizations[entry.resource.id] = entry.resource;
     }
   });
 
@@ -310,7 +316,8 @@ export async function getPatientEncountersWithRelated(
     encounters,
     practitioners,
     conditions,
-    accounts
+    accounts,
+    organizations
   };
 }
 

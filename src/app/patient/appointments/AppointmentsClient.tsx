@@ -154,11 +154,11 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
           {/* Book Appointment Button - Dashboard Style */}
           <button
             onClick={() => router.push('/patient/book-appointment')}
-            className="group bg-white rounded-lg border-2 border-blue-200 p-4 hover:border-blue-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 w-full sm:w-auto"
+            className="group bg-white rounded-lg border-2 border-blue-200 p-3 hover:border-blue-400 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 w-full sm:w-auto"
           >
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                <svg className="w-6 h-6 text-blue-600 group-hover:animate-spin-once" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                <svg className="w-5 h-5 text-blue-600 group-hover:animate-spin-once" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
               </div>

@@ -24,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createColumns, AppointmentRow } from '../../appointments/columns';
+import { ProviderAppointmentDialog } from '@/components/provider/ProviderAppointmentDialog';
 import type { Appointment, Encounter } from '@/types/fhir';
 
 type TimeFilter = 'all' | 'today' | 'upcoming-7' | 'upcoming' | 'past';
@@ -46,6 +47,7 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
   });
   const [updatingRows, setUpdatingRows] = useState<Set<string>>(new Set());
   const [updatingActions, setUpdatingActions] = useState<Map<string, string>>(new Map());
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null); // For detail dialog
 
   // Initialize filter state from URL params (default: today, no status)
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('today');
@@ -276,6 +278,21 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
     return () => window.removeEventListener('refresh-appointments', handleRefresh);
   }, [fetchAppointments]); // Include fetchAppointments for fallback
 
+  // Listen for view detail events from table actions (event listener only registered once)
+  useEffect(() => {
+    const handleViewDetail = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { appointment } = customEvent.detail || {};
+
+      if (appointment) {
+        setSelectedAppointment(appointment);
+      }
+    };
+
+    window.addEventListener('view-appointment-detail', handleViewDetail);
+    return () => window.removeEventListener('view-appointment-detail', handleViewDetail);
+  }, []); // Empty deps - event listener only registered once
+
   // Handlers for tracking updating rows
   const handleActionStart = useCallback((appointmentId: string, action: string) => {
     setUpdatingRows(prev => new Set(prev).add(appointmentId));
@@ -460,6 +477,13 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
           </Table>
         )}
       </div>
+
+      {/* Appointment Detail Dialog */}
+      <ProviderAppointmentDialog
+        appointment={selectedAppointment}
+        isOpen={!!selectedAppointment}
+        onClose={() => setSelectedAppointment(null)}
+      />
     </div>
   );
 }

@@ -275,42 +275,6 @@ export default function AppointmentView(props: AppointmentViewProps) {
     }
   };
 
-  // Handle reschedule appointment
-  const handleRescheduleAppointment = async () => {
-    if (mode !== 'view') return;
-
-    const { appointment } = props;
-    const confirmReschedule = window.confirm('Do you want to request a reschedule for this appointment? The provider will review your request.');
-    if (!confirmReschedule) return;
-
-    setLoading(true);
-
-    try {
-      const response = await fetch(`/api/fhir/appointments/${appointment?.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify([
-          { op: 'replace', path: '/status', value: 'proposed' }
-        ]),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to request reschedule');
-      }
-
-      alert('Reschedule request sent successfully. The provider will review and contact you with available times.');
-      router.push('/patient/dashboard');
-
-    } catch (error) {
-      console.error('Error requesting reschedule:', error);
-      alert(error instanceof Error ? error.message : 'Failed to request reschedule. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Navigation handlers
   const handlePrevious = () => {
     if (mode === 'confirm') {
@@ -499,12 +463,6 @@ export default function AppointmentView(props: AppointmentViewProps) {
                   <svg className="w-4 h-4 text-green-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="text-green-800">You can reschedule up to 24 hours in advance</span>
-                </div>
-                <div className="flex items-start">
-                  <svg className="w-4 h-4 text-green-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
                   <span className="text-green-800">Cancellation fees may apply for late cancellations</span>
                 </div>
               </div>
@@ -539,22 +497,13 @@ export default function AppointmentView(props: AppointmentViewProps) {
                 {loading ? 'Creating...' : 'Confirm Booking'}
               </Button>
             ) : canModify ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={handleRescheduleAppointment}
-                  disabled={loading}
-                >
-                  {loading ? 'Requesting...' : 'Request Reschedule'}
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={handleCancelAppointment}
-                  disabled={loading}
-                >
-                  {loading ? 'Cancelling...' : 'Cancel Appointment'}
-                </Button>
-              </>
+              <Button
+                variant="danger"
+                onClick={handleCancelAppointment}
+                disabled={loading}
+              >
+                {loading ? 'Cancelling...' : 'Cancel Appointment'}
+              </Button>
             ) : null}
           </div>
         </div>

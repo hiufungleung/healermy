@@ -461,12 +461,6 @@ export default function NotificationsClient({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
       );
-    } else if (content.toLowerCase().includes('reschedule') || content.toLowerCase().includes('rescheduled')) {
-      return (
-        <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      );
     }
 
     // Then check by category
@@ -522,8 +516,6 @@ export default function NotificationsClient({
       return 'Appointment Confirmed';
     } else if (content.toLowerCase().includes('cancelled') || content.toLowerCase().includes('canceled')) {
       return 'Appointment Cancelled';
-    } else if (content.toLowerCase().includes('reschedule') || content.toLowerCase().includes('rescheduled')) {
-      return 'Appointment Rescheduled';
     } else if (content.toLowerCase().includes('reminder')) {
       return 'Appointment Reminder';
     } else if (content.toLowerCase().includes('test result') || content.toLowerCase().includes('lab result')) {
@@ -656,9 +648,7 @@ export default function NotificationsClient({
     // Only show for actual appointment status updates, not reminders
     if (lowerMessage.includes('confirmed') ||
         lowerMessage.includes('cancelled') ||
-        lowerMessage.includes('canceled') ||
-        lowerMessage.includes('reschedule') ||
-        lowerMessage.includes('rescheduled')) {
+        lowerMessage.includes('canceled')) {
       return (
         <Badge variant="info" size="sm">
           Appointment Status Update

@@ -590,11 +590,6 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
             load(view, date);
             onSlotUpdate?.();
           }}
-          onAppointmentCancelled={() => {
-            setSelectedSlot(null);
-            load(view, date);
-            onSlotUpdate?.();
-          }}
         />
       )}
     </Card>
