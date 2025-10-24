@@ -84,12 +84,13 @@ export default function PractitionerDetailClient({
   // Error states
   const [slotsError] = useState<string | null>(null);
 
-  // UI state - Initialize from URL params (default: slots/calendar)
-  const [activeTab, setActiveTab] = useState<'schedules' | 'slots' | 'appointments'>(() => {
+  // UI state - Initialize from URL params (default: calendar)
+  const [activeTab, setActiveTab] = useState<'schedules' | 'calendar' | 'appointments'>(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam === 'schedules') return 'schedules';
     if (tabParam === 'appointments') return 'appointments';
-    return 'slots'; // Default to Calendar
+    if (tabParam === 'slots') return 'calendar'; // Backwards compatibility: redirect old "slots" param to "calendar"
+    return 'calendar'; // Default to Calendar
   });
   const [showCreateSchedule, setShowCreateSchedule] = useState(false);
   const [showGenerateSlots, setShowGenerateSlots] = useState(false);
@@ -97,7 +98,7 @@ export default function PractitionerDetailClient({
 
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
-    const newTab = value as 'schedules' | 'slots' | 'appointments';
+    const newTab = value as 'schedules' | 'calendar' | 'appointments';
     setActiveTab(newTab);
 
     // Update URL without page reload
@@ -185,10 +186,10 @@ export default function PractitionerDetailClient({
     fetchPractitionerName();
   }, [practitionerId, onPractitionerNameUpdate]);
 
-  // Fetch schedules when Slots tab is active (needed for GenerateSlotsForm)
+  // Fetch schedules when Calendar tab is active (needed for GenerateSlotsForm)
   useEffect(() => {
     const fetchSchedulesForSlots = async () => {
-      if (activeTab !== 'slots') return;
+      if (activeTab !== 'calendar') return;
 
       try {
         console.log('🔄 Loading schedules for Generate Slots form...');
@@ -217,7 +218,7 @@ export default function PractitionerDetailClient({
   // Slots are now fetched by SlotCalendar component itself (month-based with caching)
   // Just mark as loaded when tab is active
   useEffect(() => {
-    if (activeTab === 'slots' && !slotsLoaded) {
+    if (activeTab === 'calendar' && !slotsLoaded) {
       setLoadingSlots(false);
       setSlotsLoaded(true);
     }
@@ -279,17 +280,25 @@ export default function PractitionerDetailClient({
   const renderSlotsContent = () => {
     return (
       <div className="space-y-4">
-        {/* Header with Generate Slots button */}
+        {/* Header with Create Schedule and Generate Slots buttons */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <h2 className="text-lg md:text-base sm:text-lg md:text-xl font-semibold">
             Slot Calendar
           </h2>
-          <Button
-            variant="primary"
-            onClick={() => setShowGenerateSlots(true)}
-          >
-            Generate Slots
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateSchedule(true)}
+            >
+              Create Schedule
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => setShowGenerateSlots(true)}
+            >
+              Generate Slots
+            </Button>
+          </div>
         </div>
 
         {/* Calendar */}
@@ -322,12 +331,12 @@ export default function PractitionerDetailClient({
       {/* Tab Content */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6" suppressHydrationWarning>
         <TabsList className="grid w-full grid-cols-3 max-w-[600px]">
-          <TabsTrigger value="slots">Calendar</TabsTrigger>
+          <TabsTrigger value="calendar">Calendar</TabsTrigger>
           <TabsTrigger value="schedules">Schedules</TabsTrigger>
           <TabsTrigger value="appointments">Appointments</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="slots">
+        <TabsContent value="calendar">
           {renderSlotsContent()}
         </TabsContent>
 

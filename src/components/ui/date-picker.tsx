@@ -61,6 +61,7 @@ export function DatePicker({
           selected={date}
           onSelect={onDateChange}
           onMonthChange={onMonthChange}
+          defaultMonth={date || minDate}
           disabled={(date) => {
             if (minDate && date < minDate) return true
             if (maxDate && date > maxDate) return true

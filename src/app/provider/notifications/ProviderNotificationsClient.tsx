@@ -4,29 +4,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
-import { Badge } from '@/components/common/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { FancyLoader } from '@/components/common/FancyLoader';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { formatAppointmentDateTime } from '@/library/timezone';
-import { toast } from 'sonner';
+import { ProviderAppointmentDialog } from '@/components/provider/ProviderAppointmentDialog';
 
 interface Communication {
   id: string;
@@ -68,13 +48,9 @@ export default function ProviderNotificationsClient({
   const snapshotCapturedRef = React.useRef(false); // Track if snapshot was captured for current unread tab session
   const [locallyModifiedIds, setLocallyModifiedIds] = useState<Map<string, Communication>>(new Map()); // Track locally modified communications to preserve across prop updates
 
-  // Appointment dialog states
-  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
-  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+  // Appointment dialog state (using ProviderAppointmentDialog)
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
-  const [appointmentLoading, setAppointmentLoading] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Function to check if appointment needs handling (is pending)
   const needsHandling = (comm: Communication): boolean => {
@@ -111,7 +87,7 @@ export default function ProviderNotificationsClient({
   const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
 
   // Loading state for better UX
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start with true to show loader on page load
 
 
 
@@ -191,13 +167,40 @@ export default function ProviderNotificationsClient({
 
   // Remove duplicate useEffect - communications are fetched in the main useEffect below
 
+  // Fetch initial data on mount
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      console.log('[PROVIDER NOTIFICATIONS] 🔄 Fetching initial data...');
+
+      try {
+        const response = await fetch('/api/fhir/communications', {
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const bundle = await response.json();
+          const communications = (bundle.entry || []).map((entry: any) => entry.resource);
+
+          console.log('[PROVIDER NOTIFICATIONS] ✅ Loaded', communications.length, 'communications');
+          setLocalCommunications(communications);
+        }
+      } catch (error) {
+        console.error('[PROVIDER NOTIFICATIONS] ❌ Initial fetch error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchInitialData();
+  }, []);
 
   // Optimized appointment status fetching - batch requests with higher concurrency
   useEffect(() => {
     const fetchAppointmentStatuses = async () => {
       const appointmentIds = new Set<string>();
 
-      // Extract appointment IDs from ALL communications (no artificial limit)
+      // Extract appointment IDs and patient IDs from ALL communications
+      const patientIds = new Set<string>();
       localCommunications.forEach(comm => {
         const appointmentRef = comm.about?.[0]?.reference;
         if (appointmentRef?.startsWith('Appointment/')) {
@@ -207,69 +210,104 @@ export default function ProviderNotificationsClient({
             appointmentIds.add(appointmentId);
           }
         }
-      });
 
-      // Only fetch if we have appointment IDs - increased concurrency to 15 for faster loading
-      if (appointmentIds.size > 0) {
-        setLoadingStatuses(true);
-        const appointmentIdsArray = Array.from(appointmentIds);
-        const newDeletedAppointments = new Set(deletedAppointments);
-
-        // Process in batches of 15 for optimal performance
-        const batchSize = 15;
-        const batches = [];
-        for (let i = 0; i < appointmentIdsArray.length; i += batchSize) {
-          batches.push(appointmentIdsArray.slice(i, i + batchSize));
-        }
-
-        // Process batches using FHIR _id parameter (much more efficient!)
-        for (const batch of batches) {
-          try {
-            // Use batch fetch endpoint with comma-separated IDs
-            const idsParam = batch.join(',');
-            const response = await fetch(`/api/fhir/appointments?_id=${idsParam}`, {
-              credentials: 'include'
-            });
-
-            if (response.ok) {
-              const bundle = await response.json();
-              const appointments = bundle.entry?.map((e: any) => e.resource) || [];
-
-              // Update statuses from batch response
-              setAppointmentStatuses(prev => {
-                const newStatuses = { ...prev };
-                appointments.forEach((appointment: any) => {
-                  if (appointment.id) {
-                    newStatuses[appointment.id] = appointment.status;
-                  }
-                });
-                return newStatuses;
-              });
-
-              // Check for any IDs that weren't returned (deleted/not found)
-              const returnedIds = new Set(appointments.map((apt: any) => apt.id));
-              batch.forEach(id => {
-                if (!returnedIds.has(id)) {
-                  console.log(`Appointment ${id} was not found, marking as cancelled`);
-                  newDeletedAppointments.add(id);
-                  setAppointmentStatuses(prev => ({ ...prev, [id]: 'cancelled' }));
-                }
-              });
-            } else {
-              console.warn(`Failed to fetch batch of appointments (${batch.length} IDs):`, response.status);
-            }
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.warn(`Error fetching appointment batch:`, errorMessage);
+        // Extract patient IDs
+        const recipientRef = comm.recipient?.[0]?.reference;
+        if (recipientRef?.startsWith('Patient/')) {
+          const patientId = recipientRef.replace('Patient/', '');
+          if (!patientNames[patientId]) {
+            patientIds.add(patientId);
           }
         }
+      });
 
-        // Update deleted appointments cache if any were found
-        if (newDeletedAppointments.size > deletedAppointments.size) {
-          setDeletedAppointments(newDeletedAppointments);
+      // OPTIMIZED: Use single FHIR batch request for ALL appointments AND patients
+      if (appointmentIds.size > 0 || patientIds.size > 0) {
+        setLoadingStatuses(true);
+        const newDeletedAppointments = new Set(deletedAppointments);
+
+        console.log(`[NOTIFICATIONS] 🚀 Fetching ${appointmentIds.size} appointments + ${patientIds.size} patients in SINGLE batch`);
+
+        try {
+          // Build batch bundle with all GET requests
+          const batchBundle = {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [
+              // Add appointment requests
+              ...Array.from(appointmentIds).map(id => ({
+                request: { method: 'GET', url: `Appointment/${id}` }
+              })),
+              // Add patient requests
+              ...Array.from(patientIds).map(id => ({
+                request: { method: 'GET', url: `Patient/${id}` }
+              }))
+            ]
+          };
+
+          const response = await fetch('/api/fhir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/fhir+json' },
+            credentials: 'include',
+            body: JSON.stringify(batchBundle)
+          });
+
+          if (!response.ok) {
+            console.error('[NOTIFICATIONS] ❌ Batch request failed:', response.status);
+            setLoadingStatuses(false);
+            return;
+          }
+
+          const responseBundle = await response.json();
+
+          // Process batch response
+          const newStatuses: Record<string, string> = {};
+          const newPatientNames: Record<string, string> = {};
+          const appointmentIdsArray = Array.from(appointmentIds);
+          const patientIdsArray = Array.from(patientIds);
+
+          responseBundle.entry?.forEach((entry: any, index: number) => {
+            if (entry.response && parseInt(entry.response.status) >= 200 && parseInt(entry.response.status) < 300) {
+              const resource = entry.resource;
+
+              if (resource?.resourceType === 'Appointment') {
+                newStatuses[resource.id] = resource.status;
+              } else if (resource?.resourceType === 'Patient') {
+                // Extract patient name
+                if (resource.name && resource.name[0]) {
+                  const name = resource.name[0];
+                  const given = Array.isArray(name.given) ? name.given.join(' ') : name.given || '';
+                  const family = name.family || '';
+                  const fullName = `${given} ${family}`.trim() || `Patient ${resource.id}`;
+                  newPatientNames[resource.id] = fullName;
+                }
+              }
+            } else {
+              // Check if this was an appointment request that failed
+              if (index < appointmentIdsArray.length) {
+                const appointmentId = appointmentIdsArray[index];
+                console.log(`Appointment ${appointmentId} was not found, marking as cancelled`);
+                newDeletedAppointments.add(appointmentId);
+                newStatuses[appointmentId] = 'cancelled';
+              }
+            }
+          });
+
+          console.log(`[NOTIFICATIONS] ✅ Batch result: ${Object.keys(newStatuses).length} appointments, ${Object.keys(newPatientNames).length} patients`);
+
+          // Update state
+          setAppointmentStatuses(prev => ({ ...prev, ...newStatuses }));
+          setPatientNames(prev => ({ ...prev, ...newPatientNames }));
+
+          if (newDeletedAppointments.size > deletedAppointments.size) {
+            setDeletedAppointments(newDeletedAppointments);
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error('[NOTIFICATIONS] ❌ Batch request error:', errorMessage);
+        } finally {
+          setLoadingStatuses(false);
         }
-
-        setLoadingStatuses(false);
       }
     };
 
@@ -325,60 +363,8 @@ export default function ProviderNotificationsClient({
     setIsLoading(false);
   }, [initialCommunications, locallyModifiedIds]);
 
-  // Fetch patient names when communications change (using batch fetching for better performance)
-  useEffect(() => {
-    const fetchPatientNames = async () => {
-      const patientIds = new Set<string>();
-
-      // Extract patient IDs from communications
-      localCommunications.forEach(comm => {
-        const senderRef = comm.sender?.reference || '';
-        if (senderRef.startsWith('Patient/')) {
-          const patientId = senderRef.replace('Patient/', '');
-          patientIds.add(patientId);
-        }
-      });
-
-      // Fetch patient names for new patient IDs
-      const namesToFetch = Array.from(patientIds).filter(id => !patientNames[id]);
-
-      if (namesToFetch.length > 0) {
-        try {
-          // Use batch fetch with comma-separated IDs (much more efficient!)
-          const idsParam = namesToFetch.slice(0, 20).join(','); // Batch up to 20 patients at once
-          const response = await fetch(`/api/fhir/patients?_id=${idsParam}`, {
-            credentials: 'include'
-          });
-
-          if (response.ok) {
-            const bundle = await response.json();
-            const patients = bundle.entry?.map((e: any) => e.resource) || [];
-
-            const newNames: Record<string, string> = {};
-            patients.forEach((patient: any) => {
-              if (patient.id) {
-                const name = patient.name?.[0];
-                const displayName = name?.text ||
-                  `${name?.given?.join(' ') || ''} ${name?.family || ''}`.trim() ||
-                  `Patient ${patient.id}`;
-                newNames[patient.id] = displayName;
-              }
-            });
-
-            setPatientNames(prev => ({ ...prev, ...newNames }));
-          } else {
-            console.error('Failed to batch fetch patient names:', response.status);
-          }
-        } catch (error) {
-          console.error('Error batch fetching patient names:', error);
-        }
-      }
-    };
-
-    if (localCommunications.length > 0) {
-      fetchPatientNames();
-    }
-  }, [localCommunications, patientNames]);
+  // Patient names are now fetched together with appointments in the FHIR batch (see appointment statuses useEffect below)
+  // This eliminates the need for a separate patient fetching API call
 
   // Load hidden notifications and read status from localStorage on mount
   useEffect(() => {
@@ -395,6 +381,49 @@ export default function ProviderNotificationsClient({
     } catch (error) {
       console.error('Error loading notifications from localStorage:', error);
     }
+  }, []);
+
+  // Refresh function for bell icon click
+  const refreshNotifications = async () => {
+    console.log('[NOTIFICATIONS] 🔄 Refreshing from bell icon click...');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/fhir/communications', {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const bundle = await response.json();
+        const freshCommunications = (bundle.entry || []).map((entry: any) => entry.resource);
+
+        console.log('[NOTIFICATIONS] ✅ Refreshed', freshCommunications.length, 'communications');
+
+        // Clear caches to force re-fetch of appointments/patients
+        setAppointmentStatuses({});
+        setPatientNames({});
+        setDeletedAppointments(new Set());
+        setLocallyModifiedIds(new Map());
+
+        // Update communications (this will trigger useEffect to fetch appointments/patients)
+        setLocalCommunications(freshCommunications);
+      }
+    } catch (error) {
+      console.error('[NOTIFICATIONS] ❌ Refresh error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Listen for bell icon click events
+  useEffect(() => {
+    const handleBellClick = () => {
+      console.log('[NOTIFICATIONS] Bell icon clicked, refreshing...');
+      refreshNotifications();
+    };
+
+    window.addEventListener('refresh-notifications', handleBellClick);
+    return () => window.removeEventListener('refresh-notifications', handleBellClick);
   }, []);
 
   // Check URL parameters on mount and set filter accordingly
@@ -570,70 +599,58 @@ export default function ProviderNotificationsClient({
     if (aboutRef?.startsWith('Appointment/')) {
       const appointmentId = aboutRef.replace('Appointment/', '');
 
-      // Fetch appointment details
-      setAppointmentLoading(true);
-      setIsDetailDialogOpen(true);
-
       try {
-        const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+        console.log('[PROVIDER NOTIFICATIONS] 🚀 Fetching appointment + patient details');
+
+        // Fetch appointment details
+        const appointmentResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
           credentials: 'include'
         });
 
-        if (response.ok) {
-          const appointment = await response.json();
+        if (!appointmentResponse.ok) {
+          throw new Error('Failed to fetch appointment');
+        }
 
-          // Fetch patient details
-          const patientParticipant = appointment.participant?.find((p: any) =>
-            p.actor?.reference?.startsWith('Patient/')
-          );
+        const appointment = await appointmentResponse.json();
 
-          if (patientParticipant?.actor?.reference) {
-            const patientId = patientParticipant.actor.reference.replace('Patient/', '');
+        // Extract patient ID from appointment participants
+        const patientParticipant = appointment.participant?.find((p: any) =>
+          p.actor?.reference?.startsWith('Patient/')
+        );
+
+        // Fetch patient details if patient reference exists
+        if (patientParticipant?.actor?.reference) {
+          const patientId = patientParticipant.actor.reference.replace('Patient/', '');
+
+          try {
             const patientResponse = await fetch(`/api/fhir/patients/${patientId}`, {
               credentials: 'include'
             });
 
             if (patientResponse.ok) {
               const patient = await patientResponse.json();
-              appointment.patientDetails = {
-                name: patient.name?.[0]?.text ||
-                      `${patient.name?.[0]?.given?.join(' ') || ''} ${patient.name?.[0]?.family || ''}`.trim() ||
-                      'Patient',
-                phone: patient.telecom?.find((t: any) => t.system === 'phone')?.value || 'N/A',
-                email: patient.telecom?.find((t: any) => t.system === 'email')?.value || 'N/A'
-              };
+
+              // Add patient name to appointment
+              const patientName = patient.name?.[0]?.text ||
+                `${patient.name?.[0]?.given?.join(' ') || ''} ${patient.name?.[0]?.family || ''}`.trim() ||
+                'Unknown Patient';
+
+              appointment.patientName = patientName;
+              console.log('[PROVIDER NOTIFICATIONS] ✅ Patient name:', patientName);
             }
+          } catch (patientError) {
+            console.error('[PROVIDER NOTIFICATIONS] ⚠️ Failed to fetch patient details:', patientError);
+            // Continue without patient name - dialog will handle gracefully
           }
-
-          // Fetch practitioner details
-          const practitionerParticipant = appointment.participant?.find((p: any) =>
-            p.actor?.reference?.startsWith('Practitioner/')
-          );
-
-          if (practitionerParticipant?.actor?.reference) {
-            const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
-            const practitionerResponse = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
-              credentials: 'include'
-            });
-
-            if (practitionerResponse.ok) {
-              const practitioner = await practitionerResponse.json();
-              appointment.practitionerDetails = {
-                name: practitioner.name?.[0]?.text ||
-                      `${practitioner.name?.[0]?.given?.join(' ') || ''} ${practitioner.name?.[0]?.family || ''}`.trim() ||
-                      'Provider'
-              };
-            }
-          }
-
-          setSelectedAppointment(appointment);
         }
+
+        setSelectedAppointment(appointment);
+        setIsDialogOpen(true);
+
+        console.log('[PROVIDER NOTIFICATIONS] ✅ Appointment loaded, opening dialog');
       } catch (error) {
         console.error('Error fetching appointment details:', error);
-        toast.error('Failed to load appointment details');
-        setIsDetailDialogOpen(false);
-      } finally {
-        setAppointmentLoading(false);
+        alert('Failed to load appointment details');
       }
     }
 
@@ -761,7 +778,7 @@ export default function ProviderNotificationsClient({
         return true;
       }
     });
-  }, [baseCommunications, activeFilter, readNotifications, appointmentStatuses]);
+  }, [baseCommunications, activeFilter, readNotifications, appointmentStatuses, unreadTabSnapshot]);
 
   // Base deduplicated communications (for total count calculation) - not filtered by activeFilter
   const baseDeduplicatedCommunications = useMemo(() => {
@@ -857,10 +874,19 @@ export default function ProviderNotificationsClient({
     });
   }, [unreadCount]);
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     try {
       // Mark all communications as read
       const unreadMessages = localCommunications.filter(comm => !isMessageRead(comm));
+
+      if (unreadMessages.length === 0) {
+        console.log('[PROVIDER NOTIFICATIONS] No unread messages to mark');
+        return;
+      }
+
+      console.log(`[PROVIDER NOTIFICATIONS] 🚀 Marking ${unreadMessages.length} messages as read with SINGLE batch`);
+
+      // Optimistic UI update
       setLocalCommunications(prev =>
         prev.map(comm => ({
           ...comm,
@@ -884,16 +910,96 @@ export default function ProviderNotificationsClient({
       localStorage.setItem('healermy-provider-read-notifications',
         JSON.stringify(Array.from(allNotificationIds)));
 
-      // Mark all as read on server using existing API
-      unreadMessages.forEach(comm => {
-        if (comm.id) markAsRead(comm.id);
+      // OPTIMIZED: Use FHIR batch to mark all as read in single request
+      const batchBundle = {
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: unreadMessages.map(comm => ({
+          request: {
+            method: 'PATCH',
+            url: `Communication/${comm.id}`,
+            // Using custom action format (not JSON Patch RFC 6902)
+            // This matches the existing mark-read API endpoint
+          },
+          resource: {
+            resourceType: 'Parameters',
+            parameter: [{
+              name: 'action',
+              valueString: 'mark-read'
+            }]
+          }
+        }))
+      };
+
+      const batchResponse = await fetch('/api/fhir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/fhir+json' },
+        credentials: 'include',
+        body: JSON.stringify(batchBundle),
       });
+
+      if (!batchResponse.ok) {
+        console.error('[PROVIDER NOTIFICATIONS] ❌ Failed to mark all as read on server');
+      } else {
+        console.log(`[PROVIDER NOTIFICATIONS] ✅ Marked ${unreadMessages.length} messages as read in single batch`);
+      }
 
       // Dispatch event to update notification bell
       window.dispatchEvent(new CustomEvent('messageUpdate'));
     } catch (error) {
       console.error('Error marking all as read:', error);
     }
+  };
+
+  // Helper function to get notification icon
+  const getNotificationIcon = (comm: Communication) => {
+    return (
+      <svg className="w-3 h-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+      </svg>
+    );
+  };
+
+  // Helper function to get sender display name
+  const getSenderDisplay = (comm: Communication) => {
+    const senderRef = comm.sender?.reference || '';
+    const patientId = senderRef.replace('Patient/', '');
+    const patientName = patientNames[patientId] || 'Healthcare Provider';
+
+    if (patientId && patientId !== senderRef) {
+      return patientName;
+    }
+    return 'Healthcare Provider';
+  };
+
+  // Helper function to get category display text
+  const getCategoryDisplay = (comm: Communication) => {
+    const appointmentRef = comm.about?.[0]?.reference;
+    const appointmentId = appointmentRef?.replace('Appointment/', '');
+    const appointmentStatus = appointmentId ? appointmentStatuses[appointmentId] : null;
+
+    if (appointmentStatus === 'pending') {
+      return 'New Appointment Request';
+    } else if (appointmentStatus) {
+      return 'Appointment Status Update';
+    }
+    return 'Appointment Notification';
+  };
+
+  // Helper function to get message content
+  const getMessageContent = (comm: Communication) => {
+    const appointmentRef = comm.about?.[0]?.reference;
+    const appointmentId = appointmentRef?.replace('Appointment/', '');
+    const appointmentStatus = appointmentId ? appointmentStatuses[appointmentId] : null;
+    const messageContent = comm.payload?.[0]?.contentString || '';
+
+    if (appointmentStatus === 'pending') {
+      return 'Awaiting approval - Please review and respond to this appointment request.';
+    } else if (appointmentStatus) {
+      return 'This appointment request has been processed.';
+    }
+
+    return messageContent || 'No additional details';
   };
 
   return (
@@ -964,160 +1070,92 @@ export default function ProviderNotificationsClient({
           displayedItems.map((item) => {
             // Communication item (from FHIR API)
             const comm = item.data;
-              const isUnread = !isMessageRead(comm) && !locallyReadIds.has(comm.id);
+            const isUnread = !isMessageRead(comm) && !locallyReadIds.has(comm.id);
 
-              return (
+            return (
+              <div key={comm.id}>
                 <Card
-                  key={comm.id}
-                  className={`hover:shadow-md transition-shadow cursor-pointer ${
+                  className={`p-4 py-3 rounded-[5px] transition-all duration-200 cursor-pointer ${
                     isUnread ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
-                  }`}
+                  } hover:shadow-md`}
+                  onClick={() => handleMessageClick(comm)}
                 >
-                  <div
-                    className="flex items-start space-x-4 cursor-pointer"
-                    onClick={() => handleMessageClick(comm)}
-                  >
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
-                        <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                        </svg>
-                      </div>
+                  {/* Flex container for icon and title */}
+                  <div className="flex items-center gap-2 mb-2">
+                    {/* Icon with inline-flex for SVG centering */}
+                    <div className="w-4 h-4 rounded-full bg-gray-100 inline-flex items-center justify-center flex-shrink-0">
+                      {getNotificationIcon(comm)}
                     </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className={`font-semibold mb-2 ${isUnread ? 'text-text-primary' : 'text-text-secondary'}`}>
-                            {/* Get appointment status to determine notification type */}
-                            {(() => {
-                              const appointmentRef = comm.about?.[0]?.reference;
-                              const appointmentId = appointmentRef?.replace('Appointment/', '');
-                              const appointmentStatus = appointmentId ? appointmentStatuses[appointmentId] : null;
+                    {/* Sender as Title */}
+                    <h3 className="font-semibold text-sm text-text-primary">
+                      {getSenderDisplay(comm)}
+                    </h3>
 
-                              // Determine notification title based on status
-                              let title = 'Appointment Notification';
-                              let statusBadge = null;
+                    {/* Unread indicator */}
+                    {isUnread && (
+                      <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
+                    )}
+                  </div>
 
-                              if (appointmentStatus === 'pending') {
-                                title = 'New Appointment Request';
-                                statusBadge = (
-                                  <span className="ml-2 text-xs px-2 py-1 rounded font-normal bg-yellow-100 text-yellow-800">
-                                    Pending
-                                  </span>
-                                );
-                              } else if (appointmentStatus) {
-                                // Any non-pending status is treated as "Processed"
-                                title = 'Appointment Request';
-                                statusBadge = (
-                                  <span className="ml-2 text-xs px-2 py-1 rounded font-normal bg-gray-100 text-gray-800">
-                                    Processed
-                                  </span>
-                                );
-                              }
+                  {/* Badge inline with Message Preview */}
+                  <p className="font-medium text-text-primary text-sm mb-0 line-clamp-3">
+                    <span className="text-primary font-medium">{getCategoryDisplay(comm)}:</span> {getMessageContent(comm)}
+                  </p>
 
-                              return (
-                                <>
-                                  {title}
-                                  {statusBadge}
-                                  {isUnread && (
-                                    <div className="w-2 h-2 bg-primary rounded-full inline-block ml-2"></div>
-                                  )}
-                                </>
+                  {/* Timestamp and action buttons at bottom */}
+                  <div className="pt-0 border-t border-gray-100 flex items-center justify-between">
+                    <p className="text-xs text-text-primary">
+                      {formatDate(comm.sent)}
+                    </p>
+                    <div>
+                      {isUnread && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (comm.id) {
+                              setLocallyReadIds(prev => new Set([...prev, comm.id]));
+
+                              const updatedComm = {
+                                ...comm,
+                                extension: [
+                                  ...(comm.extension || []),
+                                  {
+                                    url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
+                                    valueDateTime: new Date().toISOString()
+                                  }
+                                ]
+                              };
+
+                              setLocallyModifiedIds(prev => new Map(prev).set(comm.id, updatedComm));
+
+                              setLocalCommunications(prev =>
+                                prev.map(localComm =>
+                                  localComm.id === comm.id ? updatedComm : localComm
+                                )
                               );
-                            })()}
-                          </h3>
-                          {/* Patient name section */}
-                          {(() => {
-                            const senderRef = comm.sender?.reference || '';
-                            const patientId = senderRef.replace('Patient/', '');
-                            const patientName = patientNames[patientId] || 'Loading...';
-
-                            if (patientId && patientId !== senderRef) {
-                              return (
-                                <p className="text-sm text-text-primary mb-2">
-                                  <span className="font-medium">Patient:</span> {patientName}
-                                </p>
-                              );
+                              markAsRead(comm.id);
                             }
-                            return null;
-                          })()}
-                          <p className="text-text-secondary text-sm mb-2">
-                            {/* Display status-appropriate message */}
-                            {(() => {
-                              const appointmentRef = comm.about?.[0]?.reference;
-                              const appointmentId = appointmentRef?.replace('Appointment/', '');
-                              const appointmentStatus = appointmentId ? appointmentStatuses[appointmentId] : null;
-                              const messageContent = comm.payload?.[0]?.contentString || '';
-
-                              // Generate appropriate message based on status
-                              if (appointmentStatus === 'pending') {
-                                return 'Awaiting approval - Please review and respond to this appointment request.';
-                              } else if (appointmentStatus) {
-                                // Any non-pending status shows as processed
-                                return 'This appointment request has been processed.';
-                              }
-
-                              // Fallback to original message if no specific status
-                              return messageContent.substring(0, 150) || 'No additional details';
-                            })()}
-                          </p>
-                          <p className="text-xs text-text-secondary">
-                            {formatDate(comm.sent)}
-                          </p>
-                        </div>
-
-                        <div className="flex flex-col space-y-1 ml-4">
-                          {isUnread && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (comm.id) {
-                                  setLocallyReadIds(prev => new Set([...prev, comm.id]));
-
-                                  // Create updated communication with read extension
-                                  const updatedComm = {
-                                    ...comm,
-                                    extension: [
-                                      ...(comm.extension || []),
-                                      {
-                                        url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
-                                        valueDateTime: new Date().toISOString()
-                                      }
-                                    ]
-                                  };
-
-                                  // Track as locally modified to preserve across prop updates
-                                  setLocallyModifiedIds(prev => new Map(prev).set(comm.id, updatedComm));
-
-                                  setLocalCommunications(prev =>
-                                    prev.map(localComm =>
-                                      localComm.id === comm.id ? updatedComm : localComm
-                                    )
-                                  );
-                                  markAsRead(comm.id);
-                                }
-                              }}
-                              className="text-sm text-primary hover:underline"
-                            >
-                              Mark as Read
-                            </button>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteNotification(comm.id);
-                            }}
-                            className="text-sm text-text-secondary hover:text-red-600"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
+                          }}
+                          className="text-xs text-primary hover:underline mr-4"
+                        >
+                          Mark as Read
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteNotification(comm.id);
+                        }}
+                        className="text-xs text-text-secondary hover:text-red-600"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
                 </Card>
-              );
+              </div>
+            );
           })
         )}
 
@@ -1136,258 +1174,129 @@ export default function ProviderNotificationsClient({
       </Tabs>
 
       {/* Appointment Detail Dialog */}
-      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Appointment Details</DialogTitle>
-            <DialogDescription>
-              View and manage appointment request
-            </DialogDescription>
-          </DialogHeader>
+      <ProviderAppointmentDialog
+        appointment={selectedAppointment}
+        isOpen={isDialogOpen}
+        onClose={() => {
+          setIsDialogOpen(false);
+          setSelectedAppointment(null);
+        }}
+        onApprove={async (id: string) => {
+          // Approve appointment and refresh communications
+          try {
+            const response = await fetch(`/api/fhir/appointments/${id}`, {
+              method: 'PATCH',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json-patch+json' },
+              body: JSON.stringify([
+                { op: 'replace', path: '/status', value: 'booked' }
+              ])
+            });
 
-          {appointmentLoading ? (
-            <div className="py-8 flex justify-center">
-              <FancyLoader size="sm" />
-            </div>
-          ) : selectedAppointment ? (
-            <>
-              <div className="space-y-4">
-                {/* Status Badge */}
-                <div>
-                  <Badge
-                    variant={
-                      selectedAppointment.status === 'booked' || selectedAppointment.status === 'fulfilled' ? 'success' :
-                      selectedAppointment.status === 'cancelled' ? 'danger' :
-                      selectedAppointment.status === 'pending' ? 'warning' : 'info'
-                    }
-                    size="sm"
-                  >
-                    {selectedAppointment.status === 'booked' ? 'Confirmed' :
-                     selectedAppointment.status === 'pending' ? 'Pending Approval' :
-                     selectedAppointment.status === 'fulfilled' ? 'Completed' :
-                     selectedAppointment.status === 'cancelled' ? 'Cancelled' :
-                     selectedAppointment.status}
-                  </Badge>
-                </div>
+            if (!response.ok) throw new Error('Failed to approve appointment');
 
-                {/* Patient Name */}
-                <div>
-                  <p className="text-sm font-medium text-text-secondary">Patient</p>
-                  <p className="text-sm">{selectedAppointment.patientDetails?.name || 'Patient'}</p>
-                </div>
+            // Refresh communications
+            const commResponse = await fetch('/api/fhir/communications', {
+              credentials: 'include'
+            });
+            if (commResponse.ok) {
+              const bundle = await commResponse.json();
+              const communications = (bundle.entry || []).map((entry: any) => entry.resource);
+              setLocalCommunications(communications);
+            }
+          } catch (error) {
+            console.error('[PROVIDER NOTIFICATIONS] ❌ Error approving appointment:', error);
+            throw error;
+          }
+        }}
+        onReject={async (id: string) => {
+          // Reject appointment and refresh communications
+          try {
+            const response = await fetch(`/api/fhir/appointments/${id}`, {
+              method: 'PATCH',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json-patch+json' },
+              body: JSON.stringify([
+                { op: 'replace', path: '/status', value: 'cancelled' }
+              ])
+            });
 
-                {/* Date & Time */}
-                <div>
-                  <p className="text-sm font-medium text-text-secondary">Date & Time</p>
-                  <p className="text-sm">
-                    {selectedAppointment.start ? formatAppointmentDateTime(selectedAppointment.start) : 'TBD'}
-                  </p>
-                </div>
+            if (!response.ok) throw new Error('Failed to reject appointment');
 
-                {/* Practitioner */}
-                <div>
-                  <p className="text-sm font-medium text-text-secondary">Practitioner</p>
-                  <p className="text-sm">{selectedAppointment.practitionerDetails?.name || 'Provider'}</p>
-                </div>
+            // Refresh communications
+            const commResponse = await fetch('/api/fhir/communications', {
+              credentials: 'include'
+            });
+            if (commResponse.ok) {
+              const bundle = await commResponse.json();
+              const communications = (bundle.entry || []).map((entry: any) => entry.resource);
+              setLocalCommunications(communications);
+            }
+          } catch (error) {
+            console.error('[PROVIDER NOTIFICATIONS] ❌ Error rejecting appointment:', error);
+            throw error;
+          }
+        }}
+        onComplete={async (id: string) => {
+          // Complete appointment and refresh communications
+          try {
+            const response = await fetch(`/api/fhir/appointments/${id}`, {
+              method: 'PATCH',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json-patch+json' },
+              body: JSON.stringify([
+                { op: 'replace', path: '/status', value: 'fulfilled' }
+              ])
+            });
 
-                {/* Reason for Visit */}
-                <div>
-                  <p className="text-sm font-medium text-text-secondary">Reason for Visit</p>
-                  <p className="text-sm">{selectedAppointment.reasonCode?.[0]?.text || 'General Consultation'}</p>
-                </div>
+            if (!response.ok) throw new Error('Failed to complete appointment');
 
-                {/* Notes */}
-                {selectedAppointment.description && (
-                  <div>
-                    <p className="text-sm font-medium text-text-secondary">Notes</p>
-                    <p className="text-sm">{selectedAppointment.description}</p>
-                  </div>
-                )}
+            // Refresh communications
+            const commResponse = await fetch('/api/fhir/communications', {
+              credentials: 'include'
+            });
+            if (commResponse.ok) {
+              const bundle = await commResponse.json();
+              const communications = (bundle.entry || []).map((entry: any) => entry.resource);
+              setLocalCommunications(communications);
+            }
+          } catch (error) {
+            console.error('[PROVIDER NOTIFICATIONS] ❌ Error completing appointment:', error);
+            throw error;
+          }
+        }}
+        onCancel={async (id: string) => {
+          // Cancel appointment and refresh communications
+          try {
+            const response = await fetch(`/api/fhir/appointments/${id}`, {
+              method: 'PATCH',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json-patch+json' },
+              body: JSON.stringify([
+                { op: 'replace', path: '/status', value: 'cancelled' }
+              ])
+            });
 
-                {/* Patient Contact */}
-                <div>
-                  <p className="text-sm font-medium text-text-secondary">Patient Contact</p>
-                  <p className="text-sm">Phone: {selectedAppointment.patientDetails?.phone || 'N/A'}</p>
-                  <p className="text-sm">Email: {selectedAppointment.patientDetails?.email || 'N/A'}</p>
-                </div>
-              </div>
+            if (!response.ok) throw new Error('Failed to cancel appointment');
 
-              <DialogFooter className="flex flex-row gap-2 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsDetailDialogOpen(false)}
-                  disabled={isProcessing}
-                  className="min-w-[110px]"
-                >
-                  Close
-                </Button>
-                {selectedAppointment.status === 'pending' && (
-                  <>
-                    <Button
-                      variant="danger"
-                      onClick={() => {
-                        setIsDetailDialogOpen(false);
-                        setIsRejectDialogOpen(true);
-                      }}
-                      disabled={isProcessing}
-                      className="min-w-[110px]"
-                    >
-                      Reject
-                    </Button>
-                    <Button
-                      variant="success"
-                      onClick={() => {
-                        setIsDetailDialogOpen(false);
-                        setIsApproveDialogOpen(true);
-                      }}
-                      disabled={isProcessing}
-                      className="min-w-[110px]"
-                    >
-                      Approve
-                    </Button>
-                  </>
-                )}
-              </DialogFooter>
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-      {/* Approve Confirmation Dialog */}
-      <AlertDialog open={isApproveDialogOpen} onOpenChange={setIsApproveDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Approve Appointment?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to approve this appointment? The patient will be notified.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex flex-row gap-2 justify-end">
-            <AlertDialogCancel disabled={isProcessing} className="mt-0">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={async () => {
-                if (!selectedAppointment?.id) return;
-
-                setIsProcessing(true);
-                try {
-                  const response = await fetch(`/api/fhir/appointments/${selectedAppointment.id}`, {
-                    method: 'PATCH',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json-patch+json' },
-                    body: JSON.stringify([
-                      {
-                        op: 'replace',
-                        path: '/status',
-                        value: 'booked',
-                      },
-                    ]),
-                  });
-
-                  if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to approve appointment');
-                  }
-
-                  toast.success('Appointment Approved', {
-                    description: 'The appointment has been successfully approved.',
-                  });
-
-                  setIsApproveDialogOpen(false);
-
-                  // Refresh communications
-                  const communicationsResponse = await fetch(`/api/fhir/communications`, {
-                    credentials: 'include',
-                  });
-                  if (communicationsResponse.ok) {
-                    const bundle = await communicationsResponse.json();
-                    const communications = (bundle.entry || []).map((entry: any) => entry.resource);
-                    setLocalCommunications(communications);
-                  }
-                } catch (error) {
-                  toast.error('Error', {
-                    description: error instanceof Error ? error.message : 'Failed to approve appointment',
-                  });
-                } finally {
-                  setIsProcessing(false);
-                }
-              }}
-              disabled={isProcessing}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {isProcessing ? 'Approving...' : 'Yes, Approve'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Reject Confirmation Dialog */}
-      <AlertDialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Reject Appointment?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to reject this appointment? The patient will be notified.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex flex-row gap-2 justify-end">
-            <AlertDialogCancel disabled={isProcessing} className="mt-0">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={async () => {
-                if (!selectedAppointment?.id) return;
-
-                setIsProcessing(true);
-                try {
-                  const response = await fetch(`/api/fhir/appointments/${selectedAppointment.id}`, {
-                    method: 'PATCH',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json-patch+json' },
-                    body: JSON.stringify([
-                      {
-                        op: 'replace',
-                        path: '/status',
-                        value: 'cancelled',
-                      },
-                    ]),
-                  });
-
-                  if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to reject appointment');
-                  }
-
-                  toast.success('Appointment Rejected', {
-                    description: 'The appointment has been rejected.',
-                  });
-
-                  setIsRejectDialogOpen(false);
-
-                  // Refresh communications
-                  const communicationsResponse = await fetch(`/api/fhir/communications`, {
-                    credentials: 'include',
-                  });
-                  if (communicationsResponse.ok) {
-                    const bundle = await communicationsResponse.json();
-                    const communications = (bundle.entry || []).map((entry: any) => entry.resource);
-                    setLocalCommunications(communications);
-                  }
-                } catch (error) {
-                  toast.error('Error', {
-                    description: error instanceof Error ? error.message : 'Failed to reject appointment',
-                  });
-                } finally {
-                  setIsProcessing(false);
-                }
-              }}
-              disabled={isProcessing}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {isProcessing ? 'Rejecting...' : 'Yes, Reject'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            // Refresh communications
+            const commResponse = await fetch('/api/fhir/communications', {
+              credentials: 'include'
+            });
+            if (commResponse.ok) {
+              const bundle = await commResponse.json();
+              const communications = (bundle.entry || []).map((entry: any) => entry.resource);
+              setLocalCommunications(communications);
+            }
+          } catch (error) {
+            console.error('[PROVIDER NOTIFICATIONS] ❌ Error canceling appointment:', error);
+            throw error;
+          }
+        }}
+      />
         </div>
       </div>
     </div>
   );
 }
+

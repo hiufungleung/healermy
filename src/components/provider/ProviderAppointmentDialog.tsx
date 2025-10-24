@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,7 @@ import {
 import { Badge } from '@/components/common/Badge';
 import { Button } from '@/components/common/Button';
 import { Separator } from '@/components/ui/separator';
+import { Loader2 } from 'lucide-react';
 import { formatAppointmentDateTime } from '@/library/timezone';
 import type { Appointment } from '@/types/fhir';
 
@@ -56,6 +57,11 @@ export function ProviderAppointmentDialog({
     message: string;
   } | null>(null);
 
+  // Patient health data state
+  const [patientProfile, setPatientProfile] = useState<any>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
   // Use enhanced data from table (patientName and practitionerName already populated)
   const patientName = appointment?.patientName || 'Unknown Patient';
   const practitionerName = appointment?.practitionerName || 'Unknown Practitioner';
@@ -65,6 +71,38 @@ export function ProviderAppointmentDialog({
     p.actor?.reference?.startsWith('Patient/')
   );
   const patientId = patientParticipant?.actor?.reference?.replace('Patient/', '') || 'N/A';
+
+  // Fetch patient profile data when dialog opens
+  useEffect(() => {
+    const fetchPatientProfile = async () => {
+      if (!isOpen || !appointment || patientId === 'N/A') {
+        return;
+      }
+
+      setProfileLoading(true);
+      setProfileError(null);
+
+      try {
+        const response = await fetch(`/api/fhir/patients/${patientId}/profile`, {
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch patient profile: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setPatientProfile(data);
+      } catch (error) {
+        console.error('Error fetching patient profile:', error);
+        setProfileError(error instanceof Error ? error.message : 'Failed to load patient data');
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    fetchPatientProfile();
+  }, [isOpen, appointment, patientId]);
 
   // Match the data-table's status badge variant logic exactly
   const getStatusBadgeVariant = (status: string): 'success' | 'warning' | 'danger' | 'info' | 'secondary' => {
@@ -242,6 +280,146 @@ export function ProviderAppointmentDialog({
                   </div>
                 )}
               </div>
+            </div>
+
+            <Separator />
+
+            {/* Patient Health Data */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3">Patient Health Information</h3>
+
+              {profileLoading && (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  <span className="ml-2 text-gray-500">Loading patient health data...</span>
+                </div>
+              )}
+
+              {profileError && (
+                <div className="bg-red-50 text-red-800 p-4 rounded-lg">
+                  <p className="text-sm font-medium">Failed to load patient health data</p>
+                  <p className="text-sm mt-1">{profileError}</p>
+                </div>
+              )}
+
+              {!profileLoading && !profileError && patientProfile && (
+                <div className="space-y-4">
+                  {/* Conditions */}
+                  {patientProfile.conditions && patientProfile.conditions.length > 0 && (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        Active Conditions ({patientProfile.conditions.length})
+                      </h4>
+                      <ul className="space-y-1">
+                        {patientProfile.conditions.slice(0, 5).map((condition: any, idx: number) => (
+                          <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
+                            <span className="text-gray-400">•</span>
+                            <span>{condition.code?.text || condition.code?.coding?.[0]?.display || 'Unknown condition'}</span>
+                          </li>
+                        ))}
+                        {patientProfile.conditions.length > 5 && (
+                          <li className="text-sm text-gray-500 italic">
+                            +{patientProfile.conditions.length - 5} more conditions
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Medications */}
+                  {patientProfile.medications && patientProfile.medications.length > 0 && (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V3zm2 0h10v12H5V3zm2 2a1 1 0 000 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                        </svg>
+                        Current Medications ({patientProfile.medications.length})
+                      </h4>
+                      <ul className="space-y-1">
+                        {patientProfile.medications.slice(0, 5).map((med: any, idx: number) => (
+                          <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
+                            <span className="text-gray-400">•</span>
+                            <span>{med.medicationCodeableConcept?.text || med.medicationCodeableConcept?.coding?.[0]?.display || 'Unknown medication'}</span>
+                          </li>
+                        ))}
+                        {patientProfile.medications.length > 5 && (
+                          <li className="text-sm text-gray-500 italic">
+                            +{patientProfile.medications.length - 5} more medications
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Allergies */}
+                  {patientProfile.allergies && patientProfile.allergies.length > 0 && (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        Allergies ({patientProfile.allergies.length})
+                      </h4>
+                      <ul className="space-y-1">
+                        {patientProfile.allergies.slice(0, 5).map((allergy: any, idx: number) => (
+                          <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
+                            <span className="text-gray-400">•</span>
+                            <span>{allergy.code?.text || allergy.code?.coding?.[0]?.display || 'Unknown allergy'}</span>
+                          </li>
+                        ))}
+                        {patientProfile.allergies.length > 5 && (
+                          <li className="text-sm text-gray-500 italic">
+                            +{patientProfile.allergies.length - 5} more allergies
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Recent Observations */}
+                  {patientProfile.observations && patientProfile.observations.length > 0 && (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                          <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                        </svg>
+                        Recent Observations ({patientProfile.observations.length})
+                      </h4>
+                      <ul className="space-y-1">
+                        {patientProfile.observations.slice(0, 5).map((obs: any, idx: number) => (
+                          <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
+                            <span className="text-gray-400">•</span>
+                            <span>
+                              {obs.code?.text || obs.code?.coding?.[0]?.display || 'Unknown observation'}
+                              {obs.valueQuantity && `: ${obs.valueQuantity.value} ${obs.valueQuantity.unit || ''}`}
+                              {obs.valueString && `: ${obs.valueString}`}
+                            </span>
+                          </li>
+                        ))}
+                        {patientProfile.observations.length > 5 && (
+                          <li className="text-sm text-gray-500 italic">
+                            +{patientProfile.observations.length - 5} more observations
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* No data message */}
+                  {(!patientProfile.conditions || patientProfile.conditions.length === 0) &&
+                   (!patientProfile.medications || patientProfile.medications.length === 0) &&
+                   (!patientProfile.allergies || patientProfile.allergies.length === 0) &&
+                   (!patientProfile.observations || patientProfile.observations.length === 0) && (
+                    <div className="text-center py-6 text-gray-500">
+                      <p className="text-sm">No health data available for this patient</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Status-specific Messages */}

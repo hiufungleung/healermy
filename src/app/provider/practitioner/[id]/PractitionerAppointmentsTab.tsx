@@ -54,11 +54,11 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('today');
   const [statusFilters, setStatusFilters] = useState<StatusFilter[]>([]);
 
-  // Fetch appointments with practitioner filter - OPTIMIZED to 4 API calls
+  // Fetch appointments with practitioner filter - OPTIMIZED to 1 API call using FHIR _include and _revinclude!
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
     try {
-      console.log('[PRACTITIONER APPOINTMENTS] Starting optimized fetch with filters');
+      console.log('[PRACTITIONER APPOINTMENTS] 🚀 Starting SINGLE batch request with _include/_revinclude');
 
       // Build query parameters for appointments
       const appointmentParams = new URLSearchParams();
@@ -99,101 +99,76 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
         appointmentParams.append('status', statusFilters.join(','));
       }
 
-      console.log('[PRACTITIONER APPOINTMENTS] ⏳ CALL 1: Fetching appointments...', appointmentParams.toString());
+      // Add _include parameters to fetch related resources in same request
+      appointmentParams.append('_include', 'Appointment:patient');  // Include patients
+      appointmentParams.append('_include', 'Appointment:actor');    // Include practitioners
+      appointmentParams.append('_revinclude', 'Encounter:appointment'); // Include encounters
 
-      // CALL 1: Fetch appointments
-      const appointmentsResponse = await fetch(
-        `/api/fhir/appointments?${appointmentParams.toString()}`,
-        { credentials: 'include' }
-      );
+      console.log(`[PRACTITIONER APPOINTMENTS] Query: Appointment?${appointmentParams.toString()}`);
 
-      if (!appointmentsResponse.ok) {
-        throw new Error(`Failed to fetch appointments: ${appointmentsResponse.status}`);
+      // SINGLE CALL: Fetch appointments + patients + practitioners + encounters in ONE request!
+      const batchBundle = {
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: [{
+          request: {
+            method: 'GET',
+            url: `Appointment?${appointmentParams.toString()}`
+          }
+        }]
+      };
+
+      const batchResponse = await fetch('/api/fhir', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/fhir+json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(batchBundle),
+      });
+
+      if (!batchResponse.ok) {
+        throw new Error('Failed to fetch appointments with batch request');
       }
 
-      const appointmentsBundle = await appointmentsResponse.json();
-      const fetchedAppointments: Appointment[] = appointmentsBundle.entry?.map((e: any) => e.resource) || [];
-      console.log('[PRACTITIONER APPOINTMENTS] ✅ CALL 1 complete:', fetchedAppointments.length, 'appointments');
+      const responseBundle = await batchResponse.json();
 
-      // Extract IDs for batched calls
-      const appointmentIds = fetchedAppointments.map(apt => apt.id).filter(Boolean) as string[];
-      const patientIds = new Set<string>();
-      const practitionerIds = new Set<string>();
+      // Extract the search result bundle from batch response
+      const searchBundle = responseBundle.entry?.[0]?.resource;
+      if (!searchBundle || !searchBundle.entry) {
+        console.log('[PRACTITIONER APPOINTMENTS] ✅ No appointments found');
+        setAppointments([]);
+        return;
+      }
 
-      fetchedAppointments.forEach(apt => {
-        apt.participant?.forEach(p => {
-          const ref = p.actor?.reference;
-          if (ref?.startsWith('Patient/')) {
-            const id = ref.split('/')[1];
-            if (id) patientIds.add(id);
-          } else if (ref?.startsWith('Practitioner/')) {
-            const id = ref.split('/')[1];
-            if (id) practitionerIds.add(id);
-          }
-        });
-      });
-
-      console.log('[PRACTITIONER APPOINTMENTS] 📊 Extracted IDs:', {
-        appointments: appointmentIds.length,
-        patients: patientIds.size,
-        practitioners: practitionerIds.size
-      });
-
-      // CALLS 2-4: Parallel fetch encounters, patients, practitioners
-      console.log('[PRACTITIONER APPOINTMENTS] ⏳ CALLS 2-4: Fetching encounters, patients, practitioners...');
-
-      const [encountersResponse, patientsResponse, practitionersResponse] = await Promise.all([
-        appointmentIds.length > 0
-          ? fetch(`/api/fhir/encounters?appointment=${appointmentIds.join(',')}`, { credentials: 'include' })
-          : null,
-        patientIds.size > 0
-          ? fetch(`/api/fhir/patients?_id=${Array.from(patientIds).join(',')}`, { credentials: 'include' })
-          : null,
-        practitionerIds.size > 0
-          ? fetch(`/api/fhir/practitioners?_id=${Array.from(practitionerIds).join(',')}`, { credentials: 'include' })
-          : null,
-      ]);
-
-      // Map encounters by appointment ID
+      // Separate appointments from included resources using search.mode
+      const fetchedAppointments: Appointment[] = [];
+      const patientsMap = new Map<string, any>();
+      const practitionersMap = new Map<string, any>();
       const encountersByAppointment = new Map<string, Encounter>();
-      if (encountersResponse?.ok) {
-        const encountersBundle = await encountersResponse.json();
-        const encounters: Encounter[] = encountersBundle.entry?.map((e: any) => e.resource) || [];
-        console.log('[PRACTITIONER APPOINTMENTS] ✅ CALL 2 complete:', encounters.length, 'encounters');
-        encounters.forEach(enc => {
-          if (enc.appointment && enc.appointment.length > 0) {
-            const appointmentRef = enc.appointment[0].reference;
-            if (appointmentRef) {
-              const appointmentId = appointmentRef.split('/')[1];
-              if (appointmentId) {
-                encountersByAppointment.set(appointmentId, enc);
-              }
+
+      searchBundle.entry.forEach((entry: any) => {
+        const resource = entry.resource;
+        const searchMode = entry.search?.mode; // 'match' for appointments, 'include' for related resources
+
+        if (resource.resourceType === 'Appointment' && searchMode === 'match') {
+          fetchedAppointments.push(resource);
+        } else if (resource.resourceType === 'Patient') {
+          patientsMap.set(resource.id, resource);
+        } else if (resource.resourceType === 'Practitioner') {
+          practitionersMap.set(resource.id, resource);
+        } else if (resource.resourceType === 'Encounter') {
+          // Map encounter to appointment ID
+          if (resource.appointment?.[0]?.reference) {
+            const appointmentId = resource.appointment[0].reference.split('/')[1];
+            if (appointmentId) {
+              encountersByAppointment.set(appointmentId, resource);
             }
           }
-        });
-      }
+        }
+      });
 
-      // Map patients by ID
-      const patientsMap = new Map();
-      if (patientsResponse?.ok) {
-        const patientsBundle = await patientsResponse.json();
-        const patients = patientsBundle.entry?.map((e: any) => e.resource) || [];
-        console.log('[PRACTITIONER APPOINTMENTS] ✅ CALL 3 complete:', patients.length, 'patients');
-        patients.forEach((p: any) => {
-          if (p.id) patientsMap.set(p.id, p);
-        });
-      }
-
-      // Map practitioners by ID
-      const practitionersMap = new Map();
-      if (practitionersResponse?.ok) {
-        const practitionersBundle = await practitionersResponse.json();
-        const practitioners = practitionersBundle.entry?.map((e: any) => e.resource) || [];
-        console.log('[PRACTITIONER APPOINTMENTS] ✅ CALL 4 complete:', practitioners.length, 'practitioners');
-        practitioners.forEach((pr: any) => {
-          if (pr.id) practitionersMap.set(pr.id, pr);
-        });
-      }
+      console.log(`[PRACTITIONER APPOINTMENTS] ✅ SINGLE BATCH result: ${fetchedAppointments.length} appointments, ${patientsMap.size} patients, ${practitionersMap.size} practitioners, ${encountersByAppointment.size} encounters`);
 
       // Enhance appointments with patient, practitioner, and encounter data
       const enhanced = fetchedAppointments.map(apt => {

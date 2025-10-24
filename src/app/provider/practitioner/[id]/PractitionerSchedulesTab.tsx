@@ -351,12 +351,14 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
     }
   };
 
-  // Clear all slots for a schedule
+  // Clear all slots for a schedule - OPTIMIZED with FHIR batch DELETE
   const handleClearScheduleSlots = async (scheduleId: string) => {
     setClearingScheduleSlots(prev => new Set([...prev, scheduleId]));
 
     try {
-      // Fetch all slots for this schedule
+      console.log(`[CLEAR SLOTS] 🔍 Fetching free slots for schedule ${scheduleId}...`);
+
+      // Fetch all FREE slots for this schedule (only free slots can be deleted)
       const response = await fetch(
         `/api/fhir/slots?schedule=Schedule/${scheduleId}&status=free`,
         { credentials: 'include' }
@@ -367,19 +369,68 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
       const bundle = await response.json();
       const slots = bundle.entry?.map((e: any) => e.resource) || [];
 
-      // Delete each slot
-      const deletePromises = slots.map((slot: any) =>
-        fetch(`/api/fhir/slots/${slot.id}`, {
-          method: 'DELETE',
-          credentials: 'include',
-        })
-      );
+      if (slots.length === 0) {
+        console.log('[CLEAR SLOTS] ℹ️ No free slots to delete');
+        if (onScheduleUpdate) onScheduleUpdate();
+        return;
+      }
 
-      await Promise.all(deletePromises);
+      console.log(`[CLEAR SLOTS] 🚀 Deleting ${slots.length} free slots with SINGLE batch request`);
+
+      // OPTIMIZED: Use FHIR batch bundle to delete all slots in single request
+      const deleteBatchBundle = {
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: slots.map((slot: any) => ({
+          request: {
+            method: 'DELETE',
+            url: `Slot/${slot.id}`
+          }
+        }))
+      };
+
+      const deleteResponse = await fetch('/api/fhir', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/fhir+json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(deleteBatchBundle),
+      });
+
+      if (!deleteResponse.ok) {
+        const errorData = await deleteResponse.json();
+        throw new Error(errorData.error || `Batch delete failed: HTTP ${deleteResponse.status}`);
+      }
+
+      const responseBundle = await deleteResponse.json();
+
+      // Count successful deletions
+      let successCount = 0;
+      let failCount = 0;
+
+      if (responseBundle.entry && Array.isArray(responseBundle.entry)) {
+        responseBundle.entry.forEach((entry: any) => {
+          if (entry.response) {
+            const status = parseInt(entry.response.status);
+            if (status >= 200 && status < 300) {
+              successCount++;
+            } else {
+              failCount++;
+            }
+          }
+        });
+      }
+
+      console.log(`[CLEAR SLOTS] ✅ Deleted ${successCount} slots successfully`);
+      if (failCount > 0) {
+        console.warn(`[CLEAR SLOTS] ⚠️ Failed to delete ${failCount} slots`);
+      }
 
       if (onScheduleUpdate) onScheduleUpdate();
     } catch (error) {
-      console.error('Error clearing schedule slots:', error);
+      console.error('[CLEAR SLOTS] ❌ Error clearing schedule slots:', error);
+      alert('Failed to clear all slots. Some slots may have been deleted. Please refresh the page.');
     } finally {
       setClearingScheduleSlots(prev => {
         const next = new Set(prev);

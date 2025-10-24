@@ -269,7 +269,8 @@ export function formatSlotTime(slotStart: string, slotEnd: string): string {
  */
 export function getDateInputValue(date?: Date): string {
   const targetDate = date || getNowInAppTimezone();
-  return targetDate.toISOString().split('T')[0];
+  // Format using local date components to avoid UTC conversion
+  return `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
 }
 
 /**

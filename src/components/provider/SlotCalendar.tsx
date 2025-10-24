@@ -43,8 +43,8 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
 
   const calendarRef = useRef<any>(null);
 
-  // Fetch slots
-  const getSlots = async (d: Date) => {
+  // Fetch slots AND schedules using FHIR _include (single request)
+  const getSlotsWithSchedules = async (d: Date) => {
     // Get start of week (Monday)
     const day = d.getDay();
     const startDate = new Date(d);
@@ -66,21 +66,59 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
     params.append('schedule.actor', `Practitioner/${practitionerId}`);
     params.append('start', `ge${startISO}`);
     params.append('start', `lt${endISO}`);
+    // Include schedules referenced by slots in single request
+    params.append('_include', 'Slot:schedule');
 
     const res = await fetch(`/api/fhir/slots?${params}`, { credentials: 'include' });
     if (res.ok) {
       const bundle = await res.json();
-      setSlots(bundle.entry?.map((e: any) => e.resource) || []);
+
+      // Separate slots from included schedules using search.mode
+      const fetchedSlots: Slot[] = [];
+      const fetchedSchedules: Schedule[] = [];
+
+      bundle.entry?.forEach((entry: any) => {
+        const resource = entry.resource;
+        const searchMode = entry.search?.mode; // 'match' for slots, 'include' for schedules
+
+        if (resource.resourceType === 'Slot' && searchMode === 'match') {
+          fetchedSlots.push(resource);
+        } else if (resource.resourceType === 'Schedule') {
+          fetchedSchedules.push(resource);
+        }
+      });
+
+      console.log(`[SLOT CALENDAR] ✅ Fetched ${fetchedSlots.length} slots + ${fetchedSchedules.length} schedules in single request`);
+
+      setSlots(fetchedSlots);
+      setSchedules(fetchedSchedules);
     }
   };
 
   // Fetch schedules
-  const getSchedules = async (d: Date) => {
-    // Get first day of current month
-    const startDate = new Date(d.getFullYear(), d.getMonth(), 1);
+  const getSchedules = async (d: Date, currentView: string) => {
+    let startDate: Date;
+    let endDate: Date;
 
-    // Get first day of next month
-    const endDate = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    // For week view, use week range (same as slots)
+    // For month view, use month range
+    if (currentView === 'timeGridWeek') {
+      // Get start of week (Monday)
+      const day = d.getDay();
+      startDate = new Date(d);
+      startDate.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
+      startDate.setHours(0, 0, 0, 0);
+
+      // Get start of next week (Monday + 7 days)
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 7);
+    } else {
+      // Month view: Get first day of current month
+      startDate = new Date(d.getFullYear(), d.getMonth(), 1);
+
+      // Get first day of next month
+      endDate = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    }
 
     // Format as YYYY-MM-DD (schedule API only accepts date without time)
     const startStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
@@ -120,19 +158,13 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
     // Update URL parameter
     updateViewParam(v);
 
-    // Always fetch both simultaneously to avoid duplicates
+    // Fetch data based on view
     if (v === 'dayGridMonth') {
-      // Month view only needs schedules, but fetch both to keep legend consistent
-      await Promise.all([
-        getSchedules(d),
-        // Don't fetch slots for month view to avoid unnecessary API call
-      ]);
+      // Month view only needs schedules
+      await getSchedules(d, v);
     } else {
-      // Week view needs both - fetch simultaneously
-      await Promise.all([
-        getSlots(d),
-        getSchedules(d),
-      ]);
+      // Week view: fetch slots + schedules in single FHIR bundle request
+      await getSlotsWithSchedules(d);
     }
   };
 
@@ -262,10 +294,29 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
         };
       });
 
-  // Legend
-  const visible = view === 'dayGridMonth'
-    ? new Set(schedules.map(s => s.id).filter(Boolean))
-    : new Set(slots.map(s => s.schedule?.reference?.replace('Schedule/', '')).filter(Boolean));
+  // Legend - show schedules that have visible slots in current view
+  // For month view: show all schedules (from schedules state)
+  // For week view: show schedules that have slots in the slots state (actual visible slots on calendar)
+  const getVisibleScheduleIds = () => {
+    if (view === 'dayGridMonth') {
+      // Month view: show all schedules
+      return new Set(schedules.map(s => s.id).filter(Boolean));
+    } else {
+      // Week view: show schedules that have slots rendered in the current week
+      // Extract schedule IDs from the slots that are being displayed
+      const slotScheduleIds = new Set(
+        slots
+          .map(s => s.schedule?.reference?.replace('Schedule/', ''))
+          .filter(Boolean) as string[]
+      );
+
+      // Also include schedules from the schedules state that match these IDs
+      // This ensures we get the full schedule info for the legend
+      return slotScheduleIds;
+    }
+  };
+
+  const visible = getVisibleScheduleIds();
 
   const legend = schedules
     .filter(s => visible.has(s.id || ''))
@@ -335,17 +386,30 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
             const currentView = calendarApi?.view.type || view;
 
             if (currentView === 'timeGridWeek' && args.start && args.end) {
-              // For weekly view: "dd - dd MMM, yyyy"
+              // For weekly view: format based on whether dates span months/years
               const start = new Date(args.start.marker);
               const end = new Date(args.end.marker);
               end.setDate(end.getDate() - 1); // Adjust end date to last day of week
 
               const startDay = start.getDate();
               const endDay = end.getDate();
-              const month = end.toLocaleDateString('en-US', { month: 'short' });
-              const year = end.getFullYear();
+              const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
+              const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
+              const startYear = start.getFullYear();
+              const endYear = end.getFullYear();
 
-              return `${startDay} - ${endDay} ${month}, ${year}`;
+              // If dates span different years: "28 Dec 2024 - 3 Jan 2025"
+              if (startYear !== endYear) {
+                return `${startDay} ${startMonth} ${startYear} - ${endDay} ${endMonth} ${endYear}`;
+              }
+              // If dates span different months: "26 Oct - 1 Nov, 2025"
+              else if (startMonth !== endMonth) {
+                return `${startDay} ${startMonth} - ${endDay} ${endMonth}, ${endYear}`;
+              }
+              // Same month and year: "26 - 30 Oct, 2025"
+              else {
+                return `${startDay} - ${endDay} ${endMonth}, ${endYear}`;
+              }
             }
           }
           // Default formatting for other views

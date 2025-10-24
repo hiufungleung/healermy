@@ -1,29 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromCookies, prepareToken } from '@/app/api/fhir/utils/auth';
 
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
 /**
- * GET /api/fhir/patients/profile
+ * GET /api/fhir/patients/[id]/profile
  * Get complete patient profile with all related resources using FHIR bundle
  *
  * This endpoint uses a single FHIR batch bundle to fetch all patient data efficiently.
- * Patient ID is extracted from session (not from URL).
+ * Patient ID is taken from URL parameter (not session), so providers can view any patient.
  *
  * Returns all patient health data in a single consolidated response.
  * Billing data (Coverage, ExplanationOfBenefit) is fetched but should not be displayed in UI.
  */
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    // Extract patient ID from session
-    const session = await getSessionFromCookies();
-    const patientId = session.patient;
+    const { id: patientId } = await context.params;
 
     if (!patientId) {
       return NextResponse.json(
-        { error: 'Patient ID not found in session' },
-        { status: 401 }
+        { error: 'Patient ID is required' },
+        { status: 400 }
       );
     }
 
+    const session = await getSessionFromCookies();
     const token = prepareToken(session.accessToken);
     const fhirBaseUrl = session.fhirBaseUrl;
 
@@ -155,10 +158,15 @@ export async function GET(request: NextRequest) {
       if (!entry?.resource) return [];
 
       // If it's a search bundle, extract entries
-      if (entry.resource.resourceType === 'Bundle' && entry.resource.entry) {
-        return entry.resource.entry
-          .filter((e: any) => e.search?.mode === 'match') // Only get matched resources, not included
-          .map((e: any) => e.resource);
+      if (entry.resource.resourceType === 'Bundle') {
+        // Check if bundle has entries
+        if (entry.resource.entry && entry.resource.entry.length > 0) {
+          return entry.resource.entry
+            .filter((e: any) => e.search?.mode === 'match') // Only get matched resources, not included
+            .map((e: any) => e.resource);
+        }
+        // Empty bundle (total: 0) - return empty array
+        return [];
       }
 
       // If it's a single resource, return it
@@ -226,7 +234,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(profileData);
 
   } catch (error) {
-    console.error('Error in GET /api/fhir/patients/profile:', error);
+    console.error('Error in GET /api/fhir/patients/[id]/profile:', error);
     return NextResponse.json(
       {
         error: 'Failed to fetch patient profile',

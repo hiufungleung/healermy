@@ -274,20 +274,65 @@ export default function DashboardClient({
         const startOfDay = new Date(appointmentDate);
         startOfDay.setHours(0, 0, 0, 0);
 
-        // Fetch patient's encounter using appointment reference
-        const encounterResponse = await fetch(
-          `/api/fhir/encounters?appointment=Appointment/${nextTodayAppointment.id}`,
-          { credentials: 'include' }
-        );
+        // OPTIMIZED: Single batch request for both encounter and practitioner appointments
+        console.log('[QUEUE] 🚀 Fetching encounter + appointments in SINGLE batch request');
 
+        const batchBundle = {
+          resourceType: 'Bundle',
+          type: 'batch',
+          entry: [
+            {
+              request: {
+                method: 'GET',
+                url: `Encounter?appointment=Appointment/${nextTodayAppointment.id}`
+              }
+            },
+            {
+              request: {
+                method: 'GET',
+                url: `Appointment?practitioner=${practitionerId}&date=ge${startOfDay.toISOString()}&date=le${appointmentDate.toISOString()}&_sort=date`
+              }
+            }
+          ]
+        };
+
+        const batchResponse = await fetch('/api/fhir', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/fhir+json' },
+          credentials: 'include',
+          body: JSON.stringify(batchBundle),
+        });
+
+        if (!batchResponse.ok) {
+          console.error('[QUEUE] Failed to fetch batch data');
+          setQueuePosition(null);
+          setEstimatedWaitTime(null);
+          return;
+        }
+
+        const responseBundle = await batchResponse.json();
+
+        // Extract encounter from first batch entry
         let myEncounter = null;
         let encounterStatus = null;
-        if (encounterResponse.ok) {
-          const encounterData = await encounterResponse.json();
-          const encounters = encounterData.encounters || [];
-          myEncounter = encounters[0]; // Should only be one
-          encounterStatus = myEncounter?.status;
+        const encounterEntry = responseBundle.entry?.[0];
+        if (encounterEntry?.response && parseInt(encounterEntry.response.status) >= 200 && parseInt(encounterEntry.response.status) < 300) {
+          const encounterBundle = encounterEntry.resource;
+          if (encounterBundle?.entry?.[0]?.resource) {
+            myEncounter = encounterBundle.entry[0].resource;
+            encounterStatus = myEncounter?.status;
+          }
         }
+
+        // Extract appointments from second batch entry
+        let allAppointments: any[] = [];
+        const appointmentsEntry = responseBundle.entry?.[1];
+        if (appointmentsEntry?.response && parseInt(appointmentsEntry.response.status) >= 200 && parseInt(appointmentsEntry.response.status) < 300) {
+          const appointmentsBundle = appointmentsEntry.resource;
+          allAppointments = appointmentsBundle?.appointments || [];
+        }
+
+        console.log(`[QUEUE] ✅ Batch result: encounter status=${encounterStatus}, ${allAppointments.length} appointments`);
 
         // Update encounter status states
         setIsEncounterPlanned(encounterStatus === 'planned');
@@ -306,23 +351,6 @@ export default function DashboardClient({
           setEstimatedWaitTime(null);
           return;
         }
-
-        // Fetch appointments for this practitioner today, up to patient's appointment time
-        // Status NOT cancelled or fulfilled, date >= start of day, date <= patient's appointment start
-        const appointmentsResponse = await fetch(
-          `/api/fhir/appointments?practitioner=${practitionerId}&date=ge${startOfDay.toISOString()}&date=le${appointmentDate.toISOString()}&_sort=date`,
-          { credentials: 'include' }
-        );
-
-        if (!appointmentsResponse.ok) {
-          console.error('Failed to fetch appointments for queue calculation');
-          setQueuePosition(null);
-          setEstimatedWaitTime(null);
-          return;
-        }
-
-        const appointmentsData = await appointmentsResponse.json();
-        const allAppointments = appointmentsData.appointments || [];
 
         // Filter eligible appointments:
         // - Status NOT cancelled or fulfilled

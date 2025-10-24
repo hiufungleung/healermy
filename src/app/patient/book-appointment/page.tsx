@@ -1216,9 +1216,9 @@ function NewBookingFlow() {
             scheduleParams.append('service-category', selectedServiceCategory);
           }
 
-          // Add the name search params to schedule query
-          const scheduleUrl = `/api/fhir/schedules?${scheduleParams.toString()}&${nameParams}`;
-          console.log('[SEARCH] Searching schedules with filters:', scheduleUrl);
+          // OPTIMIZED: Use _include to fetch practitioners with schedules in single request
+          const scheduleUrl = `/api/fhir/schedules?${scheduleParams.toString()}&${nameParams}&_include=Schedule:actor:Practitioner`;
+          console.log('[SEARCH] 🚀 Searching schedules with _include (single request):', scheduleUrl);
 
           const schedulesResponse = await fetch(scheduleUrl, { credentials: 'include' });
 
@@ -1229,34 +1229,29 @@ function NewBookingFlow() {
           }
 
           const schedulesBundle = await schedulesResponse.json();
-          const matchingSchedules = schedulesBundle.entry?.map((e: any) => e.resource) || [];
 
-          // Extract unique practitioner IDs from schedules
-          const practitionerIds = new Set<string>();
-          matchingSchedules.forEach((schedule: any) => {
-            if (schedule.actor) {
-              schedule.actor.forEach((actor: any) => {
-                if (actor.reference?.startsWith('Practitioner/')) {
-                  const id = actor.reference.replace('Practitioner/', '');
-                  practitionerIds.add(id);
-                }
-              });
-            }
-          });
+          // Separate schedules from included practitioners using search.mode
+          const matchingSchedules: any[] = [];
+          const practitionersMap = new Map<string, any>();
 
-          if (practitionerIds.size > 0) {
-            // Fetch practitioner details using _id parameter
-            const idsParam = Array.from(practitionerIds).join(',');
-            const practitionersUrl = `/api/fhir/practitioners?_id=${idsParam}`;
-            console.log('[SEARCH] Fetching practitioners by IDs:', practitionersUrl);
+          if (schedulesBundle.entry) {
+            schedulesBundle.entry.forEach((entry: any) => {
+              const resource = entry.resource;
+              const searchMode = entry.search?.mode;
 
-            const practitionersResponse = await fetch(practitionersUrl, { credentials: 'include' });
-            if (practitionersResponse.ok) {
-              const practitionersBundle = await practitionersResponse.json();
-              setAllPractitioners(practitionersBundle.entry?.map((e: any) => e.resource) || []);
-            } else {
-              setAllPractitioners([]);
-            }
+              if (resource.resourceType === 'Schedule' && searchMode === 'match') {
+                matchingSchedules.push(resource);
+              } else if (resource.resourceType === 'Practitioner') {
+                practitionersMap.set(resource.id, resource);
+              }
+            });
+          }
+
+          console.log(`[SEARCH] ✅ Single request result: ${matchingSchedules.length} schedules, ${practitionersMap.size} practitioners`);
+
+          // Set practitioners from the included resources
+          if (practitionersMap.size > 0) {
+            setAllPractitioners(Array.from(practitionersMap.values()));
           } else {
             setAllPractitioners([]);
           }

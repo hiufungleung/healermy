@@ -60,7 +60,7 @@ export default function NotificationsClient({
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'action_required'>('all');
   const [localCommunications, setLocalCommunications] = useState<Communication[]>(initialCommunications);
   // Removed patient state - use session.patient directly since we only need the ID
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with true to show loader on page load
   const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
   const [locallyReadIds, setLocallyReadIds] = useState<Set<string>>(new Set()); // Track locally read messages for immediate blue bar removal
   const [locallyModifiedIds, setLocallyModifiedIds] = useState<Map<string, Communication>>(new Map()); // Track locally modified messages
@@ -74,6 +74,33 @@ export default function NotificationsClient({
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   const [appointmentLoading, setAppointmentLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Fetch initial data on mount
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      console.log('[PATIENT NOTIFICATIONS] 🔄 Fetching initial data...');
+
+      try {
+        const response = await fetch('/api/fhir/communications', {
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const bundle = await response.json();
+          const communications = (bundle.entry || []).map((entry: any) => entry.resource);
+
+          console.log('[PATIENT NOTIFICATIONS] ✅ Loaded', communications.length, 'communications');
+          setLocalCommunications(communications);
+        }
+      } catch (error) {
+        console.error('[PATIENT NOTIFICATIONS] ❌ Initial fetch error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInitialData();
+  }, []);
 
   // Intelligently merge prop updates while preserving local modifications
   useEffect(() => {
@@ -167,6 +194,43 @@ export default function NotificationsClient({
     }
   }, [activeFilter, localCommunications.length]); // Only depend on filter change and data availability
 
+  // Refresh function for bell icon click
+  const refreshNotifications = async () => {
+    console.log('[PATIENT NOTIFICATIONS] 🔄 Refreshing from bell icon click...');
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/fhir/communications', {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const bundle = await response.json();
+        const freshCommunications = (bundle.entry || []).map((entry: any) => entry.resource);
+
+        console.log('[PATIENT NOTIFICATIONS] ✅ Refreshed', freshCommunications.length, 'communications');
+
+        // Update communications
+        setLocalCommunications(freshCommunications);
+      }
+    } catch (error) {
+      console.error('[PATIENT NOTIFICATIONS] ❌ Refresh error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Listen for bell icon click events
+  useEffect(() => {
+    const handleBellClick = () => {
+      console.log('[PATIENT NOTIFICATIONS] Bell icon clicked, refreshing...');
+      refreshNotifications();
+    };
+
+    window.addEventListener('refresh-notifications', handleBellClick);
+    return () => window.removeEventListener('refresh-notifications', handleBellClick);
+  }, []);
+
   // Function to check if message is read
   const isMessageRead = (comm: Communication): boolean => {
     const patientRef = `Patient/${session.patient}`;
@@ -223,9 +287,17 @@ export default function NotificationsClient({
   };
 
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     const unreadMessages = localCommunications.filter(comm => !isMessageRead(comm));
 
+    if (unreadMessages.length === 0) {
+      console.log('[PATIENT NOTIFICATIONS] No unread messages to mark');
+      return;
+    }
+
+    console.log(`[PATIENT NOTIFICATIONS] 🚀 Marking ${unreadMessages.length} messages as read with SINGLE batch`);
+
+    // Optimistic UI update
     setLocalCommunications(prev =>
       prev.map(comm => ({
         ...comm,
@@ -239,13 +311,46 @@ export default function NotificationsClient({
       }))
     );
 
-    // Mark all as read on server
-    unreadMessages.forEach(comm => {
-      if (comm.id) markAsRead(comm.id);
-    });
+    try {
+      // OPTIMIZED: Use FHIR batch to mark all as read in single request
+      const batchBundle = {
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: unreadMessages.map(comm => ({
+          request: {
+            method: 'PATCH',
+            url: `Communication/${comm.id}`,
+            // Using custom action format (not JSON Patch RFC 6902)
+            // This matches the existing mark-read API endpoint
+          },
+          resource: {
+            resourceType: 'Parameters',
+            parameter: [{
+              name: 'action',
+              valueString: 'mark-read'
+            }]
+          }
+        }))
+      };
 
-    // Dispatch event to update notification bell
-    window.dispatchEvent(new CustomEvent('messageUpdate'));
+      const batchResponse = await fetch('/api/fhir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/fhir+json' },
+        credentials: 'include',
+        body: JSON.stringify(batchBundle),
+      });
+
+      if (!batchResponse.ok) {
+        console.error('[PATIENT NOTIFICATIONS] ❌ Failed to mark all as read on server');
+      } else {
+        console.log(`[PATIENT NOTIFICATIONS] ✅ Marked ${unreadMessages.length} messages as read in single batch`);
+      }
+
+      // Dispatch event to update notification bell
+      window.dispatchEvent(new CustomEvent('messageUpdate'));
+    } catch (error) {
+      console.error('[PATIENT NOTIFICATIONS] ❌ Error marking all as read:', error);
+    }
   };
 
   const handleMessageClick = async (comm: Communication) => {
@@ -254,31 +359,58 @@ export default function NotificationsClient({
     if (aboutRef?.startsWith('Appointment/')) {
       const appointmentId = aboutRef.replace('Appointment/', '');
 
-      // Fetch appointment details
+      // Fetch appointment details using FHIR batch (optimized)
       setAppointmentLoading(true);
       setIsDetailDialogOpen(true);
 
       try {
-        const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+        console.log('[PATIENT NOTIFICATIONS] 🚀 Fetching appointment details with FHIR batch');
+
+        // OPTIMIZED: Fetch appointment first, then batch-fetch practitioner if needed
+        const appointmentResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
           credentials: 'include'
         });
 
-        if (response.ok) {
-          const appointment = await response.json();
+        if (!appointmentResponse.ok) {
+          throw new Error('Failed to fetch appointment');
+        }
 
-          // Fetch practitioner details
-          const practitionerParticipant = appointment.participant?.find((p: any) =>
-            p.actor?.reference?.startsWith('Practitioner/')
-          );
+        const appointment = await appointmentResponse.json();
 
-          if (practitionerParticipant?.actor?.reference) {
-            const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
-            const practitionerResponse = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
-              credentials: 'include'
-            });
+        // Extract practitioner ID
+        const practitionerParticipant = appointment.participant?.find((p: any) =>
+          p.actor?.reference?.startsWith('Practitioner/')
+        );
 
-            if (practitionerResponse.ok) {
-              const practitioner = await practitionerResponse.json();
+        if (practitionerParticipant?.actor?.reference) {
+          const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
+
+          // OPTIMIZED: Use FHIR batch to get practitioner
+          const batchBundle = {
+            resourceType: 'Bundle',
+            type: 'batch',
+            entry: [{
+              request: {
+                method: 'GET',
+                url: `Practitioner/${practitionerId}`
+              }
+            }]
+          };
+
+          const batchResponse = await fetch('/api/fhir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/fhir+json' },
+            credentials: 'include',
+            body: JSON.stringify(batchBundle),
+          });
+
+          if (batchResponse.ok) {
+            const responseBundle = await batchResponse.json();
+            const practitionerEntry = responseBundle.entry?.[0];
+
+            if (practitionerEntry?.response && parseInt(practitionerEntry.response.status) >= 200 && parseInt(practitionerEntry.response.status) < 300) {
+              const practitioner = practitionerEntry.resource;
+
               appointment.practitionerDetails = {
                 name: practitioner.name?.[0]?.text ||
                       `${practitioner.name?.[0]?.given?.join(' ') || ''} ${practitioner.name?.[0]?.family || ''}`.trim() ||
@@ -292,11 +424,13 @@ export default function NotificationsClient({
                     practitioner.address[0].postalCode
                   ].filter(Boolean).join(', ') : 'TBD'
               };
+
+              console.log('[PATIENT NOTIFICATIONS] ✅ Fetched appointment + practitioner in batch');
             }
           }
-
-          setSelectedAppointment(appointment);
         }
+
+        setSelectedAppointment(appointment);
       } catch (error) {
         console.error('Error fetching appointment details:', error);
         toast.error('Failed to load appointment details');
@@ -445,37 +579,6 @@ export default function NotificationsClient({
     }
   };
 
-  const getMessageTitle = (comm: Communication) => {
-    const category = comm.category?.[0]?.text;
-    const content = comm.payload?.[0]?.contentString || '';
-    
-    // First check content for common patterns regardless of category
-    if (content.toLowerCase().includes('confirmed') || content.toLowerCase().includes('approved')) {
-      return 'Appointment Confirmed';
-    } else if (content.toLowerCase().includes('cancelled') || content.toLowerCase().includes('canceled')) {
-      return 'Appointment Cancelled';
-    } else if (content.toLowerCase().includes('reminder')) {
-      return 'Appointment Reminder';
-    } else if (content.toLowerCase().includes('test result') || content.toLowerCase().includes('lab result')) {
-      return 'Test Results Available';
-    } else if (content.toLowerCase().includes('prescription') || content.toLowerCase().includes('medication')) {
-      return 'Prescription Update';
-    }
-    
-    // Then check by category
-    switch (category) {
-      case 'appointment-update':
-        return 'Appointment Update';
-      case 'manual-message':
-        return 'Message from Provider';
-      case 'system-notification':
-        return 'System Notification';
-      default:
-        // If no specific content pattern and unknown category, return a generic title
-        return 'Healthcare Message';
-    }
-  };
-
   const getCategoryDisplay = (category?: Array<{ text?: string }>) => {
     if (!category?.[0]?.text) return 'Message';
     
@@ -533,11 +636,6 @@ export default function NotificationsClient({
 
   // Filter communications
   const filteredCommunications = localCommunications.filter(comm => {
-    const patientRef = `Patient/${session.patient}`;
-    const isReceived = comm.recipient?.some(r => r.reference === patientRef);
-    const isSent = comm.sender?.reference === patientRef;
-    const category = comm.category?.[0]?.text;
-
     switch (activeFilter) {
       case 'unread':
         // Include messages that are either currently unread OR were in the unread tab when it was opened
@@ -581,21 +679,94 @@ export default function NotificationsClient({
   const systemCount = localCommunications.filter(comm => comm.category?.[0]?.text === 'system-notification').length;
   const totalCount = localCommunications.length;
 
-  // Function to get appointment status badge - shows blue "Appointment Status Update" for appointment status changes only
-  const getAppointmentStatusBadge = (message: string) => {
-    const lowerMessage = message.toLowerCase();
 
-    // Only show for actual appointment status updates, not reminders
-    if (lowerMessage.includes('confirmed') ||
-        lowerMessage.includes('cancelled') ||
-        lowerMessage.includes('canceled')) {
-      return (
-        <Badge variant="info" size="sm">
-          Appointment Status Update
-        </Badge>
-      );
-    }
-    return null;
+  // Reusable NotificationCard component
+  const NotificationCard = ({ comm }: { comm: Communication }) => {
+    const messageContent = comm.payload?.[0]?.contentString || 'No content';
+    const isLongMessage = messageContent.length > 150;
+    const isUnread = !isMessageRead(comm) && !locallyReadIds.has(comm.id);
+
+    return (
+      <div key={comm.id}>
+        <Card
+          className={`p-4 py-3 rounded-[5px] transition-all duration-200 cursor-pointer ${
+            isUnread ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
+          } hover:shadow-md`}
+          onClick={() => handleMessageClick(comm)}
+        >
+          {/* Flex container for icon and title */}
+          <div className="flex items-center gap-2 mb-2">
+            {/* Icon with inline-flex for SVG centering */}
+            <div className="w-4 h-4 rounded-full bg-gray-100 inline-flex items-center justify-center flex-shrink-0">
+              {getNotificationIcon(comm)}
+            </div>
+
+            {/* Sender as Title */}
+            <h3 className="font-semibold text-sm text-text-primary">
+              {getSenderDisplay(comm)}
+            </h3>
+
+            {/* Unread indicator */}
+            {isUnread && (
+              <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
+            )}
+          </div>
+
+          {/* Badge inline with Message Preview */}
+          <p className="font-medium text-text-primary text-sm mb-0 line-clamp-3">
+            <span className="text-primary font-medium">{getCategoryDisplay(comm.category)}:</span> {`${messageContent.substring(0, 150)}${isLongMessage ? '...' : ''}`}
+          </p>
+
+          {/* Timestamp and action buttons at bottom */}
+          <div className="pt-0 border-t border-gray-100 flex items-center justify-between">
+            <p className="text-xs text-text-primary">
+              {formatDate(comm.sent)}
+            </p>
+            <div>
+              {isUnread && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (comm.id) {
+                      setLocallyReadIds(prev => new Set([...prev, comm.id]));
+                      setLocalCommunications(prev =>
+                        prev.map(localComm =>
+                          localComm.id === comm.id
+                            ? {
+                                ...localComm,
+                                extension: [
+                                  ...(localComm.extension || []),
+                                  {
+                                    url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
+                                    valueDateTime: new Date().toISOString()
+                                  }
+                                ]
+                              }
+                            : localComm
+                        )
+                      );
+                      markAsRead(comm.id);
+                    }
+                  }}
+                  className="text-xs text-primary hover:underline mr-4"
+                >
+                  Mark as Read
+                </button>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteNotification(comm.id);
+                }}
+                className="text-xs text-text-secondary hover:text-red-600"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
   };
 
   return (
@@ -603,8 +774,8 @@ export default function NotificationsClient({
       {/* Header - Always visible */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl sm:text-2xl sm:text-3xl font-bold text-text-primary mb-2">Notifications & Messages</h1>
-          <p className="text-text-secondary">Stay updated with your healthcare communications</p>
+          <h1 className="text-xl font-bold text-text-primary mb-2">Notifications & Messages</h1>
+          <p className="text-sm text-text-secondary">Stay updated with your healthcare communications</p>
         </div>
 
         {!loading && unreadCount > 0 && (
@@ -683,111 +854,9 @@ export default function NotificationsClient({
             <p className="text-text-secondary">No notifications found</p>
           </Card>
         ) : (
-          displayedItems.map((item) => {
-            const comm = item.data;
-            const messageContent = comm.payload?.[0]?.contentString || 'No content';
-            const isLongMessage = messageContent.length > 150;
-            const isUnread = !isMessageRead(comm) && !locallyReadIds.has(comm.id);
-
-            return (
-              <div key={comm.id}>
-                <Card
-                  className={`transition-all duration-200 cursor-pointer ${
-                    isUnread ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
-                  } hover:shadow-md`}
-                  onClick={() => handleMessageClick(comm)}
-                >
-                  <div className="flex items-start space-x-4">
-                    {/* Icon */}
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
-                        {getNotificationIcon(comm)}
-                      </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      {/* Header */}
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className={`font-semibold ${isUnread ? 'text-text-primary' : 'text-text-secondary'}`}>
-                              {getMessageTitle(comm)}
-                            </h3>
-                            {isUnread && (
-                              <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-2 items-center">
-                            <Badge variant="info" size="sm">
-                              {getCategoryDisplay(comm.category)}
-                            </Badge>
-                            <span className="text-xs text-text-secondary">
-                              From: {getSenderDisplay(comm)}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-                          {isUnread && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (comm.id) {
-                                  setLocallyReadIds(prev => new Set([...prev, comm.id]));
-                                  setLocalCommunications(prev =>
-                                    prev.map(localComm =>
-                                      localComm.id === comm.id
-                                        ? {
-                                            ...localComm,
-                                            extension: [
-                                              ...(localComm.extension || []),
-                                              {
-                                                url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
-                                                valueDateTime: new Date().toISOString()
-                                              }
-                                            ]
-                                          }
-                                        : localComm
-                                    )
-                                  );
-                                  markAsRead(comm.id);
-                                }
-                              }}
-                              className="text-sm text-primary hover:underline whitespace-nowrap"
-                            >
-                              Mark as Read
-                            </button>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteNotification(comm.id);
-                            }}
-                            className="text-sm text-text-secondary hover:text-red-600 whitespace-nowrap"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Message Preview */}
-                      <div>
-                        <p className="text-text-secondary text-sm mb-2 line-clamp-3">
-                          {`${messageContent.substring(0, 150)}${isLongMessage ? '...' : ''}`}
-                        </p>
-
-                        <p className="text-xs text-text-secondary">
-                          {formatDate(comm.sent)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            );
-          })
+          displayedItems.map((item) => (
+            <NotificationCard key={item.data.id} comm={item.data} />
+          ))
         )}
 
         {/* Load More */}
@@ -819,111 +888,9 @@ export default function NotificationsClient({
             <p className="text-text-secondary">No unread notifications</p>
           </Card>
         ) : (
-          displayedItems.map((item) => {
-            const comm = item.data;
-            const messageContent = comm.payload?.[0]?.contentString || 'No content';
-            const isLongMessage = messageContent.length > 150;
-            const isUnread = !isMessageRead(comm) && !locallyReadIds.has(comm.id);
-
-            return (
-              <div key={comm.id}>
-                <Card
-                  className={`transition-all duration-200 cursor-pointer ${
-                    isUnread ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
-                  } hover:shadow-md`}
-                  onClick={() => handleMessageClick(comm)}
-                >
-                  <div className="flex items-start space-x-4">
-                    {/* Icon */}
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
-                        {getNotificationIcon(comm)}
-                      </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      {/* Header */}
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className={`font-semibold ${isUnread ? 'text-text-primary' : 'text-text-secondary'}`}>
-                              {getMessageTitle(comm)}
-                            </h3>
-                            {isUnread && (
-                              <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-2 items-center">
-                            <Badge variant="info" size="sm">
-                              {getCategoryDisplay(comm.category)}
-                            </Badge>
-                            <span className="text-xs text-text-secondary">
-                              From: {getSenderDisplay(comm)}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-                          {isUnread && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (comm.id) {
-                                  setLocallyReadIds(prev => new Set([...prev, comm.id]));
-                                  setLocalCommunications(prev =>
-                                    prev.map(localComm =>
-                                      localComm.id === comm.id
-                                        ? {
-                                            ...localComm,
-                                            extension: [
-                                              ...(localComm.extension || []),
-                                              {
-                                                url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
-                                                valueDateTime: new Date().toISOString()
-                                              }
-                                            ]
-                                          }
-                                        : localComm
-                                    )
-                                  );
-                                  markAsRead(comm.id);
-                                }
-                              }}
-                              className="text-sm text-primary hover:underline whitespace-nowrap"
-                            >
-                              Mark as Read
-                            </button>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteNotification(comm.id);
-                            }}
-                            className="text-sm text-text-secondary hover:text-red-600 whitespace-nowrap"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Message Preview */}
-                      <div>
-                        <p className="text-text-secondary text-sm mb-2 line-clamp-3">
-                          {`${messageContent.substring(0, 150)}${isLongMessage ? '...' : ''}`}
-                        </p>
-
-                        <p className="text-xs text-text-secondary">
-                          {formatDate(comm.sent)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            );
-          })
+          displayedItems.map((item) => (
+            <NotificationCard key={item.data.id} comm={item.data} />
+          ))
         )}
 
         {/* Load More */}
@@ -955,111 +922,9 @@ export default function NotificationsClient({
             <p className="text-text-secondary">No action required</p>
           </Card>
         ) : (
-          displayedItems.map((item) => {
-            const comm = item.data;
-            const messageContent = comm.payload?.[0]?.contentString || 'No content';
-            const isLongMessage = messageContent.length > 150;
-            const isUnread = !isMessageRead(comm) && !locallyReadIds.has(comm.id);
-
-            return (
-              <div key={comm.id}>
-                <Card
-                  className={`transition-all duration-200 cursor-pointer ${
-                    isUnread ? 'border-l-4 border-l-primary bg-blue-50/30' : ''
-                  } hover:shadow-md`}
-                  onClick={() => handleMessageClick(comm)}
-                >
-                  <div className="flex items-start space-x-4">
-                    {/* Icon */}
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
-                        {getNotificationIcon(comm)}
-                      </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      {/* Header */}
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className={`font-semibold ${isUnread ? 'text-text-primary' : 'text-text-secondary'}`}>
-                              {getMessageTitle(comm)}
-                            </h3>
-                            {isUnread && (
-                              <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0"></div>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-2 items-center">
-                            <Badge variant="info" size="sm">
-                              {getCategoryDisplay(comm.category)}
-                            </Badge>
-                            <span className="text-xs text-text-secondary">
-                              From: {getSenderDisplay(comm)}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-                          {isUnread && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (comm.id) {
-                                  setLocallyReadIds(prev => new Set([...prev, comm.id]));
-                                  setLocalCommunications(prev =>
-                                    prev.map(localComm =>
-                                      localComm.id === comm.id
-                                        ? {
-                                            ...localComm,
-                                            extension: [
-                                              ...(localComm.extension || []),
-                                              {
-                                                url: 'http://hl7.org/fhir/StructureDefinition/communication-read-status',
-                                                valueDateTime: new Date().toISOString()
-                                              }
-                                            ]
-                                          }
-                                        : localComm
-                                    )
-                                  );
-                                  markAsRead(comm.id);
-                                }
-                              }}
-                              className="text-sm text-primary hover:underline whitespace-nowrap"
-                            >
-                              Mark as Read
-                            </button>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteNotification(comm.id);
-                            }}
-                            className="text-sm text-text-secondary hover:text-red-600 whitespace-nowrap"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Message Preview */}
-                      <div>
-                        <p className="text-text-secondary text-sm mb-2 line-clamp-3">
-                          {`${messageContent.substring(0, 150)}${isLongMessage ? '...' : ''}`}
-                        </p>
-
-                        <p className="text-xs text-text-secondary">
-                          {formatDate(comm.sent)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            );
-          })
+          displayedItems.map((item) => (
+            <NotificationCard key={item.data.id} comm={item.data} />
+          ))
         )}
 
         {/* Load More */}

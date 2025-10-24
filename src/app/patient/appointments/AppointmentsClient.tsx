@@ -44,33 +44,92 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
   // Fetch appointments
   useEffect(() => {
     const fetchAppointments = async () => {
-      console.log('[APPOINTMENTS] Fetching appointments for patient:', session.patient);
+      console.log('[PATIENT APPOINTMENTS] 🚀 Fetching with SINGLE batch request (appointments + practitioners)');
       setLoading(true);
 
       try {
-        const response = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
-          credentials: 'include'
+        // OPTIMIZED: Single batch request with _include for practitioners
+        const batchBundle = {
+          resourceType: 'Bundle',
+          type: 'batch',
+          entry: [{
+            request: {
+              method: 'GET',
+              url: `Appointment?patient=${session.patient}&_include=Appointment:actor`
+            }
+          }]
+        };
+
+        const batchResponse = await fetch('/api/fhir', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/fhir+json' },
+          credentials: 'include',
+          body: JSON.stringify(batchBundle),
         });
 
-        console.log('[APPOINTMENTS] API response status:', response.status);
-
-        if (response.ok) {
-          const bundle = await response.json();
-          const appointments = bundle.entry?.map((e: any) => e.resource) || [];
-          console.log('[APPOINTMENTS] Fetched', appointments.length, 'appointments');
-
-          // Use the reusable appointment enhancement utility
-          const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');
-          const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
-          console.log('[APPOINTMENTS] Enhanced appointments:', enhancedAppointments.length);
-          setAppointments(enhancedAppointments);
-        } else {
-          const errorText = await response.text();
-          console.error('[APPOINTMENTS] Failed to fetch:', response.status, response.statusText, errorText);
-          setAppointments([]);
+        if (!batchResponse.ok) {
+          throw new Error(`Failed to fetch appointments: ${batchResponse.status}`);
         }
+
+        const responseBundle = await batchResponse.json();
+
+        // Extract the search result bundle from batch response
+        const searchBundle = responseBundle.entry?.[0]?.resource;
+        if (!searchBundle || !searchBundle.entry) {
+          console.log('[PATIENT APPOINTMENTS] ✅ No appointments found');
+          setAppointments([]);
+          return;
+        }
+
+        // Separate appointments from included practitioners using search.mode
+        const fetchedAppointments: any[] = [];
+        const practitionersMap = new Map<string, any>();
+
+        searchBundle.entry.forEach((entry: any) => {
+          const resource = entry.resource;
+          const searchMode = entry.search?.mode;
+
+          if (resource.resourceType === 'Appointment' && searchMode === 'match') {
+            fetchedAppointments.push(resource);
+          } else if (resource.resourceType === 'Practitioner') {
+            practitionersMap.set(resource.id, resource);
+          }
+        });
+
+        console.log(`[PATIENT APPOINTMENTS] ✅ SINGLE BATCH result: ${fetchedAppointments.length} appointments, ${practitionersMap.size} practitioners`);
+
+        // Enhance appointments with practitioner details
+        const enhanced = fetchedAppointments.map(apt => {
+          const practitionerRef = apt.participant?.find((p: any) =>
+            p.actor?.reference?.startsWith('Practitioner/')
+          );
+
+          if (practitionerRef?.actor?.reference) {
+            const practitionerId = practitionerRef.actor.reference.split('/')[1];
+            const practitioner = practitionersMap.get(practitionerId);
+
+            if (practitioner?.name?.[0]) {
+              const name = practitioner.name[0];
+              const practitionerName = `${name.given?.[0] || ''} ${name.family || ''}`.trim();
+
+              return {
+                ...apt,
+                practitionerDetails: {
+                  name: practitionerName,
+                  specialty: practitioner.qualification?.[0]?.code?.coding?.[0]?.display || 'General Practice',
+                  address: practitioner.address?.[0],
+                  phone: practitioner.telecom?.find((t: any) => t.system === 'phone')?.value
+                }
+              };
+            }
+          }
+
+          return apt;
+        });
+
+        setAppointments(enhanced);
       } catch (error) {
-        console.error('[APPOINTMENTS] Error fetching appointments:', error);
+        console.error('[PATIENT APPOINTMENTS] Error:', error);
         setAppointments([]);
       } finally {
         setLoading(false);

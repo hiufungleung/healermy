@@ -23,7 +23,10 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
     const targetUrl = `${notificationsPath}?filter=unread`;
 
     if (currentPath === notificationsPath) {
-      // Already on notifications page, just update URL and trigger filter change
+      // Already on notifications page, trigger refresh
+      console.log('[BELL ICON] Dispatching refresh-notifications event');
+      window.dispatchEvent(new CustomEvent('refresh-notifications'));
+      // Then update URL and trigger filter change
       window.history.pushState({}, '', targetUrl);
       // Trigger a popstate event to notify components of URL change
       window.dispatchEvent(new PopStateEvent('popstate'));
