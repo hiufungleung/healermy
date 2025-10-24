@@ -398,52 +398,87 @@ export function GenerateSlotsForm({
       // Initialize progress
       setProgress({ current: 0, total: slotsToCreate.length });
 
-      // Create individual POST requests for each slot
+      // Create FHIR batch bundle with all slots
+      // https://build.fhir.org/bundle.html
+      const bundle = {
+        resourceType: 'Bundle',
+        type: 'batch',
+        entry: slotsToCreate.map((slot) => ({
+          resource: slot,
+          request: {
+            method: 'POST',
+            url: 'Slot'
+          }
+        }))
+      };
+
+      console.log(`[BATCH] Sending batch request with ${bundle.entry.length} slots`);
+
+      // Send single batch request to FHIR server
       const createdSlots: any[] = [];
       const failedSlots: { slot: Slot; error: string }[] = [];
-      let completedCount = 0;
 
-      // Create promises for all slots and track progress as each completes
-      const slotPromises = slotsToCreate.map(async (slot) => {
-        try {
-          const response = await fetch('/api/fhir/slots', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/fhir+json',
-            },
-            credentials: 'include',
-            body: JSON.stringify(slot),
+      try {
+        const response = await fetch('/api/fhir', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/fhir+json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(bundle),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || errorData.details || `Batch request failed: HTTP ${response.status}`);
+        }
+
+        const responseBundle = await response.json();
+
+        // Parse response bundle to extract created and failed slots
+        if (responseBundle.entry && Array.isArray(responseBundle.entry)) {
+          responseBundle.entry.forEach((entry: any, index: number) => {
+            const originalSlot = slotsToCreate[index];
+
+            // Update progress as we process each response
+            setProgress({ current: index + 1, total: slotsToCreate.length });
+
+            if (entry.response) {
+              const status = parseInt(entry.response.status);
+
+              if (status >= 200 && status < 300) {
+                // Success (2xx status)
+                createdSlots.push(entry.resource || originalSlot);
+              } else {
+                // Failure
+                const errorMessage = entry.response.outcome?.issue?.[0]?.diagnostics
+                  || entry.response.outcome?.text?.div
+                  || `HTTP ${status}`;
+
+                failedSlots.push({
+                  slot: originalSlot,
+                  error: errorMessage
+                });
+              }
+            } else {
+              // No response for this entry
+              failedSlots.push({
+                slot: originalSlot,
+                error: 'No response from server'
+              });
+            }
           });
-
-          completedCount++;
-          setProgress({ current: completedCount, total: slotsToCreate.length });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            failedSlots.push({
-              slot,
-              error: errorData.error || errorData.details || `HTTP ${response.status}`
-            });
-            return null;
-          }
-
-          const createdSlot = await response.json();
-          createdSlots.push(createdSlot);
-          return createdSlot;
-        } catch (error) {
-          completedCount++;
-          setProgress({ current: completedCount, total: slotsToCreate.length });
-
+        }
+      } catch (error) {
+        // If the entire batch request fails, mark all slots as failed
+        console.error('[BATCH] Batch request failed:', error);
+        slotsToCreate.forEach((slot) => {
           failedSlots.push({
             slot,
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: error instanceof Error ? error.message : 'Batch request failed'
           });
-          return null;
-        }
-      });
-
-      // Wait for all requests to complete
-      await Promise.all(slotPromises);
+        });
+      }
 
       // Clear progress when done
       setProgress(null);

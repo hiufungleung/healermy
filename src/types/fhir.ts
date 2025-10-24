@@ -128,6 +128,22 @@ export interface Slot {
 export interface Appointment {
   resourceType: 'Appointment';
   id: string;
+  meta?: {
+    versionId?: string;
+    lastUpdated?: string;
+    source?: string;
+    profile?: string[];
+    security?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+    tag?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+  };
   status: 'proposed' | 'pending' | 'booked' | 'arrived' | 'fulfilled' | 'cancelled' | 'noshow' | 'entered-in-error' | 'checked-in' | 'waitlist';
   serviceType?: Array<{
     text?: string;

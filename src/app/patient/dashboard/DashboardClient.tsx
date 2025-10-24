@@ -37,6 +37,7 @@ export default function DashboardClient({
   const [estimatedWaitTime, setEstimatedWaitTime] = useState<number | null>(null);
   const [isPatientArrived, setIsPatientArrived] = useState(false);
   const [isEncounterPlanned, setIsEncounterPlanned] = useState(false);
+  const [isEncounterInProgress, setIsEncounterInProgress] = useState(false);
 
   // Track if we've already fetched to prevent duplicate calls
   const hasFetchedRef = React.useRef(false);
@@ -110,15 +111,24 @@ export default function DashboardClient({
     }
   };
 
-  // Filter appointments for upcoming section: all appointments from today onwards (not cancelled, not fulfilled)
+  // Filter appointments for upcoming section: all appointments from today onwards (not cancelled)
+  // For fulfilled: only show if _lastUpdated within last 10 minutes
   const nowLocal = getNowInAppTimezone();
   const todayLocal = new Date(nowLocal);
   todayLocal.setHours(0, 0, 0, 0); // Start of today
+  const tenMinutesAgoLocal = new Date(nowLocal.getTime() - 10 * 60 * 1000);
 
   const displayAppointments = (Array.isArray(appointments) ? appointments : []).filter((appointment) => {
-    // Exclude cancelled and fulfilled appointments
-    if (appointment.status === 'cancelled' || appointment.status === 'fulfilled') {
+    // Exclude cancelled appointments
+    if (appointment.status === 'cancelled') {
       return false;
+    }
+
+    // For fulfilled appointments, only show if _lastUpdated within last 10 minutes
+    if (appointment.status === 'fulfilled') {
+      if (!appointment.meta?.lastUpdated) return false;
+      const lastUpdated = new Date(appointment.meta.lastUpdated);
+      if (lastUpdated < tenMinutesAgoLocal) return false;
     }
 
     // Show all appointments from today onwards (no date limit)
@@ -131,37 +141,51 @@ export default function DashboardClient({
   });
   
   // Calculate next appointment for today's status
+  // Requirements:
+  // - Today or future (including today's past time)
+  // - Status is booked (confirmed), arrived, or fulfilled
+  // - If fulfilled, only show if _lastUpdated within last 10 minutes
+  // - Only show one (first when sorted by start time ascending)
   const now = new Date();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
 
-  // Filter for today's and future appointments that are not fulfilled, cancelled, or booked
-  // For today: includes appointments whose time has passed but haven't been completed yet
-  // For future: includes all appointments in the future
   const activeAppointments = appointments?.filter(apt => {
     if (!apt.start) return false;
     const aptDateTime = new Date(apt.start);
 
-    // Must be today or in the future
+    // Must be today or in the future (entire day, including today's past time)
     if (aptDateTime < today) return false;
 
-    // Exclude fulfilled, cancelled, and booked appointments
-    // (we want pending, arrived, etc. - appointments that are in progress or waiting)
-    return apt.status !== 'booked' && apt.status !== 'fulfilled' && apt.status !== 'cancelled';
+    // Must be booked (confirmed), arrived, or fulfilled
+    if (apt.status !== 'booked' && apt.status !== 'arrived' && apt.status !== 'fulfilled') {
+      return false;
+    }
+
+    // If fulfilled, only show if _lastUpdated within last 10 minutes
+    if (apt.status === 'fulfilled') {
+      if (!apt.meta?.lastUpdated) return false;
+      const lastUpdated = new Date(apt.meta.lastUpdated);
+      if (lastUpdated < tenMinutesAgo) return false;
+    }
+
+    return true;
   }) || [];
 
-  console.log('[DASHBOARD] Active appointments (today or future, not booked/fulfilled/cancelled):', activeAppointments.length);
+  console.log('[DASHBOARD] Active appointments (today or future, booked/arrived/fulfilled):', activeAppointments.length);
   if (activeAppointments.length > 0) {
     console.log('[DASHBOARD] Active appointments:', activeAppointments.map(apt => ({
       id: apt.id,
       status: apt.status,
       start: apt.start,
+      lastUpdated: apt.meta?.lastUpdated,
       isPast: new Date(apt.start!) < now,
       isToday: new Date(apt.start!) >= today && new Date(apt.start!) < new Date(today.getTime() + 24 * 60 * 60 * 1000)
     })));
   }
 
-  // Find the next appointment (sorted by time, earliest first)
+  // Find the next appointment (sorted by time, earliest first) - only take the first one
   const nextTodayAppointment = activeAppointments
     .sort((a, b) => new Date(a.start!).getTime() - new Date(b.start!).getTime())[0];
 
@@ -169,6 +193,7 @@ export default function DashboardClient({
     id: nextTodayAppointment.id,
     status: nextTodayAppointment.status,
     start: nextTodayAppointment.start,
+    lastUpdated: nextTodayAppointment.meta?.lastUpdated,
     isPast: new Date(nextTodayAppointment.start!) < now,
     isToday: new Date(nextTodayAppointment.start!) >= today && new Date(nextTodayAppointment.start!) < new Date(today.getTime() + 24 * 60 * 60 * 1000)
   } : 'None');
@@ -181,7 +206,11 @@ export default function DashboardClient({
   };
 
   // Calculate queue position based on encounters for next appointment
-  // Polls every 10 seconds, but ONLY if appointment is TODAY and patient has arrived
+  // Requirements:
+  // - Only runs when patient status is 'arrived'
+  // - Fetches patient's encounter using appointment=Appointment/{id}
+  // - Counts appointments before patient: status NOT cancelled/fulfilled, start today ge{00:00} le{patient's start}
+  // - Wait time: No encounter = sum durations, planned = "< 10 mins", in-progress = show special message, finished = fulfilled (won't show)
   useEffect(() => {
     const calculateQueuePosition = async () => {
       if (!nextTodayAppointment || !nextTodayAppointment.start) {
@@ -189,6 +218,7 @@ export default function DashboardClient({
         setEstimatedWaitTime(null);
         setIsPatientArrived(false);
         setIsEncounterPlanned(false);
+        setIsEncounterInProgress(false);
         return;
       }
 
@@ -205,11 +235,12 @@ export default function DashboardClient({
       const arrived = nextTodayAppointment.status === 'arrived';
       setIsPatientArrived(arrived);
 
-      // If appointment is NOT today, don't poll at all
+      // If appointment is NOT today, don't poll
       if (!isToday) {
         setQueuePosition(null);
         setEstimatedWaitTime(null);
         setIsEncounterPlanned(false);
+        setIsEncounterInProgress(false);
         return;
       }
 
@@ -218,8 +249,10 @@ export default function DashboardClient({
         setQueuePosition(null);
         setEstimatedWaitTime(null);
         setIsEncounterPlanned(false);
+        setIsEncounterInProgress(false);
         return;
       }
+
       try {
         // Extract practitioner from the appointment
         const practitionerParticipant = nextTodayAppointment.participant?.find(
@@ -230,118 +263,100 @@ export default function DashboardClient({
           setQueuePosition(null);
           setEstimatedWaitTime(null);
           setIsEncounterPlanned(false);
+          setIsEncounterInProgress(false);
           return;
         }
 
         const practitionerReference = practitionerParticipant.actor.reference;
         const practitionerId = practitionerReference.replace('Practitioner/', '');
 
-        // Get the start and end of the appointment day
-        const appointmentDate = new Date(nextTodayAppointment.start);
+        // Get start of day
         const startOfDay = new Date(appointmentDate);
         startOfDay.setHours(0, 0, 0, 0);
-        const startOfNextDay = new Date(appointmentDate);
-        startOfNextDay.setDate(startOfNextDay.getDate() + 1);
-        startOfNextDay.setHours(0, 0, 0, 0);
 
-        // Fetch encounters and appointments in PARALLEL (not sequentially)
-        // Only fetch in-progress and planned encounters (optimized query)
-        const [encountersResponse, appointmentsResponse] = await Promise.all([
-          fetch(
-            `/api/fhir/encounters?practitioner=${practitionerId}&date=ge${startOfDay.toISOString()}&date=lt${startOfNextDay.toISOString()}&status=in-progress,planned&_sort=-date`,
-            { credentials: 'include' }
-          ),
-          fetch(
-            `/api/fhir/appointments?practitioner=${practitionerId}&date=ge${startOfDay.toISOString()}&date=lt${startOfNextDay.toISOString()}&status:not=fulfilled&_sort=date`,
-            { credentials: 'include' }
-          )
-        ]);
+        // Fetch patient's encounter using appointment reference
+        const encounterResponse = await fetch(
+          `/api/fhir/encounters?appointment=Appointment/${nextTodayAppointment.id}`,
+          { credentials: 'include' }
+        );
 
-        if (!encountersResponse.ok || !appointmentsResponse.ok) {
-          console.error('Failed to fetch encounters or appointments for queue calculation');
-          setQueuePosition(null);
-          setEstimatedWaitTime(null);
-          setIsEncounterPlanned(false);
+        let myEncounter = null;
+        let encounterStatus = null;
+        if (encounterResponse.ok) {
+          const encounterData = await encounterResponse.json();
+          const encounters = encounterData.encounters || [];
+          myEncounter = encounters[0]; // Should only be one
+          encounterStatus = myEncounter?.status;
+        }
+
+        // Update encounter status states
+        setIsEncounterPlanned(encounterStatus === 'planned');
+        setIsEncounterInProgress(encounterStatus === 'in-progress');
+
+        // If encounter is in-progress, show special message (patient is seeing doctor now)
+        if (encounterStatus === 'in-progress') {
+          setQueuePosition(0);
+          setEstimatedWaitTime(0);
           return;
         }
 
-        const encountersData = await encountersResponse.json();
-        const appointmentsData = await appointmentsResponse.json();
-        const encounters = encountersData.encounters || [];
-        const allAppointments = appointmentsData.appointments || [];
-
-        // Find the encounter for THIS patient's appointment
-        const myEncounter = encounters.find((enc: any) =>
-          enc.appointment?.[0]?.reference === `Appointment/${nextTodayAppointment.id}`
-        );
-
-        // Update encounter planned status
-        const encounterPlanned = myEncounter?.status === 'planned';
-        setIsEncounterPlanned(encounterPlanned);
-
-        // Calculate wait time based on encounter status combinations
-        const { ENCOUNTER_PLANNED_WAIT_TIME_MINUTES } = await import('@/library/queueCalculation');
-
-        let waitTimeMinutes = 0;
-        let patientsAhead = 0;
-
-        // Check if there's an in-progress encounter
-        const hasInProgress = encounters.some((enc: any) => enc.status === 'in-progress');
-        const hasPlanned = encounters.some((enc: any) => enc.status === 'planned');
-
-        if (hasInProgress && hasPlanned) {
-          // Case 1: Both in-progress and planned exist
-          // Wait time = all not-started appointments + 10 mins (will be finished)
-          const notStartedAppointments = allAppointments.filter((apt: any) => {
-            const aptTime = new Date(apt.start).getTime();
-            const myTime = new Date(nextTodayAppointment.start).getTime();
-            return aptTime < myTime && apt.status !== 'arrived' && apt.id !== nextTodayAppointment.id;
-          });
-
-          patientsAhead = notStartedAppointments.length + 1; // +1 for the planned encounter
-          waitTimeMinutes = notStartedAppointments.reduce((total: number, apt: any) => {
-            if (apt.start && apt.end) {
-              const duration = (new Date(apt.end).getTime() - new Date(apt.start).getTime()) / (1000 * 60);
-              return total + duration;
-            }
-            return total + 15; // fallback
-          }, 0) + ENCOUNTER_PLANNED_WAIT_TIME_MINUTES;
-
-        } else if (hasInProgress && !hasPlanned) {
-          // Case 2: Only in-progress exists
-          // Wait time = all not-started appointments + in-progress appointment
-          const inProgressEncounter = encounters.find((enc: any) => enc.status === 'in-progress');
-          const inProgressAppointment = allAppointments.find((apt: any) =>
-            inProgressEncounter?.appointment?.[0]?.reference === `Appointment/${apt.id}`
-          );
-
-          const notStartedAppointments = allAppointments.filter((apt: any) => {
-            const aptTime = new Date(apt.start).getTime();
-            const myTime = new Date(nextTodayAppointment.start).getTime();
-            return aptTime < myTime && apt.status !== 'arrived' && apt.id !== nextTodayAppointment.id;
-          });
-
-          patientsAhead = notStartedAppointments.length + 1; // +1 for in-progress
-
-          let inProgressDuration = 15; // fallback
-          if (inProgressAppointment?.start && inProgressAppointment?.end) {
-            inProgressDuration = (new Date(inProgressAppointment.end).getTime() -
-                                 new Date(inProgressAppointment.start).getTime()) / (1000 * 60);
-          }
-
-          waitTimeMinutes = notStartedAppointments.reduce((total: number, apt: any) => {
-            if (apt.start && apt.end) {
-              const duration = (new Date(apt.end).getTime() - new Date(apt.start).getTime()) / (1000 * 60);
-              return total + duration;
-            }
-            return total + 15;
-          }, 0) + inProgressDuration;
+        // If encounter is finished, appointment should be fulfilled (won't show as next appointment)
+        if (encounterStatus === 'finished') {
+          setQueuePosition(null);
+          setEstimatedWaitTime(null);
+          return;
         }
 
-        // If MY encounter is planned, override wait time to < 10 mins
-        if (encounterPlanned) {
-          waitTimeMinutes = ENCOUNTER_PLANNED_WAIT_TIME_MINUTES;
-          patientsAhead = 0; // I'm about to be called
+        // Fetch appointments for this practitioner today, up to patient's appointment time
+        // Status NOT cancelled or fulfilled, date >= start of day, date <= patient's appointment start
+        const appointmentsResponse = await fetch(
+          `/api/fhir/appointments?practitioner=${practitionerId}&date=ge${startOfDay.toISOString()}&date=le${appointmentDate.toISOString()}&_sort=date`,
+          { credentials: 'include' }
+        );
+
+        if (!appointmentsResponse.ok) {
+          console.error('Failed to fetch appointments for queue calculation');
+          setQueuePosition(null);
+          setEstimatedWaitTime(null);
+          return;
+        }
+
+        const appointmentsData = await appointmentsResponse.json();
+        const allAppointments = appointmentsData.appointments || [];
+
+        // Filter eligible appointments:
+        // - Status NOT cancelled or fulfilled
+        // - Start time < patient's appointment start time
+        // - Not patient's own appointment
+        const eligibleAppointments = allAppointments.filter((apt: any) => {
+          if (apt.id === nextTodayAppointment.id) return false;
+          if (apt.status === 'cancelled' || apt.status === 'fulfilled') return false;
+
+          const aptTime = new Date(apt.start).getTime();
+          const myTime = appointmentDate.getTime();
+          return aptTime < myTime;
+        });
+
+        const patientsAhead = eligibleAppointments.length;
+
+        // Calculate wait time
+        let waitTimeMinutes = 0;
+
+        if (encounterStatus === 'planned') {
+          // Encounter is planned, wait time is < 10 mins
+          waitTimeMinutes = 10;
+        } else if (patientsAhead === 0 && !encounterStatus) {
+          // No patients ahead AND no encounter exists, show < 10 mins
+          waitTimeMinutes = 10;
+        } else {
+          // No encounter or other status, sum durations of eligible appointments
+          waitTimeMinutes = eligibleAppointments.reduce((total: number, apt: any) => {
+            if (apt.start && apt.end) {
+              const duration = (new Date(apt.end).getTime() - new Date(apt.start).getTime()) / (1000 * 60);
+              return total + duration;
+            }
+            return total + 15; // fallback 15 minutes
+          }, 0);
         }
 
         setQueuePosition(patientsAhead);
@@ -351,6 +366,7 @@ export default function DashboardClient({
         setQueuePosition(null);
         setEstimatedWaitTime(null);
         setIsEncounterPlanned(false);
+        setIsEncounterInProgress(false);
       }
     };
 
@@ -510,15 +526,22 @@ export default function DashboardClient({
                     </div>
                   )}
 
-                  {/* Show "You are checked in" if patient has arrived */}
-                  {isPatientArrived && (
+                  {/* Show "Your appointment is in progress" if encounter is in-progress */}
+                  {isPatientArrived && isEncounterInProgress && (
+                    <div>
+                      <p className="text-xl sm:text-2xl font-bold text-green-600">Your appointment is in progress</p>
+                    </div>
+                  )}
+
+                  {/* Show "You are checked in" if patient has arrived but encounter not in-progress */}
+                  {isPatientArrived && !isEncounterInProgress && (
                     <div>
                       <p className="text-xl sm:text-2xl font-bold text-green-600">You are checked in</p>
                     </div>
                   )}
 
-                  {/* Show queue info only if patient has arrived */}
-                  {isPatientArrived && queuePosition !== null && queuePosition !== undefined && estimatedWaitTime !== null && estimatedWaitTime !== undefined && (
+                  {/* Show queue info only if patient has arrived AND encounter is NOT in-progress */}
+                  {isPatientArrived && !isEncounterInProgress && queuePosition !== null && queuePosition !== undefined && estimatedWaitTime !== null && estimatedWaitTime !== undefined && (
                     <div className="space-y-3">
                       {/* Header Row */}
                       <div className="grid grid-cols-2 gap-4 text-sm text-text-secondary pb-2">
