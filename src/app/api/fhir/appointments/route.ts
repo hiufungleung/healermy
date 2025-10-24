@@ -34,9 +34,9 @@ export async function GET(request: NextRequest) {
       searchParams // Pass URLSearchParams directly without conversion
     );
 
-    // Extract appointments from FHIR Bundle structure
-    const appointments: Appointment[] = result?.entry?.map((entry) => entry.resource).filter(Boolean) || [];
-    return NextResponse.json({ appointments });
+    // Return the complete FHIR Bundle with all metadata (link, total, entry, etc.)
+    // Frontend components will extract what they need from the Bundle structure
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error in GET /api/fhir/appointments:', error);
     

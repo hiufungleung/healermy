@@ -30,8 +30,8 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Initialize view from URL parameter (default: timeGridWeek)
-  const initialView = searchParams.get('view') === 'month' ? 'dayGridMonth' : 'timeGridWeek';
+  // Initialize view from URL parameter (default: dayGridMonth)
+  const initialView = searchParams.get('view') === 'week' ? 'timeGridWeek' : 'dayGridMonth';
 
   // State
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -69,8 +69,8 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
 
     const res = await fetch(`/api/fhir/slots?${params}`, { credentials: 'include' });
     if (res.ok) {
-      const json = await res.json();
-      setSlots(json.slots || []);
+      const bundle = await res.json();
+      setSlots(bundle.entry?.map((e: any) => e.resource) || []);
     }
   };
 
@@ -93,8 +93,8 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
 
     const res = await fetch(`/api/fhir/schedules?${params}`, { credentials: 'include' });
     if (res.ok) {
-      const json = await res.json();
-      setSchedules(json.schedules || []);
+      const bundle = await res.json();
+      setSchedules(bundle.entry?.map((e: any) => e.resource) || []);
     }
   };
 
@@ -287,65 +287,40 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
 
   return (
     <Card className="p-4">
-      {/* Legend */}
-      <div className="mb-4 pb-4 border-b">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {legend.map(item => (
-            <div
-              key={item.ref}
-              className="flex items-start space-x-2 text-xs p-2 rounded hover:bg-gray-50 cursor-pointer"
-              onMouseEnter={() => setHovered(item.ref)}
-              onMouseLeave={() => setHovered(null)}
-            >
-              <div className="flex space-x-1 mt-0.5">
-                <div className="w-4 h-4 rounded" style={{ backgroundColor: item.color.light }} />
-                {view !== 'dayGridMonth' && (
-                  <div className="w-4 h-4 rounded" style={{ backgroundColor: item.color.dark }} />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-mono text-gray-700 truncate">{item.id} {item.specialty}</div>
-                {/* <div className="text-gray-600 truncate"></div> */}
-                <div className="text-gray-500 truncate">{item.category}, {item.type}</div>
-              </div>
+      <div className="flex flex-col md:flex-row gap-6">
+        {/* Legend - Left side on md+ screens */}
+        <div className="md:w-64 lg:w-72 flex-shrink-0">
+          <div className="sticky top-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-3">
+              {legend.map(item => (
+                <div
+                  key={item.ref}
+                  className="flex items-start space-x-2 text-xs p-2 rounded hover:bg-gray-50 cursor-pointer"
+                  onMouseEnter={() => setHovered(item.ref)}
+                  onMouseLeave={() => setHovered(null)}
+                >
+                  <div className="flex space-x-1 mt-0.5">
+                    <div className="w-4 h-4 rounded" style={{ backgroundColor: item.color.light }} />
+                    {view !== 'dayGridMonth' && (
+                      <div className="w-4 h-4 rounded" style={{ backgroundColor: item.color.dark }} />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-mono text-gray-700 truncate">{item.id} {item.specialty}</div>
+                    <div className="text-gray-500 truncate">{item.category}, {item.type}</div>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+            <div className="text-xs text-gray-500 mt-3 px-2">
+              {view === 'dayGridMonth' ? 'Schedule availability by day' : 'Light = Available, Dark = Booked'}
+            </div>
+          </div>
         </div>
-        <div className="text-xs text-gray-500 mt-2">
-          {view === 'dayGridMonth' ? 'Schedule availability by day' : 'Light = Available, Dark = Booked'}
-        </div>
-      </div>
 
-      {/* Stats */}
-      {/* {view !== 'dayGridMonth' && (
-        <div className="grid grid-cols-4 gap-4 mb-4">
-          <div className="bg-gray-50 p-3 rounded-lg">
-            <div className="text-sm text-gray-600">Total Slots</div>
-            <div className="text-2xl font-bold">{slots.length}</div>
-          </div>
-          <div className="bg-green-50 p-3 rounded-lg">
-            <div className="text-sm text-green-600">Available</div>
-            <div className="text-2xl font-bold text-green-600">
-              {slots.filter(s => s.status === 'free').length}
-            </div>
-          </div>
-          <div className="bg-red-50 p-3 rounded-lg">
-            <div className="text-sm text-red-600">Booked</div>
-            <div className="text-2xl font-bold text-red-600">
-              {slots.filter(s => s.status === 'busy').length}
-            </div>
-          </div>
-          <div className="bg-yellow-50 p-3 rounded-lg">
-            <div className="text-sm text-yellow-600">Tentative</div>
-            <div className="text-2xl font-bold text-yellow-600">
-              {slots.filter(s => s.status === 'busy-tentative').length}
-            </div>
-          </div>
-        </div>
-      )} */}
-
-      {/* Calendar */}
-      <FullCalendar
+        {/* Calendar - Right side on md+ screens, max-width on xl+ */}
+        <div className="flex-1 xl:max-w-6xl">
+          <FullCalendar
         ref={calendarRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView={initialView}
@@ -430,6 +405,8 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
           load(info.view.type, targetDate);
         }}
       />
+        </div>
+      </div>
 
       <style jsx global>{`
         .fc { font-size: 0.875rem; }

@@ -232,8 +232,8 @@ export default function ProviderNotificationsClient({
             });
 
             if (response.ok) {
-              const data = await response.json();
-              const appointments = data.appointments || [];
+              const bundle = await response.json();
+              const appointments = bundle.entry?.map((e: any) => e.resource) || [];
 
               // Update statuses from batch response
               setAppointmentStatuses(prev => {
@@ -351,8 +351,8 @@ export default function ProviderNotificationsClient({
           });
 
           if (response.ok) {
-            const data = await response.json();
-            const patients = data.patients || [];
+            const bundle = await response.json();
+            const patients = bundle.entry?.map((e: any) => e.resource) || [];
 
             const newNames: Record<string, string> = {};
             patients.forEach((patient: any) => {
@@ -443,8 +443,8 @@ export default function ProviderNotificationsClient({
             });
 
             if (response.ok) {
-              const data = await response.json();
-              const communications = (data.entry || []).map((entry: any) => entry.resource);
+              const bundle = await response.json();
+              const communications = (bundle.entry || []).map((entry: any) => entry.resource);
               setLocalCommunications(communications);
             }
           } catch (error) {
@@ -1299,8 +1299,8 @@ export default function ProviderNotificationsClient({
                     credentials: 'include',
                   });
                   if (communicationsResponse.ok) {
-                    const communicationsData = await communicationsResponse.json();
-                    const communications = (communicationsData.entry || []).map((entry: any) => entry.resource);
+                    const bundle = await communicationsResponse.json();
+                    const communications = (bundle.entry || []).map((entry: any) => entry.resource);
                     setLocalCommunications(communications);
                   }
                 } catch (error) {
@@ -1366,8 +1366,8 @@ export default function ProviderNotificationsClient({
                     credentials: 'include',
                   });
                   if (communicationsResponse.ok) {
-                    const communicationsData = await communicationsResponse.json();
-                    const communications = (communicationsData.entry || []).map((entry: any) => entry.resource);
+                    const bundle = await communicationsResponse.json();
+                    const communications = (bundle.entry || []).map((entry: any) => entry.resource);
                     setLocalCommunications(communications);
                   }
                 } catch (error) {

@@ -80,7 +80,6 @@ function LaunchContent() {
       
       const smartConfig = await response.json();
       console.log('✅ SMART configuration discovered:', smartConfig);
-      debugger;
       const authorizeUrl = smartConfig.authorization_endpoint;
       const tokenUrl = smartConfig.token_endpoint;
       const revokeUrl = smartConfig.revocation_endpoint; // Store revoke endpoint

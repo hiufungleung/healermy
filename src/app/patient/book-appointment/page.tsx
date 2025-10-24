@@ -197,6 +197,7 @@ function NewBookingFlow() {
   const [showSelectionDialog, setShowSelectionDialog] = useState(false);
   const [pendingPractitioner, setPendingPractitioner] = useState<Practitioner | null>(null);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
+  const [practitionerSchedules, setPractitionerSchedules] = useState<Schedule[]>([]); // Store raw schedules
   const [availableSpecialties, setAvailableSpecialties] = useState<string[]>([]);
   const [availableServiceCategories, setAvailableServiceCategories] = useState<any[]>([]);
 
@@ -259,6 +260,149 @@ function NewBookingFlow() {
       return () => clearTimeout(timer);
     }
   }, [dialogSpecialty, dialogServiceCategory, pendingPractitioner, showSelectionDialog, updateDraft, navigateToStep]);
+
+  // Filter available service categories based on selected specialty
+  useEffect(() => {
+    if (!practitionerSchedules.length) return;
+
+    if (dialogSpecialty) {
+      // Filter schedules that have the selected specialty
+      const matchingSchedules = practitionerSchedules.filter((schedule: Schedule) => {
+        if (!schedule.specialty) return false;
+
+        const specialtyLabels = Object.values(SPECIALTY_LABELS);
+        return schedule.specialty.some((spec: any) => {
+          const code = spec.coding?.[0]?.code as SpecialtyCode;
+          const display = spec.coding?.[0]?.display;
+          const mappedSpecialty = SPECIALTY_LABELS[code];
+
+          return (mappedSpecialty === dialogSpecialty) ||
+                 (display === dialogSpecialty && specialtyLabels.includes(display));
+        });
+      });
+
+      // Extract service categories from matching schedules only
+      const categories = new Map<string, any>();
+      matchingSchedules.forEach((schedule: Schedule) => {
+        if (schedule.serviceCategory) {
+          schedule.serviceCategory.forEach((cat: any) => {
+            const code = cat.coding?.[0]?.code;
+            const matchingCategory = SERVICE_CATEGORIES.find(c => c.id === code);
+            if (matchingCategory) {
+              categories.set(code, matchingCategory);
+            }
+          });
+        }
+      });
+
+      const filteredCats = Array.from(categories.values());
+      console.log('[DIALOG] Filtered service categories for specialty', dialogSpecialty, ':', filteredCats);
+      setAvailableServiceCategories(filteredCats);
+    } else {
+      // No specialty selected - show all service categories
+      const categories = new Map<string, any>();
+      practitionerSchedules.forEach((schedule: Schedule) => {
+        if (schedule.serviceCategory) {
+          schedule.serviceCategory.forEach((cat: any) => {
+            const code = cat.coding?.[0]?.code;
+            const matchingCategory = SERVICE_CATEGORIES.find(c => c.id === code);
+            if (matchingCategory) {
+              categories.set(code, matchingCategory);
+            }
+          });
+        }
+      });
+      setAvailableServiceCategories(Array.from(categories.values()));
+    }
+  }, [dialogSpecialty, practitionerSchedules]);
+
+  // Filter available specialties based on selected service category
+  useEffect(() => {
+    if (!practitionerSchedules.length) return;
+
+    if (dialogServiceCategory) {
+      // Filter schedules that have the selected service category
+      const matchingSchedules = practitionerSchedules.filter((schedule: Schedule) => {
+        if (!schedule.serviceCategory) return false;
+
+        return schedule.serviceCategory.some((cat: any) => {
+          const code = cat.coding?.[0]?.code;
+          return code === dialogServiceCategory;
+        });
+      });
+
+      // Extract specialties from matching schedules only
+      const specialties = new Set<string>();
+      const specialtyLabels = Object.values(SPECIALTY_LABELS);
+
+      matchingSchedules.forEach((schedule: Schedule) => {
+        if (schedule.specialty) {
+          schedule.specialty.forEach((spec: any) => {
+            const code = spec.coding?.[0]?.code as SpecialtyCode;
+            const display = spec.coding?.[0]?.display;
+            const mappedSpecialty = SPECIALTY_LABELS[code];
+
+            if (mappedSpecialty && specialtyLabels.includes(mappedSpecialty)) {
+              specialties.add(mappedSpecialty);
+            } else if (display && specialtyLabels.includes(display)) {
+              specialties.add(display);
+            }
+          });
+        }
+      });
+
+      const filteredSpecs = Array.from(specialties);
+      console.log('[DIALOG] Filtered specialties for category', dialogServiceCategory, ':', filteredSpecs);
+      setAvailableSpecialties(filteredSpecs);
+    } else {
+      // No category selected - show all specialties
+      const specialties = new Set<string>();
+      const specialtyLabels = Object.values(SPECIALTY_LABELS);
+
+      practitionerSchedules.forEach((schedule: Schedule) => {
+        if (schedule.specialty) {
+          schedule.specialty.forEach((spec: any) => {
+            const code = spec.coding?.[0]?.code as SpecialtyCode;
+            const display = spec.coding?.[0]?.display;
+            const mappedSpecialty = SPECIALTY_LABELS[code];
+
+            if (mappedSpecialty && specialtyLabels.includes(mappedSpecialty)) {
+              specialties.add(mappedSpecialty);
+            } else if (display && specialtyLabels.includes(display)) {
+              specialties.add(display);
+            }
+          });
+        }
+      });
+      setAvailableSpecialties(Array.from(specialties));
+    }
+  }, [dialogServiceCategory, practitionerSchedules]);
+
+  // Clear invalid service category when specialty changes
+  useEffect(() => {
+    if (!dialogSpecialty || !dialogServiceCategory || !availableServiceCategories.length) return;
+
+    // Check if the currently selected service category is still valid
+    const isStillValid = availableServiceCategories.some(cat => cat.id === dialogServiceCategory);
+
+    if (!isStillValid) {
+      console.log('[DIALOG] Service category', dialogServiceCategory, 'is no longer valid for specialty', dialogSpecialty, '- clearing');
+      setDialogServiceCategory('');
+    }
+  }, [dialogSpecialty, availableServiceCategories, dialogServiceCategory]);
+
+  // Clear invalid specialty when service category changes
+  useEffect(() => {
+    if (!dialogServiceCategory || !dialogSpecialty || !availableSpecialties.length) return;
+
+    // Check if the currently selected specialty is still valid
+    const isStillValid = availableSpecialties.includes(dialogSpecialty);
+
+    if (!isStillValid) {
+      console.log('[DIALOG] Specialty', dialogSpecialty, 'is no longer valid for category', dialogServiceCategory, '- clearing');
+      setDialogSpecialty('');
+    }
+  }, [dialogServiceCategory, availableSpecialties, dialogSpecialty]);
 
   // Sync state with bookingDraft when it changes (from URL or localStorage)
   useEffect(() => {
@@ -635,8 +779,8 @@ function NewBookingFlow() {
 
       if (!response.ok) throw new Error('Failed to fetch practitioners');
 
-      const result = await response.json();
-      const fetchedPractitioners = result.practitioners || [];
+      const bundle = await response.json();
+      const fetchedPractitioners = bundle.entry?.map((e: any) => e.resource) || [];
       setPractitioners(fetchedPractitioners);
       setAllPractitioners(fetchedPractitioners);
       setCurrentPage(1); // Reset to first page
@@ -717,8 +861,8 @@ function NewBookingFlow() {
         return;
       }
 
-      const schedulesData = await schedulesResponse.json();
-      const matchingSchedules = schedulesData.schedules || [];
+      const schedulesBundle = await schedulesResponse.json();
+      const matchingSchedules = schedulesBundle.entry?.map((e: any) => e.resource) || [];
 
       console.log('🔍 [FILTER] Server returned', matchingSchedules.length, 'matching schedules');
 
@@ -765,8 +909,8 @@ function NewBookingFlow() {
           return;
         }
 
-        const data = await response.json();
-        const practitioners = data.practitioners || [];
+        const bundle = await response.json();
+        const practitioners = bundle.entry?.map((e: any) => e.resource) || [];
 
         // Add matching schedules to each practitioner
         const practitionersWithSchedules = practitioners.map((practitioner: any) => ({
@@ -884,10 +1028,10 @@ function NewBookingFlow() {
       }
 
       const firstHalfData = await firstHalfResponse.json();
-      const secondHalfData = await secondHalfResponse.json();
+      const secondHalfBundle = await secondHalfResponse.json();
 
-      const firstHalfSlots = firstHalfData.slots || [];
-      const secondHalfSlots = secondHalfData.slots || [];
+      const firstHalfSlots = firstHalfData.entry?.map((e: any) => e.resource) || [];
+      const secondHalfSlots = secondHalfBundle.entry?.map((e: any) => e.resource) || [];
 
       // Combine both halves
       const allSlots = [...firstHalfSlots, ...secondHalfSlots];
@@ -1084,8 +1228,8 @@ function NewBookingFlow() {
             return;
           }
 
-          const schedulesData = await schedulesResponse.json();
-          const matchingSchedules = schedulesData.schedules || [];
+          const schedulesBundle = await schedulesResponse.json();
+          const matchingSchedules = schedulesBundle.entry?.map((e: any) => e.resource) || [];
 
           // Extract unique practitioner IDs from schedules
           const practitionerIds = new Set<string>();
@@ -1108,8 +1252,8 @@ function NewBookingFlow() {
 
             const practitionersResponse = await fetch(practitionersUrl, { credentials: 'include' });
             if (practitionersResponse.ok) {
-              const practitionersData = await practitionersResponse.json();
-              setAllPractitioners(practitionersData.practitioners || []);
+              const practitionersBundle = await practitionersResponse.json();
+              setAllPractitioners(practitionersBundle.entry?.map((e: any) => e.resource) || []);
             } else {
               setAllPractitioners([]);
             }
@@ -1133,8 +1277,8 @@ function NewBookingFlow() {
 
           if (!response.ok) throw new Error('Failed to fetch practitioners');
 
-          const result = await response.json();
-          setAllPractitioners(result.practitioners || []);
+          const bundle = await response.json();
+          setAllPractitioners(bundle.entry?.map((e: any) => e.resource) || []);
         }
       } catch (error) {
         console.error('Error searching practitioners:', error);
@@ -1156,6 +1300,7 @@ function NewBookingFlow() {
       setIsLoadingSchedules(true);
 
       // Clear available options initially
+      setPractitionerSchedules([]);
       setAvailableSpecialties([]);
       setAvailableServiceCategories([]);
 
@@ -1186,12 +1331,15 @@ function NewBookingFlow() {
             return;
           }
 
-          const data = await response.json();
-          const schedules = data.schedules || [];
+          const bundle = await response.json();
+          const schedules = bundle.entry?.map((e: any) => e.resource) || [];
 
           console.log('[DIALOG] Fetched schedules for practitioner:', schedules);
 
-          // Extract unique specialties and service categories
+          // Store raw schedules for dynamic filtering
+          setPractitionerSchedules(schedules);
+
+          // Extract ALL unique specialties and service categories (no filtering yet)
           const specialties = new Set<string>();
           const categories = new Map<string, any>();
 
@@ -1233,8 +1381,8 @@ function NewBookingFlow() {
           const availableSpecs = Array.from(specialties);
           const availableCats = Array.from(categories.values());
 
-          console.log('[DIALOG] Extracted specialties:', availableSpecs);
-          console.log('[DIALOG] Extracted categories:', availableCats);
+          console.log('[DIALOG] Extracted ALL specialties:', availableSpecs);
+          console.log('[DIALOG] Extracted ALL categories:', availableCats);
 
           setAvailableSpecialties(availableSpecs);
           setAvailableServiceCategories(availableCats);
@@ -2152,6 +2300,7 @@ function NewBookingFlow() {
             setDialogServiceCategory('');
             setPendingPractitioner(null);
             setAccordionValue(undefined);
+            setPractitionerSchedules([]);
           }
         }}>
         <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl max-h-[85vh] overflow-y-auto">

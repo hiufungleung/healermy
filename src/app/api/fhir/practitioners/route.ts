@@ -45,17 +45,9 @@ export async function GET(request: NextRequest) {
     const response = await FHIRClient.fetchWithAuth(fhirUrl, token);
     const fhirBundle = await response.json();
 
-    // Transform FHIR Bundle to expected format
-    const practitioners = fhirBundle.entry?.map((entry: any) => entry.resource) || [];
-    const nextUrl = fhirBundle.link?.find((link: any) => link.relation === 'next')?.url;
-    
-    const result = {
-      practitioners,
-      total: fhirBundle.total || practitioners.length,
-      nextUrl: nextUrl || null
-    };
-
-    return NextResponse.json(result);
+    // Return the complete FHIR Bundle with all metadata (link, total, entry, etc.)
+    // Frontend components will extract what they need from the Bundle structure
+    return NextResponse.json(fhirBundle);
   } catch (error) {
     console.error('Error in GET /api/fhir/practitioners:', error);
     

@@ -43,13 +43,9 @@ export async function GET(request: NextRequest) {
 
     const fhirBundle = await response.json();
 
-    // Transform FHIR Bundle to expected format
-    const patients = fhirBundle.entry?.map((entry: any) => entry.resource) || [];
-
-    return NextResponse.json({
-      patients,
-      total: fhirBundle.total || patients.length
-    });
+    // Return the complete FHIR Bundle with all metadata (link, total, entry, etc.)
+    // Frontend components will extract what they need from the Bundle structure
+    return NextResponse.json(fhirBundle);
   } catch (error) {
     console.error('Error in GET /api/fhir/patients:', error);
 

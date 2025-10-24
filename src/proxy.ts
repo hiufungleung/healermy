@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SessionData } from '@/types/auth';
 import { decrypt, encrypt } from '@/library/auth/encryption';
-import { refreshAccessToken } from '@/library/auth/tokenRefresh';
+import { refreshAccessToken, TokenRefreshError } from '@/library/auth/tokenRefresh';
 import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
 import { getPublicBaseUrl } from '@/library/request-utils';
 
@@ -147,11 +147,25 @@ export async function proxy(request: NextRequest) {
           return response;
         } catch (refreshError) {
           console.error('❌ [PROXY] Token refresh error:', refreshError);
+
+          // Check if it's a network error
+          if (refreshError instanceof TokenRefreshError && refreshError.isNetworkError) {
+            // Network error - preserve cookie and allow request to proceed
+            // User can retry when network is back
+            console.warn(`⚠️ [PROXY] Network error during token refresh (status: ${refreshError.statusCode}), preserving session cookie`);
+            console.warn(`⚠️ [PROXY] Allowing request to proceed - user may see stale data or errors`);
+
+            // Continue with the request without modifying cookies
+            return NextResponse.next();
+          }
+
+          // Authentication error (invalid refresh token) - fall through to delete cookie
+          console.error(`❌ [PROXY] Authentication error during token refresh (status: ${refreshError instanceof TokenRefreshError ? refreshError.statusCode : 'unknown'})`);
         }
       }
-      
-      // If refresh failed or no refresh token, redirect to home
-      console.log(`❌ [PROXY] Session expired and refresh failed, redirecting to home: ${pathname}`);
+
+      // If refresh failed with auth error or no refresh token, redirect to home and delete cookie
+      console.log(`❌ [PROXY] Session expired and refresh failed (invalid token), redirecting to home: ${pathname}`);
       const baseUrl = getPublicBaseUrl(request);
       const response = NextResponse.redirect(new URL('/', baseUrl));
       response.cookies.delete(TOKEN_COOKIE_NAME);

@@ -68,8 +68,8 @@ export default function DashboardClient({
           throw new Error(errorData.error || `Failed to load appointments (${response.status})`);
         }
 
-        const data = await response.json();
-        const appointments = data.appointments || [];
+        const bundle = await response.json();
+        const appointments = bundle.entry?.map((e: any) => e.resource) || [];
 
         // Use the reusable appointment enhancement utility
         const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');
@@ -97,8 +97,8 @@ export default function DashboardClient({
         credentials: 'include'
       });
       if (refreshResponse.ok) {
-        const data = await refreshResponse.json();
-        const appointments = data.appointments || [];
+        const bundle = await refreshResponse.json();
+        const appointments = bundle.entry?.map((e: any) => e.resource) || [];
 
         // Use the reusable appointment enhancement utility
         const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');

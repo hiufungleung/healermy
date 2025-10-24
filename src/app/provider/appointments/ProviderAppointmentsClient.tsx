@@ -126,8 +126,8 @@ export default function ProviderAppointmentsClient() {
         throw new Error('Failed to fetch appointments');
       }
 
-      const appointmentsData = await appointmentsResponse.json();
-      const fetchedAppointments: Appointment[] = appointmentsData.appointments || [];
+      const bundle = await appointmentsResponse.json();
+      const fetchedAppointments: Appointment[] = bundle.entry?.map((e: any) => e.resource) || [];
       console.log('[APPOINTMENTS] ✅ Call 1/4: Fetched', fetchedAppointments.length, 'appointments');
 
       // Extract appointment IDs, patient IDs, and practitioner IDs
@@ -182,11 +182,11 @@ export default function ProviderAppointmentsClient() {
           : null,
       ]);
 
-      // Process encounters
+      // Process encounters - extract from FHIR Bundle
       const encountersByAppointment = new Map<string, Encounter>();
       if (encountersResponse?.ok) {
-        const encountersData = await encountersResponse.json();
-        const encounters: Encounter[] = encountersData.encounters || [];
+        const encountersBundle = await encountersResponse.json();
+        const encounters: Encounter[] = encountersBundle.entry?.map((e: any) => e.resource) || [];
         encounters.forEach(enc => {
           if (enc.appointment && enc.appointment.length > 0) {
             const appointmentRef = enc.appointment[0].reference;
@@ -203,11 +203,11 @@ export default function ProviderAppointmentsClient() {
         console.log('[APPOINTMENTS] ⏭️  Call 2/4: Skipped (no appointments)');
       }
 
-      // Process patients
+      // Process patients - extract from FHIR Bundle
       const patientsMap = new Map<string, any>();
       if (patientsResponse?.ok) {
-        const patientsData = await patientsResponse.json();
-        const patients = patientsData.patients || [];
+        const patientsBundle = await patientsResponse.json();
+        const patients = patientsBundle.entry?.map((e: any) => e.resource) || [];
         patients.forEach((patient: any) => {
           if (patient.id) patientsMap.set(patient.id, patient);
         });
@@ -216,11 +216,11 @@ export default function ProviderAppointmentsClient() {
         console.log('[APPOINTMENTS] ⏭️  Call 3/4: Skipped (no patients)');
       }
 
-      // Process practitioners
+      // Process practitioners - extract from FHIR Bundle
       const practitionersMap = new Map<string, any>();
       if (practitionersResponse?.ok) {
-        const practitionersData = await practitionersResponse.json();
-        const practitioners = practitionersData.practitioners || [];
+        const practitionersBundle = await practitionersResponse.json();
+        const practitioners = practitionersBundle.entry?.map((e: any) => e.resource) || [];
         practitioners.forEach((practitioner: any) => {
           if (practitioner.id) practitionersMap.set(practitioner.id, practitioner);
         });

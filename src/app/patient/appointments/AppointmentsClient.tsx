@@ -55,8 +55,8 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
         console.log('[APPOINTMENTS] API response status:', response.status);
 
         if (response.ok) {
-          const data = await response.json();
-          const appointments = data.appointments || [];
+          const bundle = await response.json();
+          const appointments = bundle.entry?.map((e: any) => e.resource) || [];
           console.log('[APPOINTMENTS] Fetched', appointments.length, 'appointments');
 
           // Use the reusable appointment enhancement utility

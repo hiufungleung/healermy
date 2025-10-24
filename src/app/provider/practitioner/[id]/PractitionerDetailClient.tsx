@@ -84,12 +84,12 @@ export default function PractitionerDetailClient({
   // Error states
   const [slotsError] = useState<string | null>(null);
 
-  // UI state - Initialize from URL params
+  // UI state - Initialize from URL params (default: slots/calendar)
   const [activeTab, setActiveTab] = useState<'schedules' | 'slots' | 'appointments'>(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam === 'slots') return 'slots';
+    if (tabParam === 'schedules') return 'schedules';
     if (tabParam === 'appointments') return 'appointments';
-    return 'schedules';
+    return 'slots'; // Default to Calendar
   });
   const [showCreateSchedule, setShowCreateSchedule] = useState(false);
   const [showGenerateSlots, setShowGenerateSlots] = useState(false);
@@ -201,8 +201,8 @@ export default function PractitionerDetailClient({
         });
 
         if (response.ok) {
-          const result = await response.json();
-          const fetchedSchedules: Schedule[] = result.schedules || [];
+          const bundle = await response.json();
+          const fetchedSchedules: Schedule[] = bundle.entry?.map((e: any) => e.resource) || [];
           setSchedules(fetchedSchedules);
           console.log('✅ Loaded schedules for slots tab:', fetchedSchedules.length);
         }
@@ -252,8 +252,8 @@ export default function PractitionerDetailClient({
             credentials: 'include',
           });
           if (response.ok) {
-            const data = await response.json();
-            return data.slots || [];
+            const bundle = await response.json();
+            return bundle.entry?.map((e: any) => e.resource) || [];
           }
         } catch (error) {
           console.warn(`Error fetching slots for stats:`, error);
@@ -320,12 +320,16 @@ export default function PractitionerDetailClient({
   return (
     <>
       {/* Tab Content */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6" suppressHydrationWarning>
         <TabsList className="grid w-full grid-cols-3 max-w-[600px]">
+          <TabsTrigger value="slots">Calendar</TabsTrigger>
           <TabsTrigger value="schedules">Schedules</TabsTrigger>
-          <TabsTrigger value="slots">Slots</TabsTrigger>
           <TabsTrigger value="appointments">Appointments</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="slots">
+          {renderSlotsContent()}
+        </TabsContent>
 
         <TabsContent value="schedules">
           <PractitionerSchedulesTab
@@ -337,10 +341,6 @@ export default function PractitionerDetailClient({
               }
             }}
           />
-        </TabsContent>
-
-        <TabsContent value="slots">
-          {renderSlotsContent()}
         </TabsContent>
 
         <TabsContent value="appointments">

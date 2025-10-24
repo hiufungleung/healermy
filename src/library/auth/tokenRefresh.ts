@@ -14,6 +14,17 @@ interface TokenResponse {
   fhirUser?: string;
 }
 
+export class TokenRefreshError extends Error {
+  constructor(
+    message: string,
+    public statusCode?: number,
+    public isNetworkError: boolean = false
+  ) {
+    super(message);
+    this.name = 'TokenRefreshError';
+  }
+}
+
 export async function refreshAccessToken(refreshToken: string, tokenUrl: string, role: 'patient' | 'provider' | 'practitioner'): Promise<TokenResponse> {
   // Retrieve client credentials from environment variables
   // All roles use the same credentials (single FHIR app in MELD sandbox)
@@ -42,19 +53,44 @@ export async function refreshAccessToken(refreshToken: string, tokenUrl: string,
   console.log('🔄 [TOKEN REFRESH] Request headers:', headers);
   console.log('🔄 [TOKEN REFRESH] Request body:', tokenParams.toString());
 
-  const response = await fetch(tokenUrl, {
-    method: 'POST',
-    headers,
-    body: tokenParams.toString(),
-  });
+  try {
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers,
+      body: tokenParams.toString(),
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Token refresh failed: ${response.status} - ${errorText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      const statusCode = response.status;
+
+      // Classify the error type
+      // 400, 401 = Invalid refresh token (authentication error)
+      // 500, 502, 503, 504 = Server/network error
+      const isNetworkError = statusCode >= 500 && statusCode < 600;
+
+      throw new TokenRefreshError(
+        `Token refresh failed: ${statusCode} - ${errorText}`,
+        statusCode,
+        isNetworkError
+      );
+    }
+
+    const tokenData: TokenResponse = await response.json();
+    return tokenData;
+  } catch (error) {
+    // Network timeout or fetch failure (no response received)
+    if (error instanceof TokenRefreshError) {
+      throw error; // Re-throw our structured error
+    }
+
+    // Any other error (network timeout, DNS failure, etc.) is a network error
+    throw new TokenRefreshError(
+      `Network error during token refresh: ${error instanceof Error ? error.message : String(error)}`,
+      undefined,
+      true // This is definitely a network error
+    );
   }
-
-  const tokenData: TokenResponse = await response.json();
-  return tokenData;
 }
 
 export function isTokenExpiringSoon(expiresAt: number, bufferMinutes: number = 5): boolean {

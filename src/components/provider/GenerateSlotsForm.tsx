@@ -26,7 +26,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { TimePicker } from '@/components/ui/time-picker';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { createFHIRDateTime } from '@/library/timezone';
+import { createFHIRDateTime, getNowInAppTimezone, getDateInputValue } from '@/library/timezone';
 import type { Schedule, Slot } from '@/types/fhir';
 import { getAllDaysOfWeek, FHIR_DAY_NAME_TO_CODE } from '@/constants/fhir';
 
@@ -153,15 +153,16 @@ export function GenerateSlotsForm({
   // Get effective min/max dates considering both schedule and today's constraints
   const getEffectiveDateConstraints = () => {
     const scheduleConstraints = getScheduleDateConstraints();
-    const today = new Date().toISOString().split('T')[0];
+    const today = getDateInputValue();
 
     if (!scheduleConstraints) {
       return { minDate: today, maxDate: undefined };
     }
 
-    // Allow today if the schedule is still active (end date is today or later)
-    // Users can select today and the slot generation will handle filtering past times
-    const minDate = scheduleConstraints.minDate && scheduleConstraints.minDate <= today ? today : (scheduleConstraints.minDate || today);
+    // Always allow selecting today as the minimum date
+    // The slot generation will automatically filter out past times for today
+    // Only use the schedule's start date if it's in the future
+    const minDate = today;
 
     return {
       minDate,
@@ -236,7 +237,7 @@ export function GenerateSlotsForm({
 
   // Filter schedules to only show those with active periods (not completely in the past)
   const getAvailableSchedules = (): Schedule[] => {
-    const today = new Date();
+    const today = getNowInAppTimezone();
     today.setHours(0, 0, 0, 0);
 
     return schedules.filter(schedule => {
@@ -254,21 +255,17 @@ export function GenerateSlotsForm({
     const selectedSchedule = schedules.find(s => s.id === formData.scheduleId);
     if (!selectedSchedule?.planningHorizon?.start || !selectedSchedule.planningHorizon.end) return;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Get today's date using centralized utility
+    const today = getNowInAppTimezone();
+    const todayStr = getDateInputValue(today);
 
-    const scheduleStart = new Date(selectedSchedule.planningHorizon.start);
-    scheduleStart.setHours(0, 0, 0, 0);
+    // Get schedule end date
+    const scheduleEndStr = selectedSchedule.planningHorizon.end;
 
-    const scheduleEnd = new Date(selectedSchedule.planningHorizon.end);
-    scheduleEnd.setHours(0, 0, 0, 0);
-
-    // Use today if it's after the schedule start date
-    const effectiveStartDate = scheduleStart < today ? today : scheduleStart;
-
-    // Convert dates to YYYY-MM-DD format
-    const startDateStr = effectiveStartDate.toISOString().split('T')[0];
-    const endDateStr = scheduleEnd.toISOString().split('T')[0];
+    // Always use today as the minimum start date (users can generate slots for today)
+    // The slot generation will automatically filter out past times
+    const startDateStr = todayStr;
+    const endDateStr = scheduleEndStr;
 
     // Only update if dates are different from current values
     if (formData.startDate !== startDateStr || formData.endDate !== endDateStr) {
@@ -360,7 +357,7 @@ export function GenerateSlotsForm({
             // Validate that the slot is in the future (local time)
             // Compare using local time directly instead of FHIR UTC time
             const localSlotDateTime = new Date(`${dateStr}T${startTime}:00`);
-            const nowLocal = new Date();
+            const nowLocal = getNowInAppTimezone();
 
             if (localSlotDateTime <= nowLocal) {
               skippedPastSlots++;
@@ -383,7 +380,7 @@ export function GenerateSlotsForm({
         }
       }
 
-      console.log(`Generated ${slotsToCreate.length} potential slots with overlap validation...`);
+      console.log(`Generated ${slotsToCreate.length} potential slots...`);
 
       if (skippedPastSlots > 0) {
         console.log(`Skipped ${skippedPastSlots} past slots that were in the past`);
@@ -398,93 +395,95 @@ export function GenerateSlotsForm({
         }
       }
 
-      // Use chunked batch creation with progress updates
-      const CHUNK_SIZE = 50; // Create 50 slots at a time for better progress visibility
-      const chunks: Slot[][] = [];
-      for (let i = 0; i < slotsToCreate.length; i += CHUNK_SIZE) {
-        chunks.push(slotsToCreate.slice(i, i + CHUNK_SIZE));
-      }
-
-      let createdSlots: any[] = [];
-      let totalRejected: any[] = [];
-      let processedSlots = 0;
-
       // Initialize progress
       setProgress({ current: 0, total: slotsToCreate.length });
 
-      // Process chunks sequentially to show progress updates
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
+      // Create individual POST requests for each slot
+      const createdSlots: any[] = [];
+      const failedSlots: { slot: Slot; error: string }[] = [];
+      let completedCount = 0;
 
-        const response = await fetch('/api/fhir/slots/batch', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({ slots: chunk }),
-        });
+      // Create promises for all slots and track progress as each completes
+      const slotPromises = slotsToCreate.map(async (slot) => {
+        try {
+          const response = await fetch('/api/fhir/slots', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/fhir+json',
+            },
+            credentials: 'include',
+            body: JSON.stringify(slot),
+          });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `Failed to create slots: ${response.status}`);
+          completedCount++;
+          setProgress({ current: completedCount, total: slotsToCreate.length });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            failedSlots.push({
+              slot,
+              error: errorData.error || errorData.details || `HTTP ${response.status}`
+            });
+            return null;
+          }
+
+          const createdSlot = await response.json();
+          createdSlots.push(createdSlot);
+          return createdSlot;
+        } catch (error) {
+          completedCount++;
+          setProgress({ current: completedCount, total: slotsToCreate.length });
+
+          failedSlots.push({
+            slot,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+          return null;
         }
+      });
 
-        const chunkResult = await response.json();
-        createdSlots = [...createdSlots, ...(chunkResult.results?.created || [])];
-        totalRejected = [...totalRejected, ...(chunkResult.results?.rejected || [])];
-
-        // Update progress after each chunk
-        processedSlots += chunk.length;
-        setProgress({ current: processedSlots, total: slotsToCreate.length });
-      }
+      // Wait for all requests to complete
+      await Promise.all(slotPromises);
 
       // Clear progress when done
       setProgress(null);
 
-      // Consolidate results from all chunks
-      const result = {
-        created: createdSlots.length,
-        rejected: totalRejected,
-        results: {
-          created: createdSlots
-        }
-      };
+      const createdCount = createdSlots.length;
+      const failedCount = failedSlots.length;
+
+      console.log(`✅ Created ${createdCount} slots`);
+      if (failedCount > 0) {
+        console.warn(`❌ Failed to create ${failedCount} slots`);
+        failedSlots.forEach((failure, index) => {
+          console.warn(`${index + 1}. ${failure.slot.start} - ${failure.error}`);
+        });
+      }
 
       // Show detailed results to user
-      if (result.rejected && result.rejected.length > 0) {
-        const rejectedCount = result.rejected.length;
-        const createdCount = result.created || 0;
-
-        // Log detailed rejection reasons for debugging
-        console.warn(`${rejectedCount} slots were rejected due to overlaps:`);
-        result.rejected.forEach((rejection: any, index: number) => {
-          console.warn(`${index + 1}. ${rejection.reason}`);
-        });
-
-        // Create detailed error message with specific conflicts
+      if (failedCount > 0) {
+        // Create detailed error message
         let conflictDetails = '';
-        if (result.rejected.length > 0) {
-          const conflicts = result.rejected.slice(0, 5).map((rejection: any, index: number) =>
-            `${index + 1}. ${rejection.slot?.start ? new Date(rejection.slot.start).toLocaleString() : 'Unknown time'} - ${rejection.reason}`
+        if (failedSlots.length > 0) {
+          const conflicts = failedSlots.slice(0, 5).map((failure, index) =>
+            `${index + 1}. ${failure.slot.start ? new Date(failure.slot.start).toLocaleString() : 'Unknown time'} - ${failure.error}`
           );
-          conflictDetails = '\n\nConflicts found:\n' + conflicts.join('\n');
-          if (result.rejected.length > 5) {
-            conflictDetails += `\n... and ${result.rejected.length - 5} more conflicts`;
+          conflictDetails = '\n\nFailed slots:\n' + conflicts.join('\n');
+          if (failedSlots.length > 5) {
+            conflictDetails += `\n... and ${failedSlots.length - 5} more failures`;
           }
         }
 
         // Provide different messages based on success/failure
         if (createdCount > 0) {
           const pastSlotMessage = skippedPastSlots > 0 ? ` ${skippedPastSlots} past slots were also skipped.` : '';
-          const successMessage = `✅ Created ${createdCount} slots successfully.\n⚠️ ${rejectedCount} slots were skipped due to overlaps or conflicts.${pastSlotMessage}${conflictDetails}`;
+          const successMessage = `✅ Created ${createdCount} slots successfully.\n⚠️ ${failedCount} slots failed.${pastSlotMessage}${conflictDetails}`;
 
           setError(successMessage);
           // Continue to onSuccess call below
         } else {
-          // All slots were rejected
+          // All slots failed
           const pastSlotMessage = skippedPastSlots > 0 ? ` Additionally, ${skippedPastSlots} slots were skipped for being in the past.` : '';
-          throw new Error(`❌ All ${rejectedCount} slots were rejected due to overlaps or conflicts.${pastSlotMessage}${conflictDetails}\n\n💡 Tip: Check existing slots and adjust your time ranges to avoid conflicts.`);
+          throw new Error(`❌ All ${failedCount} slots failed.${pastSlotMessage}${conflictDetails}`);
         }
       }
 
@@ -492,14 +491,14 @@ export function GenerateSlotsForm({
       if (skippedPastSlots > 0) {
         console.log('🔔 Past slots detected! Passing to parent:', {
           skippedPastSlots,
-          totalCreated: result.created || slotsToCreate.length
+          totalCreated: createdCount
         });
-        onSuccess(result.results?.created || [], {
+        onSuccess(createdSlots, {
           count: skippedPastSlots,
-          totalSlots: result.created || slotsToCreate.length
+          totalSlots: createdCount
         });
       } else {
-        onSuccess(result.results?.created || []);
+        onSuccess(createdSlots);
       }
       onClose();
       setError(null);

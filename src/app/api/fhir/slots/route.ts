@@ -45,19 +45,9 @@ export async function GET(request: NextRequest) {
     console.log('🔍 [SLOT API] FHIR total:', fhirBundle.total);
     console.log('🔍 [SLOT API] FHIR entry count:', fhirBundle.entry?.length || 0);
 
-    // Transform FHIR Bundle to expected format
-    const slots = fhirBundle.entry?.map((entry: any) => entry.resource) || [];
-    const nextUrl = fhirBundle.link?.find((link: any) => link.relation === 'next')?.url;
-
-    console.log('🔍 [SLOT API] Returning slots count:', slots.length);
-
-    const result = {
-      slots,
-      total: fhirBundle.total || slots.length,
-      nextUrl: nextUrl || null
-    };
-
-    return NextResponse.json(result);
+    // Return the complete FHIR Bundle with all metadata (link, total, entry, etc.)
+    // Frontend components will extract what they need from the Bundle structure
+    return NextResponse.json(fhirBundle);
   } catch (error) {
     console.error('Error in GET /api/fhir/slots:', error);
     

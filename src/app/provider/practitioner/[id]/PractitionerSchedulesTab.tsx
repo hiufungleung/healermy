@@ -176,8 +176,8 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
         throw new Error(`Failed to fetch schedules: ${response.status}`);
       }
 
-      const result = await response.json();
-      const fetchedSchedules: Schedule[] = result.schedules || [];
+      const bundle = await response.json();
+      const fetchedSchedules: Schedule[] = bundle.entry?.map((e: any) => e.resource) || [];
 
       console.log('[SCHEDULES] Fetched', fetchedSchedules.length, 'schedules');
 
@@ -364,7 +364,8 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
 
       if (!response.ok) throw new Error('Failed to fetch slots');
 
-      const { slots } = await response.json();
+      const bundle = await response.json();
+      const slots = bundle.entry?.map((e: any) => e.resource) || [];
 
       // Delete each slot
       const deletePromises = slots.map((slot: any) =>

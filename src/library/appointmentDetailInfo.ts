@@ -46,8 +46,8 @@ export async function enhanceAppointmentsWithPractitionerDetails(
         });
 
         if (practitionersResponse.ok) {
-          const practitionersData = await practitionersResponse.json();
-          const practitioners = practitionersData.practitioners || [];
+          const bundle = await practitionersResponse.json();
+          const practitioners = bundle.entry?.map((e: any) => e.resource) || [];
 
           // Create map with practitioner ID as key
           practitioners.forEach((practitioner: any) => {

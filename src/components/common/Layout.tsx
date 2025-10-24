@@ -204,6 +204,7 @@ export function Layout({ children, patientName, providerName }: LayoutProps) {
                       <button
                         className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold hover:bg-primary/90 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                         aria-label="User menu"
+                        suppressHydrationWarning
                       >
                         {avatarInitial}
                       </button>

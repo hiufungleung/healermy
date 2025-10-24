@@ -120,12 +120,12 @@ export default function ProviderDashboardClient({
         }),
       ]);
 
-      // Process Today's Schedule appointments
-      const bookedArrivedData = bookedArrivedResponse.ok ? await bookedArrivedResponse.json() : { appointments: [] };
-      const fulfilledData = fulfilledResponse.ok ? await fulfilledResponse.json() : { appointments: [] };
+      // Process Today's Schedule appointments - extract from FHIR Bundle
+      const bookedArrivedData = bookedArrivedResponse.ok ? await bookedArrivedResponse.json() : { entry: [] };
+      const fulfilledData = fulfilledResponse.ok ? await fulfilledResponse.json() : { entry: [] };
 
-      const bookedArrivedAppts: Appointment[] = bookedArrivedData.appointments || [];
-      const fulfilledAppts: Appointment[] = fulfilledData.appointments || [];
+      const bookedArrivedAppts: Appointment[] = bookedArrivedData.entry?.map((e: any) => e.resource) || [];
+      const fulfilledAppts: Appointment[] = fulfilledData.entry?.map((e: any) => e.resource) || [];
 
       // Combine all appointments for Today's Schedule
       const allTodayAppts = [...bookedArrivedAppts, ...fulfilledAppts];
@@ -174,11 +174,11 @@ export default function ProviderDashboardClient({
           : null,
       ]);
 
-      // Process encounters
+      // Process encounters - extract from FHIR Bundle
       const encountersByAppointment = new Map<string, Encounter>();
       if (encountersResponse?.ok) {
         const encountersData = await encountersResponse.json();
-        const encounters: Encounter[] = encountersData.encounters || [];
+        const encounters: Encounter[] = encountersData.entry?.map((e: any) => e.resource) || [];
         encounters.forEach(enc => {
           if (enc.appointment && enc.appointment.length > 0) {
             const appointmentRef = enc.appointment[0].reference;
@@ -192,11 +192,11 @@ export default function ProviderDashboardClient({
         });
       }
 
-      // Process patients
+      // Process patients - extract from FHIR Bundle
       const patientsMap = new Map<string, Patient>();
       if (patientsResponse?.ok) {
         const patientsData = await patientsResponse.json();
-        const patients: Patient[] = patientsData.patients || [];
+        const patients: Patient[] = patientsData.entry?.map((e: any) => e.resource) || [];
         patients.forEach(patient => {
           if (patient.id) {
             patientsMap.set(patient.id, patient);
@@ -204,11 +204,11 @@ export default function ProviderDashboardClient({
         });
       }
 
-      // Process practitioners
+      // Process practitioners - extract from FHIR Bundle
       const practitionersMap = new Map<string, Practitioner>();
       if (practitionersResponse?.ok) {
         const practitionersData = await practitionersResponse.json();
-        const practitioners: Practitioner[] = practitionersData.practitioners || [];
+        const practitioners: Practitioner[] = practitionersData.entry?.map((e: any) => e.resource) || [];
         practitioners.forEach(practitioner => {
           if (practitioner.id) {
             practitionersMap.set(practitioner.id, practitioner);
@@ -264,10 +264,10 @@ export default function ProviderDashboardClient({
 
       setTodayScheduleAppointments(enhancedAppointments);
 
-      // Process pending appointments for sidebar
+      // Process pending appointments for sidebar - extract from FHIR Bundle
       if (pendingResponse.ok) {
         const pendingData = await pendingResponse.json();
-        const pendingAppts = pendingData.appointments || [];
+        const pendingAppts = pendingData.entry?.map((e: any) => e.resource) || [];
         setPendingAppointments(pendingAppts);
       }
     } catch (error) {

@@ -78,8 +78,8 @@ export function SlotDetailDialog({
         });
 
         if (response.ok) {
-          const data = await response.json();
-          const appointments = data.appointments || [];
+          const bundle = await response.json();
+          const appointments = bundle.entry?.map((e: any) => e.resource) || [];
 
           if (appointments.length > 0) {
             const apt = appointments[0];

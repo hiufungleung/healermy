@@ -1222,8 +1222,8 @@ export default function NotificationsClient({
                     credentials: 'include',
                   });
                   if (communicationsResponse.ok) {
-                    const communicationsData = await communicationsResponse.json();
-                    const communications = (communicationsData.entry || []).map((entry: any) => entry.resource);
+                    const bundle = await communicationsResponse.json();
+                    const communications = (bundle.entry || []).map((entry: any) => entry.resource);
                     setLocalCommunications(communications);
                   }
                 } catch (error) {

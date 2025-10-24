@@ -111,8 +111,8 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
         throw new Error(`Failed to fetch appointments: ${appointmentsResponse.status}`);
       }
 
-      const appointmentsData = await appointmentsResponse.json();
-      const fetchedAppointments: Appointment[] = appointmentsData.appointments || [];
+      const appointmentsBundle = await appointmentsResponse.json();
+      const fetchedAppointments: Appointment[] = appointmentsBundle.entry?.map((e: any) => e.resource) || [];
       console.log('[PRACTITIONER APPOINTMENTS] ✅ CALL 1 complete:', fetchedAppointments.length, 'appointments');
 
       // Extract IDs for batched calls
@@ -157,8 +157,8 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
       // Map encounters by appointment ID
       const encountersByAppointment = new Map<string, Encounter>();
       if (encountersResponse?.ok) {
-        const encountersData = await encountersResponse.json();
-        const encounters: Encounter[] = encountersData.encounters || [];
+        const encountersBundle = await encountersResponse.json();
+        const encounters: Encounter[] = encountersBundle.entry?.map((e: any) => e.resource) || [];
         console.log('[PRACTITIONER APPOINTMENTS] ✅ CALL 2 complete:', encounters.length, 'encounters');
         encounters.forEach(enc => {
           if (enc.appointment && enc.appointment.length > 0) {
@@ -176,8 +176,8 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
       // Map patients by ID
       const patientsMap = new Map();
       if (patientsResponse?.ok) {
-        const patientsData = await patientsResponse.json();
-        const patients = patientsData.patients || [];
+        const patientsBundle = await patientsResponse.json();
+        const patients = patientsBundle.entry?.map((e: any) => e.resource) || [];
         console.log('[PRACTITIONER APPOINTMENTS] ✅ CALL 3 complete:', patients.length, 'patients');
         patients.forEach((p: any) => {
           if (p.id) patientsMap.set(p.id, p);
@@ -187,8 +187,8 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
       // Map practitioners by ID
       const practitionersMap = new Map();
       if (practitionersResponse?.ok) {
-        const practitionersData = await practitionersResponse.json();
-        const practitioners = practitionersData.practitioners || [];
+        const practitionersBundle = await practitionersResponse.json();
+        const practitioners = practitionersBundle.entry?.map((e: any) => e.resource) || [];
         console.log('[PRACTITIONER APPOINTMENTS] ✅ CALL 4 complete:', practitioners.length, 'practitioners');
         practitioners.forEach((pr: any) => {
           if (pr.id) practitionersMap.set(pr.id, pr);
@@ -354,7 +354,7 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
         {/* Time Filter */}
         <div>
           <label className="text-sm font-medium text-gray-700 mb-2 block">Time</label>
-          <Tabs value={timeFilter} onValueChange={(value) => setTimeFilter(value as TimeFilter)}>
+          <Tabs value={timeFilter} onValueChange={(value) => setTimeFilter(value as TimeFilter)} suppressHydrationWarning>
             <TabsList>
               <TabsTrigger className='text-[13px]' value="today">Today</TabsTrigger>
               <TabsTrigger className='text-[13px]' value="upcoming-7">Upcoming 7 days</TabsTrigger>

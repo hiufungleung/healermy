@@ -140,8 +140,8 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
         return;
       }
 
-      const commData = await response.json();
-      const allCommunications = (commData.entry || []).map((entry: any) => entry.resource);
+      const bundle = await response.json();
+      const allCommunications = (bundle.entry || []).map((entry: any) => entry.resource);
 
       // Store full communications data
       setCommunications(allCommunications);

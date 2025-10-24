@@ -36,10 +36,9 @@ export async function GET(request: NextRequest) {
 
     const bundle = await response.json();
 
-    return NextResponse.json({
-      allergies: bundle.entry?.map((entry: any) => entry.resource) || [],
-      total: bundle.total || 0
-    });
+    // Return the complete FHIR Bundle with all metadata (link, total, entry, etc.)
+    // Frontend components will extract what they need from the Bundle structure
+    return NextResponse.json(bundle);
 
   } catch (error) {
     console.error('Error in GET /api/fhir/allergy-intolerances:', error);
