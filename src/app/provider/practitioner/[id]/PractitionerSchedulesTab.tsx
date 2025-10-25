@@ -167,7 +167,7 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
 
       console.log('[SCHEDULES] Fetching with filters:', params.toString());
 
-      const response = await fetch(`/api/fhir/schedules?${params.toString()}`, {
+      const response = await fetch(`/api/fhir/Schedule?${params.toString()}`, {
         method: 'GET',
         credentials: 'include',
       });
@@ -239,7 +239,7 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
   const handleActivateSchedule = async (scheduleId: string) => {
     try {
       // Try 'replace' operation first
-      let response = await fetch(`/api/fhir/schedules/${scheduleId}`, {
+      let response = await fetch(`/api/fhir/Schedule/${scheduleId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json-patch+json' },
         credentials: 'include',
@@ -251,7 +251,7 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
       // If replace fails (e.g., path doesn't exist), try 'add' operation
       if (!response.ok) {
         console.warn('[SCHEDULES] Replace failed, trying add operation for schedule:', scheduleId);
-        response = await fetch(`/api/fhir/schedules/${scheduleId}`, {
+        response = await fetch(`/api/fhir/Schedule/${scheduleId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json-patch+json' },
           credentials: 'include',
@@ -283,7 +283,7 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
   const handleDeactivateSchedule = async (scheduleId: string) => {
     try {
       // Try 'replace' operation first
-      let response = await fetch(`/api/fhir/schedules/${scheduleId}`, {
+      let response = await fetch(`/api/fhir/Schedule/${scheduleId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json-patch+json' },
         credentials: 'include',
@@ -295,7 +295,7 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
       // If replace fails (e.g., path doesn't exist), try 'add' operation
       if (!response.ok) {
         console.warn('[SCHEDULES] Replace failed, trying add operation for schedule:', scheduleId);
-        response = await fetch(`/api/fhir/schedules/${scheduleId}`, {
+        response = await fetch(`/api/fhir/Schedule/${scheduleId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json-patch+json' },
           credentials: 'include',
@@ -328,7 +328,7 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
     setDeletingSchedules(prev => new Set([...prev, scheduleId]));
 
     try {
-      const response = await fetch(`/api/fhir/schedules/${scheduleId}`, {
+      const response = await fetch(`/api/fhir/Schedule/${scheduleId}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -360,7 +360,7 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
 
       // Fetch all FREE slots for this schedule (only free slots can be deleted)
       const response = await fetch(
-        `/api/fhir/slots?schedule=Schedule/${scheduleId}&status=free`,
+        `/api/fhir/Slot?schedule=Schedule/${scheduleId}&status=free`,
         { credentials: 'include' }
       );
 

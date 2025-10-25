@@ -557,7 +557,7 @@ function NewBookingFlow() {
       console.log(`[VALIDATION] Validating slot ${selectedSlotId}, date ${selectedDate}, time ${selectedTime} on Step ${currentStep}`);
 
       try {
-        const response = await fetch(`/api/fhir/slots/${selectedSlotId}`, {
+        const response = await fetch(`/api/fhir/Slot/${selectedSlotId}`, {
           method: 'GET',
           credentials: 'include',
         });
@@ -773,7 +773,7 @@ function NewBookingFlow() {
     setLoading(true);
     try {
       // Fetch all practitioners without pagination parameters
-      const response = await fetch(`/api/fhir/practitioners`, {
+      const response = await fetch(`/api/fhir/Practitioner`, {
         credentials: 'include'
       });
 
@@ -850,7 +850,7 @@ function NewBookingFlow() {
         }
       }
 
-      const scheduleUrl = `/api/fhir/schedules?${params.toString()}`;
+      const scheduleUrl = `/api/fhir/Schedule?${params.toString()}`;
       console.log('🔍 [FILTER] Server-side query URL:', scheduleUrl);
 
       const schedulesResponse = await fetch(scheduleUrl, { credentials: 'include' });
@@ -899,7 +899,7 @@ function NewBookingFlow() {
       // Fetch practitioner details using batch request (much more efficient!)
       try {
         const idsParam = Array.from(practitionerIds).join(',');
-        const response = await fetch(`/api/fhir/practitioners?_id=${idsParam}`, {
+        const response = await fetch(`/api/fhir/Practitioner?_id=${idsParam}`, {
           credentials: 'include'
         });
 
@@ -1014,8 +1014,8 @@ function NewBookingFlow() {
       // Fetch both halves in parallel
       console.log('[MONTH SLOTS] Fetching both halves in parallel...');
       const [firstHalfResponse, secondHalfResponse] = await Promise.all([
-        fetch(`/api/fhir/slots?${firstHalfParams.toString()}`, { credentials: 'include' }),
-        fetch(`/api/fhir/slots?${secondHalfParams.toString()}`, { credentials: 'include' })
+        fetch(`/api/fhir/Slot?${firstHalfParams.toString()}`, { credentials: 'include' }),
+        fetch(`/api/fhir/Slot?${secondHalfParams.toString()}`, { credentials: 'include' })
       ]);
 
       if (!firstHalfResponse.ok || !secondHalfResponse.ok) {
@@ -1217,7 +1217,7 @@ function NewBookingFlow() {
           }
 
           // OPTIMIZED: Use _include to fetch practitioners with schedules in single request
-          const scheduleUrl = `/api/fhir/schedules?${scheduleParams.toString()}&${nameParams}&_include=Schedule:actor:Practitioner`;
+          const scheduleUrl = `/api/fhir/Schedule?${scheduleParams.toString()}&${nameParams}&_include=Schedule:actor:Practitioner`;
           console.log('[SEARCH] 🚀 Searching schedules with _include (single request):', scheduleUrl);
 
           const schedulesResponse = await fetch(scheduleUrl, { credentials: 'include' });
@@ -1268,7 +1268,7 @@ function NewBookingFlow() {
             queryParams = `family:contains=${encodeURIComponent(firstWord)},${encodeURIComponent(restWords)}&given:contains=${encodeURIComponent(firstWord)},${encodeURIComponent(restWords)}`;
           }
 
-          const response = await fetch(`/api/fhir/practitioners?${queryParams}`, { credentials: 'include' });
+          const response = await fetch(`/api/fhir/Practitioner?${queryParams}`, { credentials: 'include' });
 
           if (!response.ok) throw new Error('Failed to fetch practitioners');
 
@@ -1316,7 +1316,7 @@ function NewBookingFlow() {
       // Fetch available schedules for this practitioner asynchronously
       (async () => {
         try {
-          const response = await fetch(`/api/fhir/schedules?actor=Practitioner/${practitioner.id}`, {
+          const response = await fetch(`/api/fhir/Schedule?actor=Practitioner/${practitioner.id}`, {
             credentials: 'include'
           });
 
@@ -1567,7 +1567,7 @@ function NewBookingFlow() {
 
       console.log('[BOOKING] Creating appointment with data:', appointmentRequestData);
 
-      const response = await fetch('/api/fhir/appointments', {
+      const response = await fetch('/api/fhir/Appointment', {
         method: 'POST',
         credentials: 'include',
         body: JSON.stringify(appointmentRequestData),

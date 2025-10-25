@@ -69,7 +69,7 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
     // Include schedules referenced by slots in single request
     params.append('_include', 'Slot:schedule');
 
-    const res = await fetch(`/api/fhir/slots?${params}`, { credentials: 'include' });
+    const res = await fetch(`/api/fhir/Slot?${params}`, { credentials: 'include' });
     if (res.ok) {
       const bundle = await res.json();
 
@@ -129,7 +129,7 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
     params.append('date', `ge${startStr}`);
     params.append('date', `lt${endStr}`);
 
-    const res = await fetch(`/api/fhir/schedules?${params}`, { credentials: 'include' });
+    const res = await fetch(`/api/fhir/Schedule?${params}`, { credentials: 'include' });
     if (res.ok) {
       const bundle = await res.json();
       setSchedules(bundle.entry?.map((e: any) => e.resource) || []);

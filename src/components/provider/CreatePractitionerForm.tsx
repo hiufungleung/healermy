@@ -200,7 +200,7 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
 
       console.log('Creating practitioner with data:', practitionerResource);
 
-      const response = await fetch('/api/fhir/practitioners', {
+      const response = await fetch('/api/fhir/Practitioner', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

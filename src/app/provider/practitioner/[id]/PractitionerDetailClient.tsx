@@ -126,7 +126,7 @@ export default function PractitionerDetailClient({
       if (!slot.id) return;
 
       try {
-        const response = await fetch(`/api/fhir/slots/${slot.id}`, {
+        const response = await fetch(`/api/fhir/Slot/${slot.id}`, {
           method: 'PATCH',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json-patch+json' },
@@ -159,7 +159,7 @@ export default function PractitionerDetailClient({
     const fetchPractitionerName = async () => {
       try {
         console.log('🔄 Loading practitioner name...');
-        const response = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
+        const response = await fetch(`/api/fhir/Practitioner/${practitionerId}`, {
           method: 'GET',
           credentials: 'include',
         });
@@ -196,7 +196,7 @@ export default function PractitionerDetailClient({
         const params = new URLSearchParams();
         params.append('actor', `Practitioner/${practitionerId}`);
 
-        const response = await fetch(`/api/fhir/schedules?${params.toString()}`, {
+        const response = await fetch(`/api/fhir/Schedule?${params.toString()}`, {
           method: 'GET',
           credentials: 'include',
         });
@@ -248,7 +248,7 @@ export default function PractitionerDetailClient({
 
       const slotPromises = scheduleIds.map(async (scheduleId) => {
         try {
-          const response = await fetch(`/api/fhir/slots?schedule=Schedule/${scheduleId}`, {
+          const response = await fetch(`/api/fhir/Slot?schedule=Schedule/${scheduleId}`, {
             method: 'GET',
             credentials: 'include',
           });

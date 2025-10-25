@@ -215,7 +215,7 @@ export default function AppointmentView(props: AppointmentViewProps) {
         description: reasonText
       };
 
-      const response = await fetch('/api/fhir/appointments', {
+      const response = await fetch('/api/fhir/Appointment', {
         method: 'POST',
         credentials: 'include',
         body: JSON.stringify(appointmentRequestData),
@@ -250,7 +250,7 @@ export default function AppointmentView(props: AppointmentViewProps) {
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/fhir/appointments/${appointment?.id}`, {
+      const response = await fetch(`/api/fhir/Appointment/${appointment?.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

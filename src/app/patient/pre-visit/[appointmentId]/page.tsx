@@ -33,7 +33,7 @@ export default function PreVisitSummary() {
     setLoading(true);
     try {
       // Use the new consolidated profile endpoint
-      const response = await fetch('/api/fhir/patients/profile', {
+      const response = await fetch('/api/fhir/Patient/profile', {
         method: 'GET',
         credentials: 'include',
       });

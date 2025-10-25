@@ -3,7 +3,7 @@ import { FHIRClient } from '@/app/api/fhir/client';
 import { getSessionFromCookies, prepareToken } from '@/app/api/fhir/utils/auth';
 
 /**
- * GET /api/fhir/coverage
+ * GET /api/fhir/Coverage
  * Search for coverage (insurance)
  * Query params:
  * - beneficiary: Patient/[id] or [id] - Filter by beneficiary (patient)
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(bundle);
 
   } catch (error) {
-    console.error('Error in GET /api/fhir/coverage:', error);
+    console.error('Error in GET /api/fhir/Coverage:', error);
     return NextResponse.json(
       { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

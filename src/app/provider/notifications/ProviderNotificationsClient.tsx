@@ -95,7 +95,7 @@ export default function ProviderNotificationsClient({
   const fetchPatientName = async (patientId: string): Promise<string> => {
     try {
       console.log(`[fetchPatientName] Client-side: Fetching patient ${patientId}`);
-      const response = await fetch(`/api/fhir/patients/${patientId}`, {
+      const response = await fetch(`/api/fhir/Patient/${patientId}`, {
         method: 'GET',
         credentials: 'include',
       });
@@ -173,7 +173,7 @@ export default function ProviderNotificationsClient({
       console.log('[PROVIDER NOTIFICATIONS] 🔄 Fetching initial data...');
 
       try {
-        const response = await fetch('/api/fhir/communications', {
+        const response = await fetch('/api/fhir/Communication', {
           credentials: 'include'
         });
 
@@ -389,7 +389,7 @@ export default function ProviderNotificationsClient({
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/fhir/communications', {
+      const response = await fetch('/api/fhir/Communication', {
         credentials: 'include'
       });
 
@@ -466,7 +466,7 @@ export default function ProviderNotificationsClient({
         // Re-fetch communications and appointment statuses when page becomes visible again
         const refreshData = async () => {
           try {
-            const response = await fetch('/api/fhir/communications', {
+            const response = await fetch('/api/fhir/Communication', {
               method: 'GET',
               credentials: 'include',
             });
@@ -530,7 +530,7 @@ export default function ProviderNotificationsClient({
     }
 
     try {
-      const response = await fetch(`/api/fhir/communications/${communicationId}`, {
+      const response = await fetch(`/api/fhir/Communication/${communicationId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -559,7 +559,7 @@ export default function ProviderNotificationsClient({
     try {
       // Mark the communication as deleted by provider using PATCH (adds extension)
       // This way patient can still see it, but provider won't
-      const response = await fetch(`/api/fhir/communications/${id}`, {
+      const response = await fetch(`/api/fhir/Communication/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -603,7 +603,7 @@ export default function ProviderNotificationsClient({
         console.log('[PROVIDER NOTIFICATIONS] 🚀 Fetching appointment + patient details');
 
         // Fetch appointment details
-        const appointmentResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+        const appointmentResponse = await fetch(`/api/fhir/Appointment/${appointmentId}`, {
           credentials: 'include'
         });
 
@@ -623,7 +623,7 @@ export default function ProviderNotificationsClient({
           const patientId = patientParticipant.actor.reference.replace('Patient/', '');
 
           try {
-            const patientResponse = await fetch(`/api/fhir/patients/${patientId}`, {
+            const patientResponse = await fetch(`/api/fhir/Patient/${patientId}`, {
               credentials: 'include'
             });
 
@@ -1184,7 +1184,7 @@ export default function ProviderNotificationsClient({
         onApprove={async (id: string) => {
           // Approve appointment and refresh communications
           try {
-            const response = await fetch(`/api/fhir/appointments/${id}`, {
+            const response = await fetch(`/api/fhir/Appointment/${id}`, {
               method: 'PATCH',
               credentials: 'include',
               headers: { 'Content-Type': 'application/json-patch+json' },
@@ -1196,7 +1196,7 @@ export default function ProviderNotificationsClient({
             if (!response.ok) throw new Error('Failed to approve appointment');
 
             // Refresh communications
-            const commResponse = await fetch('/api/fhir/communications', {
+            const commResponse = await fetch('/api/fhir/Communication', {
               credentials: 'include'
             });
             if (commResponse.ok) {
@@ -1212,7 +1212,7 @@ export default function ProviderNotificationsClient({
         onReject={async (id: string) => {
           // Reject appointment and refresh communications
           try {
-            const response = await fetch(`/api/fhir/appointments/${id}`, {
+            const response = await fetch(`/api/fhir/Appointment/${id}`, {
               method: 'PATCH',
               credentials: 'include',
               headers: { 'Content-Type': 'application/json-patch+json' },
@@ -1224,7 +1224,7 @@ export default function ProviderNotificationsClient({
             if (!response.ok) throw new Error('Failed to reject appointment');
 
             // Refresh communications
-            const commResponse = await fetch('/api/fhir/communications', {
+            const commResponse = await fetch('/api/fhir/Communication', {
               credentials: 'include'
             });
             if (commResponse.ok) {
@@ -1240,7 +1240,7 @@ export default function ProviderNotificationsClient({
         onComplete={async (id: string) => {
           // Complete appointment and refresh communications
           try {
-            const response = await fetch(`/api/fhir/appointments/${id}`, {
+            const response = await fetch(`/api/fhir/Appointment/${id}`, {
               method: 'PATCH',
               credentials: 'include',
               headers: { 'Content-Type': 'application/json-patch+json' },
@@ -1252,7 +1252,7 @@ export default function ProviderNotificationsClient({
             if (!response.ok) throw new Error('Failed to complete appointment');
 
             // Refresh communications
-            const commResponse = await fetch('/api/fhir/communications', {
+            const commResponse = await fetch('/api/fhir/Communication', {
               credentials: 'include'
             });
             if (commResponse.ok) {
@@ -1268,7 +1268,7 @@ export default function ProviderNotificationsClient({
         onCancel={async (id: string) => {
           // Cancel appointment and refresh communications
           try {
-            const response = await fetch(`/api/fhir/appointments/${id}`, {
+            const response = await fetch(`/api/fhir/Appointment/${id}`, {
               method: 'PATCH',
               credentials: 'include',
               headers: { 'Content-Type': 'application/json-patch+json' },
@@ -1280,7 +1280,7 @@ export default function ProviderNotificationsClient({
             if (!response.ok) throw new Error('Failed to cancel appointment');
 
             // Refresh communications
-            const commResponse = await fetch('/api/fhir/communications', {
+            const commResponse = await fetch('/api/fhir/Communication', {
               credentials: 'include'
             });
             if (commResponse.ok) {

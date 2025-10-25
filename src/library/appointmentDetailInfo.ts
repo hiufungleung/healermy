@@ -41,7 +41,7 @@ export async function enhanceAppointmentsWithPractitionerDetails(
       try {
         // Use FHIR standard _id parameter with comma-separated IDs
         const idsParam = Array.from(practitionerIds).join(',');
-        const practitionersResponse = await fetch(`/api/fhir/practitioners?_id=${idsParam}`, {
+        const practitionersResponse = await fetch(`/api/fhir/Practitioner?_id=${idsParam}`, {
           credentials: 'include'
         });
 

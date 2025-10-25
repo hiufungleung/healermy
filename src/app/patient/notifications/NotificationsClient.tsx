@@ -81,7 +81,7 @@ export default function NotificationsClient({
       console.log('[PATIENT NOTIFICATIONS] 🔄 Fetching initial data...');
 
       try {
-        const response = await fetch('/api/fhir/communications', {
+        const response = await fetch('/api/fhir/Communication', {
           credentials: 'include'
         });
 
@@ -200,7 +200,7 @@ export default function NotificationsClient({
     setLoading(true);
 
     try {
-      const response = await fetch('/api/fhir/communications', {
+      const response = await fetch('/api/fhir/Communication', {
         credentials: 'include'
       });
 
@@ -262,7 +262,7 @@ export default function NotificationsClient({
     setMarkingAsRead(prev => new Set([...prev, communicationId]));
     
     try {
-      const response = await fetch(`/api/fhir/communications/${communicationId}`, {
+      const response = await fetch(`/api/fhir/Communication/${communicationId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -367,7 +367,7 @@ export default function NotificationsClient({
         console.log('[PATIENT NOTIFICATIONS] 🚀 Fetching appointment details with FHIR batch');
 
         // OPTIMIZED: Fetch appointment first, then batch-fetch practitioner if needed
-        const appointmentResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+        const appointmentResponse = await fetch(`/api/fhir/Appointment/${appointmentId}`, {
           credentials: 'include'
         });
 
@@ -483,7 +483,7 @@ export default function NotificationsClient({
 
     try {
       // Call backend API to permanently delete the communication
-      const response = await fetch(`/api/fhir/communications/${id}`, {
+      const response = await fetch(`/api/fhir/Communication/${id}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -1057,7 +1057,7 @@ export default function NotificationsClient({
 
                 setIsProcessing(true);
                 try {
-                  const response = await fetch(`/api/fhir/appointments/${selectedAppointment.id}`, {
+                  const response = await fetch(`/api/fhir/Appointment/${selectedAppointment.id}`, {
                     method: 'PATCH',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json-patch+json' },
@@ -1083,7 +1083,7 @@ export default function NotificationsClient({
                   setIsDetailDialogOpen(false);
 
                   // Refresh communications
-                  const communicationsResponse = await fetch(`/api/fhir/communications`, {
+                  const communicationsResponse = await fetch(`/api/fhir/Communication`, {
                     credentials: 'include',
                   });
                   if (communicationsResponse.ok) {

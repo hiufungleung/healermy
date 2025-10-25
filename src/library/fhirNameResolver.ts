@@ -34,7 +34,7 @@ export function extractParticipantIds(appointments: Appointment[]) {
 export async function fetchPatientData(patientIds: Set<string>) {
   const patientPromises = Array.from(patientIds).map(async (patientId) => {
     try {
-      const response = await fetch(`/api/fhir/patients/${patientId}`, {
+      const response = await fetch(`/api/fhir/Patient/${patientId}`, {
         credentials: 'include'
       });
       if (response.ok) {
@@ -65,7 +65,7 @@ export async function fetchPatientData(patientIds: Set<string>) {
 export async function fetchPractitionerData(practitionerIds: Set<string>) {
   const practitionerPromises = Array.from(practitionerIds).map(async (practitionerId) => {
     try {
-      const response = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
+      const response = await fetch(`/api/fhir/Practitioner/${practitionerId}`, {
         credentials: 'include'
       });
       if (response.ok) {

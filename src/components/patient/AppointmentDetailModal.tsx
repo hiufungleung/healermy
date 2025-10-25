@@ -36,7 +36,7 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
 
       try {
         // Fetch appointment
-        const appointmentResponse = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+        const appointmentResponse = await fetch(`/api/fhir/Appointment/${appointmentId}`, {
           credentials: 'include'
         });
 
@@ -54,7 +54,7 @@ export const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
 
         if (practitionerParticipant?.actor?.reference) {
           const practitionerId = practitionerParticipant.actor.reference.replace('Practitioner/', '');
-          const practitionerResponse = await fetch(`/api/fhir/practitioners/${practitionerId}`, {
+          const practitionerResponse = await fetch(`/api/fhir/Practitioner/${practitionerId}`, {
             credentials: 'include'
           });
 

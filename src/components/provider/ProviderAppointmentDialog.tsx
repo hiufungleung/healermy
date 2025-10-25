@@ -83,7 +83,7 @@ export function ProviderAppointmentDialog({
       setProfileError(null);
 
       try {
-        const response = await fetch(`/api/fhir/patients/${patientId}/profile`, {
+        const response = await fetch(`/api/fhir/Patient/${patientId}/profile`, {
           credentials: 'include'
         });
 

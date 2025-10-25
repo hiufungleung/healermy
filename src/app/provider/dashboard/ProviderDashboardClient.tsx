@@ -107,15 +107,15 @@ export default function ProviderDashboardClient({
       // Fetch Today's Schedule appointments (booked/arrived + recent fulfilled) and pending in parallel
       const [bookedArrivedResponse, fulfilledResponse, pendingResponse] = await Promise.all([
         // Call 1: Booked and Arrived appointments for today
-        fetch(`/api/fhir/appointments?status=booked,arrived&slot.start=ge${today.toISOString()}&slot.start=lt${todayEnd.toISOString()}`, {
+        fetch(`/api/fhir/Appointment?status=booked,arrived&slot.start=ge${today.toISOString()}&slot.start=lt${todayEnd.toISOString()}`, {
           credentials: 'include',
         }),
         // Call 2: Fulfilled appointments for today updated within last 10 minutes
-        fetch(`/api/fhir/appointments?status=fulfilled&slot.start=ge${today.toISOString()}&slot.start=lt${todayEnd.toISOString()}&_lastUpdated=ge${tenMinutesAgo.toISOString()}`, {
+        fetch(`/api/fhir/Appointment?status=fulfilled&slot.start=ge${today.toISOString()}&slot.start=lt${todayEnd.toISOString()}&_lastUpdated=ge${tenMinutesAgo.toISOString()}`, {
           credentials: 'include',
         }),
         // Call 3: Pending appointments (limit 10 for sidebar)
-        fetch(`/api/fhir/appointments?status=pending&_count=10`, {
+        fetch(`/api/fhir/Appointment?status=pending&_count=10`, {
           credentials: 'include',
         }),
       ]);
@@ -158,17 +158,17 @@ export default function ProviderDashboardClient({
       // Fetch encounters, patients, and practitioners in parallel
       const [encountersResponse, patientsResponse, practitionersResponse] = await Promise.all([
         appointmentIds.length > 0
-          ? fetch(`/api/fhir/encounters?appointment=${appointmentIds.join(',')}`, {
+          ? fetch(`/api/fhir/Encounter?appointment=${appointmentIds.join(',')}`, {
               credentials: 'include'
             })
           : null,
         patientIds.size > 0
-          ? fetch(`/api/fhir/patients?_id=${Array.from(patientIds).join(',')}`, {
+          ? fetch(`/api/fhir/Patient?_id=${Array.from(patientIds).join(',')}`, {
               credentials: 'include'
             })
           : null,
         practitionerIds.size > 0
-          ? fetch(`/api/fhir/practitioners?_id=${Array.from(practitionerIds).join(',')}`, {
+          ? fetch(`/api/fhir/Practitioner?_id=${Array.from(practitionerIds).join(',')}`, {
               credentials: 'include'
             })
           : null,

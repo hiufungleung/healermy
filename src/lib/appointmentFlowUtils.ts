@@ -16,7 +16,7 @@
  * Returns the updated appointment resource from PATCH response
  */
 export async function confirmAppointment(appointmentId: string): Promise<any> {
-  const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+  const response = await fetch(`/api/fhir/Appointment/${appointmentId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json-patch+json' },
     credentials: 'include',
@@ -38,7 +38,7 @@ export async function confirmAppointment(appointmentId: string): Promise<any> {
  * Returns the updated appointment resource from PATCH response
  */
 export async function cancelAppointment(appointmentId: string): Promise<any> {
-  const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+  const response = await fetch(`/api/fhir/Appointment/${appointmentId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json-patch+json' },
     credentials: 'include',
@@ -60,7 +60,7 @@ export async function cancelAppointment(appointmentId: string): Promise<any> {
  * Returns the updated appointment resource from PATCH response
  */
 export async function markPatientArrived(appointmentId: string): Promise<any> {
-  const response = await fetch(`/api/fhir/appointments/${appointmentId}`, {
+  const response = await fetch(`/api/fhir/Appointment/${appointmentId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json-patch+json' },
     credentials: 'include',
@@ -83,7 +83,7 @@ export async function markPatientArrived(appointmentId: string): Promise<any> {
  * Returns the created encounter resource
  */
 export async function createPlannedEncounter(appointmentId: string): Promise<any> {
-  const response = await fetch('/api/fhir/encounters/create-for-appointment', {
+  const response = await fetch('/api/fhir/Encounter/create-for-appointment', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -108,7 +108,7 @@ export async function createPlannedEncounter(appointmentId: string): Promise<any
  * Returns the updated encounter resource from PATCH response
  */
 export async function startEncounter(encounterId: string): Promise<any> {
-  const response = await fetch(`/api/fhir/encounters/${encounterId}`, {
+  const response = await fetch(`/api/fhir/Encounter/${encounterId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json-patch+json' },
     credentials: 'include',
@@ -136,7 +136,7 @@ export async function completeEncounter(encounterId: string, appointmentId: stri
   // Send both PATCH requests in parallel
   const [encounterResponse, appointmentResponse] = await Promise.all([
     // Update encounter to finished
-    fetch(`/api/fhir/encounters/${encounterId}`, {
+    fetch(`/api/fhir/Encounter/${encounterId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json-patch+json' },
       credentials: 'include',
@@ -145,7 +145,7 @@ export async function completeEncounter(encounterId: string, appointmentId: stri
       ])
     }),
     // Update appointment to fulfilled
-    fetch(`/api/fhir/appointments/${appointmentId}`, {
+    fetch(`/api/fhir/Appointment/${appointmentId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json-patch+json' },
       credentials: 'include',

@@ -73,7 +73,7 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
       setIsLoadingUserName(true);
       try {
         if (session.role === 'patient' && session.patient) {
-          const response = await fetch(`/api/fhir/patients/${session.patient}`, {
+          const response = await fetch(`/api/fhir/Patient/${session.patient}`, {
             method: 'GET',
             credentials: 'include',
           });
@@ -94,7 +94,7 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
           // For provider, fetch name from FHIR API using practitioner ID
           if (!session.practitioner) return;
 
-          const response = await fetch(`/api/fhir/practitioners/${session.practitioner}`, {
+          const response = await fetch(`/api/fhir/Practitioner/${session.practitioner}`, {
             method: 'GET',
             credentials: 'include',
           });
@@ -132,7 +132,7 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
     }
 
     try {
-      const response = await fetch('/api/fhir/communications', {
+      const response = await fetch('/api/fhir/Communication', {
         credentials: 'include'
       });
 

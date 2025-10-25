@@ -72,7 +72,7 @@ export function SlotDetailDialog({
 
       try {
         // Find appointment that references this slot
-        const response = await fetch(`/api/fhir/appointments?slot=Slot/${slot.id}`, {
+        const response = await fetch(`/api/fhir/Appointment?slot=Slot/${slot.id}`, {
           method: 'GET',
           credentials: 'include',
         });
@@ -92,7 +92,7 @@ export function SlotDetailDialog({
 
             if (patientRef) {
               const patientId = patientRef.split('/')[1];
-              const patientResponse = await fetch(`/api/fhir/patients/${patientId}`, {
+              const patientResponse = await fetch(`/api/fhir/Patient/${patientId}`, {
                 method: 'GET',
                 credentials: 'include',
               });
@@ -127,7 +127,7 @@ export function SlotDetailDialog({
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/fhir/slots/${slot.id}`, {
+      const response = await fetch(`/api/fhir/Slot/${slot.id}`, {
         method: 'DELETE',
         credentials: 'include',
       });

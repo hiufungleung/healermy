@@ -72,7 +72,7 @@ export function PatientAppointmentCard({ appointment, onAppointmentUpdated }: Pa
   const handleCancel = async () => {
     setIsProcessing(true);
     try {
-      const response = await fetch(`/api/fhir/appointments/${appointment.id}`, {
+      const response = await fetch(`/api/fhir/Appointment/${appointment.id}`, {
         method: 'PATCH',
         credentials: 'include',
         body: JSON.stringify([
@@ -90,7 +90,7 @@ export function PatientAppointmentCard({ appointment, onAppointmentUpdated }: Pa
       }
 
       // Send cancellation notification to provider
-      const notificationResponse = await fetch('/api/fhir/communications', {
+      const notificationResponse = await fetch('/api/fhir/Communication', {
         method: 'POST',
         credentials: 'include',
         body: JSON.stringify({

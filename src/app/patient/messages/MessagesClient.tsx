@@ -51,7 +51,7 @@ export default function MessagesClient({
         setLoading(true);
 
         // Only fetch communications (no need to fetch patient data)
-        const communicationsResponse = await fetch(`/api/fhir/communications?patient=${session.patient}`, {
+        const communicationsResponse = await fetch(`/api/fhir/Communication?patient=${session.patient}`, {
           credentials: 'include',
         });
 
@@ -108,7 +108,7 @@ export default function MessagesClient({
     setMarkingAsRead(prev => new Set([...prev, communicationId]));
     
     try {
-      const response = await fetch(`/api/fhir/communications/${communicationId}`, {
+      const response = await fetch(`/api/fhir/Communication/${communicationId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

@@ -60,7 +60,7 @@ export default function DashboardClient({
         const todayStart = new Date(now);
         todayStart.setHours(0, 0, 0, 0);
         // Fetch appointments from today onwards using slot.start (real appointment time)
-        const response = await fetch(`/api/fhir/appointments?patient=${session.patient}&slot.start=ge${todayStart.toISOString()}&_sort=date`, {
+        const response = await fetch(`/api/fhir/Appointment?patient=${session.patient}&slot.start=ge${todayStart.toISOString()}&_sort=date`, {
           credentials: 'include'
         });
 
@@ -94,7 +94,7 @@ export default function DashboardClient({
       const now = getNowInAppTimezone();
       const todayStart = new Date(now);
       todayStart.setHours(0, 0, 0, 0);
-      const refreshResponse = await fetch(`/api/fhir/appointments?patient=${session.patient}&slot.start=ge${todayStart.toISOString()}&_sort=date`, {
+      const refreshResponse = await fetch(`/api/fhir/Appointment?patient=${session.patient}&slot.start=ge${todayStart.toISOString()}&_sort=date`, {
         credentials: 'include'
       });
       if (refreshResponse.ok) {

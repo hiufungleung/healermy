@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromCookies, prepareToken, validateRole } from './utils/auth';
+import { getSessionFromCookies, prepareToken } from './utils/auth';
 import { FHIRClient } from './client';
 
 /**
@@ -7,13 +7,14 @@ import { FHIRClient } from './client';
  *
  * Handles FHIR batch and transaction bundles for bulk operations
  * https://build.fhir.org/bundle.html
+ *
+ * Permissions:
+ * - GET requests: All roles (patient, provider)
+ * - POST/PUT/PATCH/DELETE: Only provider role
  */
 export async function POST(request: NextRequest) {
   try {
     const session = await getSessionFromCookies();
-
-    // Only providers can use batch operations (creating multiple resources)
-    validateRole(session, 'provider');
 
     const bundle = await request.json();
 
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate all entries have required fields
+    // Validate all entries have required fields and permissions
     for (let i = 0; i < bundle.entry.length; i++) {
       const entry = bundle.entry[i];
       if (!entry.request) {
@@ -54,6 +55,16 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+
+      // Check permissions: Only providers can perform write operations
+      const isWriteOperation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(entry.request.method);
+      if (isWriteOperation && session.role !== 'provider') {
+        return NextResponse.json(
+          { error: 'Unauthorized', details: `${entry.request.method} operations require provider role` },
+          { status: 403 }
+        );
+      }
+
       if ((entry.request.method === 'POST' || entry.request.method === 'PUT') && !entry.resource) {
         return NextResponse.json(
           { error: 'Invalid bundle entry', details: `Entry ${i} missing resource for ${entry.request.method}` },

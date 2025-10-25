@@ -103,7 +103,7 @@ export default function PatientProfileClient({ patientName }: PatientProfileClie
     try {
       console.log('📋 Fetching complete profile data...');
 
-      const response = await fetch('/api/fhir/patients/profile', {
+      const response = await fetch('/api/fhir/Patient/profile', {
         method: 'GET',
         credentials: 'include',
       });

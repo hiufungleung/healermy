@@ -181,7 +181,7 @@ export default function PractitionerManagement() {
           params.append('_id', filters.practitionerId);
         }
 
-        apiUrl = `/api/fhir/practitioners?${params.toString()}`;
+        apiUrl = `/api/fhir/Practitioner?${params.toString()}`;
       }
 
       const response = await fetch(apiUrl, {
@@ -359,7 +359,7 @@ export default function PractitionerManagement() {
     if (!practitionerToDelete?.id) return;
 
     try {
-      const response = await fetch(`/api/fhir/practitioners/${practitionerToDelete.id}`, {
+      const response = await fetch(`/api/fhir/Practitioner/${practitionerToDelete.id}`, {
         method: 'DELETE',
         credentials: 'include',
       });

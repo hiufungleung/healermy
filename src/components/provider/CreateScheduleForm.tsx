@@ -150,7 +150,7 @@ export function CreateScheduleForm({
         scheduleData.comment = formData.comment;
       }
 
-      const response = await fetch('/api/fhir/schedules', {
+      const response = await fetch('/api/fhir/Schedule', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

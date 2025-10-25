@@ -225,7 +225,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
   // Refresh appointments after update
   const refreshAppointments = async () => {
     try {
-      const response = await fetch(`/api/fhir/appointments?patient=${session.patient}`, {
+      const response = await fetch(`/api/fhir/Appointment?patient=${session.patient}`, {
         credentials: 'include'
       });
       if (response.ok) {

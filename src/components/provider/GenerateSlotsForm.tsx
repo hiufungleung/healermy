@@ -464,7 +464,7 @@ export function GenerateSlotsForm({
         checkParams.append('start', `ge${slotCheckStart}`);
         checkParams.append('start', `lt${slotCheckEnd}`);
 
-        let apiUrl = `/api/fhir/slots?${checkParams.toString()}`;
+        let apiUrl = `/api/fhir/Slot?${checkParams.toString()}`;
 
         // Fetch all pages (handle pagination)
         let allSlots: any[] = [];

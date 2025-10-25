@@ -1,5 +1,5 @@
 import { FHIRClient } from '../client';
-import { createSlot } from '../slots/operations';
+import { createSlot } from '../Slot/operations';
 
 export interface SlotInterval {
   start: Date;
