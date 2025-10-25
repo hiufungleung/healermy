@@ -49,7 +49,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { formatTimeForDisplay, formatDateForDisplay, formatDateTimeForDisplay, APP_TIMEZONE } from '@/library/timezone';
+import { formatTimeForDisplay, formatDateForDisplay, formatDateTimeForDisplay, APP_TIMEZONE, getDateInputValue } from '@/library/timezone';
 import type { Practitioner, Slot, Schedule } from '@/types/fhir';
 import { X } from 'lucide-react';
 import {
@@ -1073,14 +1073,9 @@ function NewBookingFlow() {
     const dates = new Set<string>();
     slots.forEach(slot => {
       if (slot.start) {
-        // Use timezone utility to properly extract date in app timezone
+        // Use centralized timezone utility for consistent date formatting
         const slotDate = new Date(slot.start);
-        const dateStr = new Intl.DateTimeFormat('en-CA', {
-          timeZone: APP_TIMEZONE,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        }).format(slotDate);
+        const dateStr = getDateInputValue(slotDate);
         dates.add(dateStr);
       }
     });
@@ -1102,25 +1097,15 @@ function NewBookingFlow() {
     const now = new Date();
 
     // Check if selected date is today
-    const todayStr = new Intl.DateTimeFormat('en-CA', {
-      timeZone: APP_TIMEZONE,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).format(now);
+    const todayStr = getDateInputValue(now);
     const isToday = selectedDate === todayStr;
 
     const filtered = slots.filter(slot => {
       if (!slot.start) return false;
 
-      // Use timezone utility to properly extract date in app timezone
+      // Use centralized timezone utility for consistent date formatting
       const slotDate = new Date(slot.start);
-      const slotDateStr = new Intl.DateTimeFormat('en-CA', {
-        timeZone: APP_TIMEZONE,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      }).format(slotDate);
+      const slotDateStr = getDateInputValue(slotDate);
 
       const matchesDate = slotDateStr === selectedDate;
 
@@ -1993,7 +1978,8 @@ function NewBookingFlow() {
                           const checkDate = new Date(date);
                           checkDate.setHours(0, 0, 0, 0);
                           const isNotPast = checkDate >= today;
-                          const dateStr = date.toISOString().split('T')[0];
+                          // Use timezone-aware function to match how datesWithSlots is populated
+                          const dateStr = getDateInputValue(date);
                           return isNotPast && datesWithSlots.has(dateStr);
                         }
                       }}
@@ -2042,7 +2028,8 @@ function NewBookingFlow() {
                             const checkDate = new Date(date);
                             checkDate.setHours(0, 0, 0, 0);
                             const isNotPast = checkDate >= today;
-                            const dateStr = date.toISOString().split('T')[0];
+                            // Use timezone-aware function to match how datesWithSlots is populated
+                            const dateStr = getDateInputValue(date);
                             return isNotPast && datesWithSlots.has(dateStr);
                           }
                         }}

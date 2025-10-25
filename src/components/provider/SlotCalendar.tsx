@@ -8,7 +8,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { Card } from '@/components/common/Card';
 import { SlotDetailDialog } from '@/components/provider/SlotDetailDialog';
-import { createFHIRDateTime } from '@/library/timezone';
+import { createFHIRDateTime, isFutureTime } from '@/library/timezone';
 import {
   SPECIALTY_LABELS,
   SERVICE_CATEGORY_LABELS,
@@ -281,14 +281,34 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
     : slots.map(s => {
         const ref = s.schedule?.reference || '';
         const color = getColor(ref);
+
+        // Color and title logic based on status
+        const isExpiredUnavailable = s.status === 'busy-unavailable';
+        const isExpiredBooked = s.status === 'busy' && !isFutureTime(s.end);
         const busy = s.status === 'busy' || s.status?.startsWith('busy-');
+
+        let backgroundColor, borderColor, title;
+        if (isExpiredUnavailable) {
+          // Expired, not booked -> Dark gray
+          backgroundColor = borderColor = '#6B7280';
+          title = 'Expired';
+        } else if (isExpiredBooked) {
+          // Expired, booked -> Light gray
+          backgroundColor = borderColor = '#9CA3AF';
+          title = 'Booked';
+        } else {
+          // Normal: busy uses dark color, free uses light color
+          backgroundColor = borderColor = busy ? color.dark : color.light;
+          title = s.status === 'free' ? 'Available' : 'Booked';
+        }
+
         return {
           id: s.id,
-          title: s.status === 'free' ? 'Available' : 'Booked',
+          title,
           start: s.start,
           end: s.end,
-          backgroundColor: busy ? color.dark : color.light,
-          borderColor: busy ? color.dark : color.light,
+          backgroundColor,
+          borderColor,
           classNames: hovered && hovered !== ref ? ['dim'] : [],
           extendedProps: { slotId: s.id },
         };
