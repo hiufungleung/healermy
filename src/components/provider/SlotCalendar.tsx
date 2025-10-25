@@ -45,22 +45,26 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
 
   // Fetch slots AND schedules using FHIR _include (single request)
   const getSlotsWithSchedules = async (d: Date) => {
-    // Get start of week (Monday)
+    // Get start of week (Sunday)
     const day = d.getDay();
     const startDate = new Date(d);
-    startDate.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
+    startDate.setDate(d.getDate() - day); // Sunday = 0, so this gives us the start of the week
+    startDate.setHours(0, 0, 0, 0); // Set to start of day
 
-    // Get start of next week (Monday + 7 days)
+    // Get end of week (Saturday 23:59:59) - need to add 7 days to include full Saturday
     const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 7);
+    endDate.setDate(startDate.getDate() + 7); // This gives us start of next Sunday
+    endDate.setHours(0, 0, 0, 0); // Set to start of next Sunday (which includes all of Saturday)
 
     // Format as YYYY-MM-DD using local date components (not UTC)
     const startStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
     const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
 
-    // Create FHIR datetime strings (beginning of day)
-    const startISO = createFHIRDateTime(startStr, '00:00');
-    const endISO = createFHIRDateTime(endStr, '00:00');
+    // Create UTC datetime strings directly (midnight UTC) to avoid timezone conversion issues
+    const startISO = `${startStr}T00:00:00.000Z`;
+    const endISO = `${endStr}T00:00:00.000Z`;
+
+    console.log('[SLOT CALENDAR] Week range:', { startStr, endStr, startISO, endISO });
 
     const params = new URLSearchParams();
     params.append('schedule.actor', `Practitioner/${practitionerId}`);
@@ -68,6 +72,8 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
     params.append('start', `lt${endISO}`);
     // Include schedules referenced by slots in single request
     params.append('_include', 'Slot:schedule');
+    // Increase count to 250 to avoid pagination for weekly view (default is 50)
+    params.append('_count', '250');
 
     const res = await fetch(`/api/fhir/Slot?${params}`, { credentials: 'include' });
     if (res.ok) {
@@ -103,13 +109,13 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
     // For week view, use week range (same as slots)
     // For month view, use month range
     if (currentView === 'timeGridWeek') {
-      // Get start of week (Monday)
+      // Get start of week (Sunday)
       const day = d.getDay();
       startDate = new Date(d);
-      startDate.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
+      startDate.setDate(d.getDate() - day); // Sunday = 0, so this gives us the start of the week
       startDate.setHours(0, 0, 0, 0);
 
-      // Get start of next week (Monday + 7 days)
+      // Get start of next week (Sunday + 7 days)
       endDate = new Date(startDate);
       endDate.setDate(startDate.getDate() + 7);
     } else {
@@ -282,15 +288,46 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
         const ref = s.schedule?.reference || '';
         const color = getColor(ref);
         const busy = s.status === 'busy' || s.status?.startsWith('busy-');
+
+        // Check if slot is in the past (expired)
+        const slotEnd = s.end ? new Date(s.end) : null;
+        const now = new Date();
+        const isExpired = slotEnd ? slotEnd < now : false;
+
+        // Determine background color based on status and expiry
+        let backgroundColor: string;
+        let borderColor: string;
+        let title: string;
+
+        if (isExpired) {
+          // Expired slots in grey
+          if (busy) {
+            // Booked expired: darker grey
+            backgroundColor = '#6B7280'; // gray-500
+            borderColor = '#6B7280';
+            title = 'Booked (Past)';
+          } else {
+            // Unbooked expired: lighter grey
+            backgroundColor = '#D1D5DB'; // gray-300
+            borderColor = '#D1D5DB';
+            title = 'Available (Past)';
+          }
+        } else {
+          // Active slots in schedule colors
+          backgroundColor = busy ? color.dark : color.light;
+          borderColor = busy ? color.dark : color.light;
+          title = s.status === 'free' ? 'Available' : 'Booked';
+        }
+
         return {
           id: s.id,
-          title: s.status === 'free' ? 'Available' : 'Booked',
+          title,
           start: s.start,
           end: s.end,
-          backgroundColor: busy ? color.dark : color.light,
-          borderColor: busy ? color.dark : color.light,
+          backgroundColor,
+          borderColor,
           classNames: hovered && hovered !== ref ? ['dim'] : [],
-          extendedProps: { slotId: s.id },
+          extendedProps: { slotId: s.id, isExpired },
         };
       });
 

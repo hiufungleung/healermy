@@ -451,7 +451,7 @@ import { FHIRClient } from '@/app/api/fhir/client';
 **Extract common logic:**
 ```typescript
 // Good: Reusable utility
-import { enhanceAppointmentsWithPractitionerDetails } from '@/lib/appointmentDetailInfo';
+import { enhanceAppointmentsWithPractitionerDetails } from '@/library/appointmentDetailInfo';
 const enhanced = await enhanceAppointmentsWithPractitionerDetails(appointments);
 
 // Bad: Duplicate code in multiple components

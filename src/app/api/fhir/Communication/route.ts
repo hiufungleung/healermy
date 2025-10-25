@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const appointmentId = searchParams.get('about');
     const unreadOnly = searchParams.get('unread') === 'true';
-    const count = parseInt(searchParams.get('_count') || '1000'); // Increased default to fetch all communications
+    const count = parseInt(searchParams.get('_count') || '50'); // Default limit to reduce server load
     
     // Only providers have clinic-wide view
     // Patients see only their relevant communications

@@ -244,7 +244,8 @@ export default function DashboardClient({
         return;
       }
 
-      // If patient hasn't arrived, don't fetch encounters/appointments
+      // If patient hasn't arrived, clear queue data but don't return
+      // (We still want to show "Next Appointment" time)
       if (!arrived) {
         setQueuePosition(null);
         setEstimatedWaitTime(null);
@@ -252,6 +253,8 @@ export default function DashboardClient({
         setIsEncounterInProgress(false);
         return;
       }
+
+      // Patient has arrived - fetch encounter and queue data
 
       try {
         // Extract practitioner from the appointment
@@ -329,7 +332,7 @@ export default function DashboardClient({
         const appointmentsEntry = responseBundle.entry?.[1];
         if (appointmentsEntry?.response && parseInt(appointmentsEntry.response.status) >= 200 && parseInt(appointmentsEntry.response.status) < 300) {
           const appointmentsBundle = appointmentsEntry.resource;
-          allAppointments = appointmentsBundle?.appointments || [];
+          allAppointments = appointmentsBundle?.entry?.map((e: any) => e.resource) || [];
         }
 
         console.log(`[QUEUE] ✅ Batch result: encounter status=${encounterStatus}, ${allAppointments.length} appointments`);

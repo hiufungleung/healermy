@@ -145,7 +145,13 @@ export default function ProviderAppointmentsClient() {
       });
 
       if (!batchResponse.ok) {
-        throw new Error('Failed to fetch appointments with batch request');
+        const errorText = await batchResponse.text();
+        console.error('[APPOINTMENTS] Batch request failed:', {
+          status: batchResponse.status,
+          statusText: batchResponse.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to fetch appointments: ${batchResponse.status} ${batchResponse.statusText}`);
       }
 
       const responseBundle = await batchResponse.json();

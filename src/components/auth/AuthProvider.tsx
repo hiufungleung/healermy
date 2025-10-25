@@ -256,18 +256,30 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
     };
   }, []);
 
-  // Fetch notifications on session load and poll every 30 seconds
+  // Fetch notifications on session load and poll every 10 seconds AFTER response
   useEffect(() => {
     if (!session) {
       setUnreadCount(0);
       return;
     }
 
-    // Initial fetch
-    fetchNotificationCount();
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isActive = true;
 
-    // Poll every 5 seconds
-    const interval = setInterval(fetchNotificationCount, 5000);
+    // Polling function that waits 10 seconds after each response
+    const pollNotifications = async () => {
+      if (!isActive) return;
+
+      await fetchNotificationCount();
+
+      // Wait 10 seconds after response before next fetch
+      if (isActive) {
+        timeoutId = setTimeout(pollNotifications, 60000);
+      }
+    };
+
+    // Initial fetch and start polling
+    pollNotifications();
 
     // Listen for manual refresh events
     const handleMessageUpdate = () => {
@@ -276,7 +288,8 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
     window.addEventListener('messageUpdate', handleMessageUpdate);
 
     return () => {
-      clearInterval(interval);
+      isActive = false;
+      if (timeoutId) clearTimeout(timeoutId);
       window.removeEventListener('messageUpdate', handleMessageUpdate);
     };
   }, [session]);

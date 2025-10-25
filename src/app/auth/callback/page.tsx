@@ -254,6 +254,14 @@ export default function CallbackPage() {
 
         // Create complete session data - URLs stored in session cookie
         // Note: clientSecret is NOT included here - it's only used server-side for token refresh
+        console.log('⏰ Token expiry calculation:', {
+          expires_in_from_token: tokenData.expires_in,
+          expires_in_used: tokenData.expires_in || 3600,
+          current_time: new Date().toISOString(),
+          expires_at: new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString(),
+          expires_at_timestamp: Date.now() + (tokenData.expires_in || 3600) * 1000
+        });
+
         const sessionData = {
           role,
           accessToken: tokenData.access_token,
@@ -273,7 +281,7 @@ export default function CallbackPage() {
           encounter: tokenData.encounter,
           tenant: tokenData.tenant,
         };
-        
+
         console.log('📝 Storing session data');
         
         // Store session in a secure cookie via API

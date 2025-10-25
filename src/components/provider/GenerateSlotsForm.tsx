@@ -227,11 +227,11 @@ export function GenerateSlotsForm({
         }
       });
 
-      return days.length > 0 ? days : ['1', '2', '3', '4', '5']; // Default to weekdays
+      return days.length > 0 ? days : ['0', '1', '2', '3', '4', '5', '6']; // Default to all days including weekends
     }
 
-    // Default fallback - assume weekdays for medical schedules
-    return ['1', '2', '3', '4', '5']; // Monday to Friday
+    // Default fallback - allow all days of week (including weekends)
+    return ['0', '1', '2', '3', '4', '5', '6']; // Sunday to Saturday
   };
 
   // Get days that actually occur in the selected date range

@@ -14,7 +14,7 @@ import {
 import { Badge } from '@/components/common/Badge';
 import { FancyLoader } from '@/components/common/FancyLoader';
 import { formatAppointmentDateTime } from '@/library/timezone';
-import { getAvailableActions, getActionLabel, executeAction } from '@/lib/appointmentFlowUtils';
+import { getAvailableActions, getActionLabel, executeAction } from '@/library/appointmentFlowUtils';
 import type { Appointment, Encounter } from '@/types/fhir';
 
 // Extended appointment type with patient and encounter details
