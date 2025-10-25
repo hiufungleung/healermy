@@ -1,16 +1,31 @@
 # HealerMy - FHIR Healthcare Appointment System
 
-A Next.js healthcare appointment management system using **SMART on FHIR** authentication and **pure FHIR R4** as the database. Built for COMP3820 as a proof-of-concept prototype demonstrating FHIR interoperability.
+A Next.js healthcare appointment management system using **SMART on FHIR** authentication and **pure FHIR R4** as the database. Built as a proof-of-concept demonstrating FHIR interoperability standards.
+
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15.4-black)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.1-61dafb)](https://react.dev/)
+[![FHIR R4](https://img.shields.io/badge/FHIR-R4-orange)](https://www.hl7.org/fhir/)
 
 ## 🏥 Overview
 
-HealerMy provides two distinct portals:
-- **Patient Portal**: Browse practitioners, book appointments, view medical history
-- **Provider Portal**: Manage appointments, review patient information, approve/reject requests
+HealerMy provides two role-based portals for healthcare appointment management:
 
-**Key Architecture**: Pure FHIR workflow with automatic slot management - no custom database required.
+- **Patient Portal**: Browse practitioners, book appointments, view medical history, manage communications
+- **Provider Portal**: Manage clinic appointments, review patient profiles, approve/reject requests, oversee schedules
 
-## 🐳 Docker Quick Start (5 Minutes)
+**Key Features:**
+- ✅ Pure FHIR R4 workflow - no custom database required
+- ✅ SMART on FHIR OAuth2 authentication with automatic token refresh
+- ✅ Automatic slot management - slots update based on appointment status
+- ✅ Real-time communications and notifications
+- ✅ Complete patient medical profiles (conditions, medications, procedures, encounters)
+- ✅ Secure session management with AES-GCM encryption
+- ✅ Portable Docker deployment - configure entirely via environment variables
+
+---
+
+## 🐳 Quick Start with Docker (5 Minutes)
 
 **Pull and run the pre-built image** - no installation or compilation required!
 
@@ -21,171 +36,7 @@ docker pull hiufungleung/healermy:latest
 # 2. Generate session secret
 export SESSION_SECRET=$(openssl rand -hex 32)
 
-# 3. Run the container (replace with your values)
-docker run -d \
-  --name healermy \
-  -p 3000:3000 \
-  -e BASE_URL=https://your-domain.com \
-  -e FHIR_SERVER_URL=https://gw.interop.community/healerMy/data \
-  -e CLIENT_ID=your_fhir_client_id \
-  -e CLIENT_SECRET=your_fhir_client_secret \
-  -e SESSION_SECRET=$SESSION_SECRET \
-  hiufungleung/healermy:latest
-
-# 4. Access the app at: https://your-domain.com
-```
-
-**That's it!** The image is completely portable and works anywhere Docker runs.
-
-See [Docker Deployment](#docker-deployment-portable---works-anywhere) for more options including docker-compose.
-
----
-
-## 🚀 Development Quick Start
-
-For local development with full source code:
-
-### Prerequisites
-
-- **Node.js**: 24.x or higher
-- **pnpm**: 10.18.0+ (automatically managed via corepack)
-- **FHIR Server**: Access to a SMART on FHIR compliant server (e.g., Cerner sandbox)
-
-### Installation
-
-1. **Clone the repository**
-```bash
-git clone <repository-url>
-cd comp3820-healermy
-```
-
-2. **Enable corepack** (for pnpm)
-```bash
-corepack enable
-```
-
-3. **Install dependencies**
-```bash
-pnpm install
-```
-
-4. **Configure environment variables**
-
-Create a `.env.local` file in the root directory:
-
-```bash
-# =============================================================================
-# PUBLIC CONFIGURATION
-# =============================================================================
-
-# Base URL for your application
-NEXT_PUBLIC_BASE_URL=http://localhost:3000
-
-# FHIR server endpoint
-FHIR_SERVER_URL=https://gw.interop.community/healerMy/data
-
-# =============================================================================
-# APPLICATION CONFIGURATION
-# =============================================================================
-
-# Access type: "offline" (with refresh token) or "online" (session only)
-ACCESS_TYPE=offline
-
-# Session expiry: s(seconds), m(minutes), h(hours), d(days), y(years)
-SESSION_EXPIRY=90d
-
-# =============================================================================
-# SENSITIVE CREDENTIALS
-# =============================================================================
-
-# Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-SESSION_SECRET=your_generated_session_secret_here
-
-# SMART on FHIR App Credentials (from your FHIR app registration)
-CLIENT_ID=your_client_id_here
-CLIENT_SECRET=your_client_secret_here
-
-# =============================================================================
-# FHIR PERMISSION SCOPES
-# =============================================================================
-
-# Patient scopes (read-only access to own data)
-PATIENT_SCOPE_ONLINE="launch/encounter launch/patient openid profile online_access launch fhirUser user/*.* patient/*.*"
-PATIENT_SCOPE_OFFLINE="launch/encounter launch/patient openid profile offline_access launch fhirUser user/*.* patient/*.*"
-
-# Provider scopes (full CRUD access)
-PROVIDER_SCOPE_ONLINE="launch/encounter launch/patient openid profile online_access launch fhirUser user/*.* patient/*.*"
-PROVIDER_SCOPE_OFFLINE="launch/encounter launch/patient openid profile offline_access launch fhirUser user/*.* patient/*.*"
-```
-
-5. **Generate SESSION_SECRET**
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-6. **Start development server**
-```bash
-pnpm dev
-```
-
-The application will be available at [http://localhost:3000](http://localhost:3000)
-
-### SMART Launch Flow
-
-To access the application with FHIR authentication:
-
-1. Navigate to the SMART launcher endpoint:
-```
-http://localhost:3000/launch?iss=<FHIR_SERVER_URL>&launch=<LAUNCH_TOKEN>
-```
-
-2. Complete the OAuth2 authorization flow through your FHIR provider
-
-3. You'll be redirected to the appropriate portal (Patient or Provider) based on your role
-
-## 📋 Available Commands
-
-### Development
-```bash
-pnpm dev          # Start development server with Turbopack
-pnpm build        # Build for production
-pnpm start        # Start production server
-pnpm lint         # Run ESLint
-pnpm tsc --noEmit # Type check without building
-```
-
-### Docker Deployment (Portable - Works Anywhere!)
-
-The Docker image is **completely portable** and can be used by anyone. All configuration is done via environment variables at runtime.
-
-#### Option 1: Docker Compose (Recommended)
-
-1. **Create environment file:**
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-2. **Start the container:**
-```bash
-docker-compose up -d
-```
-
-3. **View logs:**
-```bash
-docker-compose logs -f healermy
-```
-
-#### Option 2: Docker Run (Quick Start)
-
-```bash
-# Pull the image
-docker pull hiufungleung/healermy:latest
-
-# Generate session secret
-SESSION_SECRET=$(openssl rand -hex 32)
-
-# Run with minimum required config
+# 3. Run the container
 docker run -d \
   --name healermy \
   -p 3000:3000 \
@@ -196,182 +47,363 @@ docker run -d \
   -e SESSION_SECRET=$SESSION_SECRET \
   --restart unless-stopped \
   hiufungleung/healermy:latest
+
+# 4. Access the app at: https://your-domain.com/launch
 ```
 
-#### Option 3: Docker Build (Local Development)
+**Docker Compose (Recommended):**
+
+```yaml
+version: '3.8'
+services:
+  healermy:
+    image: hiufungleung/healermy:latest
+    container_name: healermy
+    ports:
+      - "3000:3000"
+    environment:
+      - BASE_URL=https://your-domain.com
+      - FHIR_SERVER_URL=https://gw.interop.community/healerMy/data
+      - CLIENT_ID=${CLIENT_ID}
+      - CLIENT_SECRET=${CLIENT_SECRET}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - SESSION_EXPIRY=90d
+      - ACCESS_TYPE=offline
+    restart: unless-stopped
+```
+
+See [.env.example](.env.example) for all configuration options.
+
+---
+
+## 💻 Local Development
+
+### Prerequisites
+
+- **Node.js**: 24.x or higher
+- **pnpm**: 10.18.0+ (automatically managed via corepack)
+- **FHIR Server**: Access to a SMART on FHIR R4 compliant server
+
+### Setup
 
 ```bash
-# Build your own image
-docker build -t healermy .
+# 1. Clone repository
+git clone <repository-url>
+cd comp3820-healermy
 
-# Run with local config
-docker run -d -p 3000:3000 --env-file .env healermy
+# 2. Enable corepack (for pnpm)
+corepack enable
+
+# 3. Install dependencies
+pnpm install
+
+# 4. Create environment file
+cp .env.example .env.local
+
+# 5. Generate session secret
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# Add output to SESSION_SECRET in .env.local
+
+# 6. Configure FHIR credentials in .env.local
+# - CLIENT_ID: From your FHIR app registration
+# - CLIENT_SECRET: From your FHIR app registration
+# - FHIR_SERVER_URL: Your FHIR server endpoint
+
+# 7. Start development server
+pnpm dev
 ```
 
-**Required Environment Variables:**
-- `BASE_URL`: Your public HTTPS URL
-- `FHIR_SERVER_URL`: FHIR server endpoint
-- `CLIENT_ID`: FHIR app client ID
-- `CLIENT_SECRET`: FHIR app client secret
-- `SESSION_SECRET`: Generated encryption key
+Application runs at: http://localhost:3000
 
-See [.env.example](.env.example) for all available configuration options.
+### Development Commands
+
+```bash
+pnpm dev          # Start dev server with Turbopack (hot reload)
+pnpm build        # Production build
+pnpm start        # Start production server
+pnpm lint         # Run ESLint
+pnpm tsc --noEmit # TypeScript type checking
+pnpm clean        # Remove .next cache
+pnpm clean:dev    # Clean cache and start dev server
+```
+
+---
 
 ## 🏗️ Architecture
 
 ### Tech Stack
 
-- **Framework**: Next.js 15.4.7 (App Router)
-- **Runtime**: Node.js 24 (Alpine in production)
-- **React**: 19.1.0
-- **TypeScript**: 5.9.2
-- **Styling**: Tailwind CSS 3.4.17
-- **FHIR Client**: fhirclient 2.6.0
-- **Package Manager**: pnpm 10.18.0
+| Category | Technology |
+|----------|-----------|
+| **Framework** | Next.js 15.4.7 (App Router, Edge Runtime) |
+| **Runtime** | Node.js 24 (Alpine in production) |
+| **Language** | TypeScript 5.9.2 (strict mode) |
+| **UI Library** | React 19.1.0 |
+| **Styling** | Tailwind CSS 3.4.17 + shadcn/ui |
+| **FHIR Client** | fhirclient 2.6.0 |
+| **Package Manager** | pnpm 10.18.0 |
 
-### Key Features
+### System Architecture
 
-- **SMART on FHIR OAuth2**: Secure authentication with token refresh
-- **Pure FHIR Workflow**: All data stored in FHIR server (no custom database)
-- **Automatic Slot Management**: Slots update automatically based on appointment status
-- **RESTful API Layer**: All FHIR operations via `/api/fhir/*` routes
-- **Edge Runtime**: Optimized middleware for token refresh
-- **Session Encryption**: AES-GCM encrypted cookies using Web Crypto API
-- **🐳 Portable Docker Image**: Zero hardcoded values - configure entirely via environment variables
+```
+┌─────────────────┐
+│  Next.js App    │
+│  (Client)       │
+└────────┬────────┘
+         │
+         ├─── /api/auth/*        (OAuth2 flow, session management)
+         │
+         └─── /api/fhir/*        (RESTful FHIR endpoints)
+                  │
+                  ├── /Appointment      (Appointment management)
+                  ├── /Communication    (Messages & notifications)
+                  ├── /Patient          (Patient resources & profiles)
+                  ├── /Practitioner     (Practitioner directory)
+                  ├── /Schedule         (Provider schedules)
+                  ├── /Slot             (Available time slots)
+                  ├── /Encounter        (Patient encounters)
+                  └── /[Resource]       (Other FHIR R4 resources)
+                       │
+                       ▼
+              ┌──────────────────┐
+              │  FHIR R4 Server  │
+              │  (External)      │
+              └──────────────────┘
+```
+
+**Key Architectural Decisions:**
+
+1. **RESTful API Layer**: All FHIR operations go through `/api/fhir/*` routes
+   - Never import FHIR client directly in components
+   - Centralized authentication and error handling
+   - Type-safe API contracts
+
+2. **FHIR R4 Naming Standard**: All endpoints follow FHIR specification
+   - Singular resource names (e.g., `/Appointment` not `/appointments`)
+   - PascalCase (e.g., `/MedicationRequest` not `/medication-requests`)
+   - Matches FHIR resource types exactly
+
+3. **Pure FHIR Data Model**: No custom database
+   - FHIR server is single source of truth
+   - Automatic slot management via FHIR operations
+   - Complete CRUD through FHIR API
+
+4. **Session Security**:
+   - AES-GCM encrypted cookies (Web Crypto API)
+   - HTTP-only, Secure, SameSite=Strict
+   - Automatic token refresh via middleware
+   - OAuth2 compliant token revocation
 
 ### Project Structure
 
 ```
-├── src/
-│   ├── app/
-│   │   ├── api/
-│   │   │   ├── auth/          # OAuth callback, logout
-│   │   │   └── fhir/          # FHIR API routes
-│   │   │       ├── appointments/
-│   │   │       ├── practitioners/
-│   │   │       ├── patients/
-│   │   │       ├── schedules/
-│   │   │       ├── slots/
-│   │   │       └── communications/
-│   │   ├── patient/           # Patient portal pages
-│   │   └── provider/          # Provider portal pages
-│   ├── components/
-│   │   ├── common/            # Reusable UI components
-│   │   ├── auth/              # Authentication components
-│   │   └── providers/         # React context providers
-│   ├── library/
-│   │   ├── auth/              # Authentication utilities
-│   │   └── fhir/              # FHIR utilities (deprecated - use API routes)
-│   ├── lib/                   # Shared utilities
-│   └── types/                 # TypeScript type definitions
-├── .env.local                 # Environment variables (not in git)
-├── Dockerfile                 # Production Docker image (Alpine-based)
-└── .github/workflows/         # CI/CD pipelines
+src/
+├── app/
+│   ├── api/
+│   │   ├── auth/              # OAuth callback, logout, session
+│   │   └── fhir/              # FHIR R4 API routes (RESTful)
+│   │       ├── Appointment/   # Appointment CRUD
+│   │       ├── Communication/ # Messages & notifications
+│   │       ├── Patient/       # Patient resources
+│   │       ├── Practitioner/  # Practitioner directory
+│   │       ├── Schedule/      # Provider schedules
+│   │       ├── Slot/          # Time slot management
+│   │       └── [Resource]/    # Other FHIR resources
+│   ├── patient/               # Patient portal pages
+│   ├── provider/              # Provider portal pages
+│   └── launch/                # SMART on FHIR launch
+├── components/
+│   ├── common/                # Shared UI components
+│   ├── patient/               # Patient-specific components
+│   ├── provider/              # Provider-specific components
+│   └── ui/                    # shadcn/ui primitives
+├── lib/                       # Utility functions
+├── library/                   # Legacy utilities (being phased out)
+├── types/                     # TypeScript definitions
+└── middleware.ts              # Token refresh, route protection
 ```
 
-## 🔒 Security
+---
+
+## 🔐 Security
+
+### Authentication Flow
+
+1. **SMART Launch**: User navigates to `/launch?iss={FHIR_URL}&launch={TOKEN}`
+2. **OAuth2 Authorization**: Redirect to FHIR provider's authorization endpoint
+3. **Token Exchange**: Callback receives code, exchanges for access/refresh tokens
+4. **Session Creation**: Tokens encrypted and stored in HTTP-only cookies
+5. **Auto Refresh**: Middleware refreshes tokens before expiry
+6. **Logout**: Revokes refresh token (RFC 7009) and clears session
 
 ### Session Management
 
-- **Split Cookie Design**: Separate encrypted cookies for tokens and session metadata
-- **HTTP-Only**: Cookies not accessible via JavaScript
-- **Secure Flag**: HTTPS-only in production
-- **SameSite Strict**: CSRF protection
-- **AES-GCM Encryption**: Web Crypto API for Edge Runtime compatibility
-
-### Token Refresh
-
-- **Automatic Refresh**: Middleware refreshes tokens 5 minutes before expiry (hardcoded)
-- **Graceful Fallback**: Redirects to login if refresh fails
-- **OAuth2 Compliant**: Follows RFC 7009 for token revocation
+- **Encryption**: AES-GCM with 256-bit keys (Web Crypto API)
+- **Storage**: Split cookies (`healermy_tokens` + `healermy_session`)
+- **Flags**: HTTP-only, Secure (HTTPS), SameSite=Strict
+- **Expiry**: Configurable (default: 90 days)
+- **Token Refresh**: Automatic via middleware (5 minutes before expiry)
 
 ### Environment Security
 
-**Never commit these to git:**
-- `SESSION_SECRET`
-- `CLIENT_SECRET`
+**⚠️ Never commit to git:**
+- `SESSION_SECRET` - Session encryption key
+- `CLIENT_SECRET` - FHIR app client secret
 - Any production credentials
+
+**Generate session secret:**
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+---
 
 ## 🔄 FHIR Workflow
 
 ### Appointment Lifecycle
 
-1. **Patient Creates Appointment** → Status: `pending`, Slot: `busy`
-2. **Provider Approves** → Status: `booked`, Slot: `busy`
-3. **Patient Arrives** → Status: `arrived`, Slot: `busy`
-4. **Patient Checked In** → Status: `checked-in`, Slot: `busy`
-5. **Appointment Completed** → Status: `fulfilled`, Slot: `busy`
-6. **If Cancelled** → Status: `cancelled`, Slot: `free`
+```
+┌─────────────┐
+│   Patient   │
+│   Books     │
+└──────┬──────┘
+       │
+       ▼
+   [pending] ────────────► Slot: busy (prevents double-booking)
+       │
+       ▼ Provider approves
+   [booked] ─────────────► Slot: busy
+       │
+       ▼ Patient arrives
+   [arrived] ────────────► Slot: busy
+       │
+       ▼ Check-in
+  [checked-in] ──────────► Slot: busy
+       │
+       ▼ Complete
+  [fulfilled] ───────────► Slot: busy
+       │
+       ▼ Or cancel
+  [cancelled] ───────────► Slot: free (available for rebooking)
+```
 
 ### Automatic Slot Management
 
-Slots automatically update when appointments change status:
-- `pending`, `booked`, `arrived`, `checked-in`, `fulfilled` → `busy`
-- `proposed` → `busy-tentative`
-- `cancelled`, `noshow`, `waitlist` → `free`
-- `entered-in-error` → `entered-in-error`
+**Appointment Status → Slot Status Mapping:**
 
-**Implementation**: See `SLOT_MANAGEMENT.md` for detailed documentation
+| Appointment Status | Slot Status | Description |
+|-------------------|-------------|-------------|
+| `pending` | `busy` | **Prevents double-booking** while awaiting approval |
+| `booked` | `busy` | Confirmed appointment |
+| `arrived` | `busy` | Patient arrived |
+| `checked-in` | `busy` | Patient checked in |
+| `fulfilled` | `busy` | Appointment completed |
+| `proposed` | `busy-tentative` | Tentatively scheduled |
+| `cancelled` | `free` | Freed for rebooking |
+| `noshow` | `free` | Freed for rebooking |
+| `waitlist` | `free` | Available |
+| `entered-in-error` | `entered-in-error` | Record error |
 
-## 🚢 Deployment
+**Implementation:** See `SLOT_MANAGEMENT.md` for technical details.
 
-### Portable Docker Image
+---
 
-The Docker image (`hiufungleung/healermy:latest`) is **completely portable** and can be deployed anywhere:
+## 🚀 Deployment
 
-**✅ Works with:**
-- AWS (EC2, ECS, Fargate)
-- Google Cloud (Cloud Run, GKE)
-- Azure (Container Instances, AKS)
+### Docker Deployment (Production)
+
+The Docker image is **fully portable** and works anywhere:
+
+**✅ Supported Platforms:**
+- AWS (EC2, ECS, Fargate, Lightsail)
+- Google Cloud (Cloud Run, GKE, Compute Engine)
+- Azure (Container Instances, AKS, App Service)
 - DigitalOcean (Droplets, App Platform)
 - Any VPS with Docker
 - Local development
 
-**✅ No hardcoded values:**
-- All configuration via environment variables
-- Same image for dev/staging/production
-- Multi-platform: linux/amd64, linux/arm64
+**✅ Multi-Architecture:**
+- `linux/amd64` (x86_64)
+- `linux/arm64` (ARM64, Apple Silicon)
 
-**Deployment Methods:**
-1. **Docker Compose**: See [docker-compose.yml](docker-compose.yml)
-2. **Docker Run**: See [Docker Quick Start](#-docker-quick-start-5-minutes)
-3. **Kubernetes**: Use environment variables in deployment manifests
-4. **Cloud Platforms**: Use managed container services
+**Deployment Example (Docker Run):**
 
-### GitHub Actions CI/CD (Automated)
+```bash
+docker run -d \
+  --name healermy \
+  -p 3000:3000 \
+  -e BASE_URL=https://healermy.example.com \
+  -e FHIR_SERVER_URL=https://fhir.example.com/data \
+  -e CLIENT_ID=your_client_id \
+  -e CLIENT_SECRET=your_client_secret \
+  -e SESSION_SECRET=$(openssl rand -hex 32) \
+  -e SESSION_EXPIRY=90d \
+  -e ACCESS_TYPE=offline \
+  --restart unless-stopped \
+  hiufungleung/healermy:latest
+```
 
-The project includes automated deployment via GitHub Actions:
+### Required Environment Variables
 
-1. **Build**: Multi-platform Docker image (amd64 + arm64)
-2. **Push**: To Docker Hub
-3. **Deploy**: SSH to EC2 and run container
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `BASE_URL` | Public HTTPS URL | `https://healermy.example.com` |
+| `FHIR_SERVER_URL` | FHIR server endpoint | `https://gw.interop.community/healerMy/data` |
+| `CLIENT_ID` | FHIR app client ID | `d4bb5a3f-2293-40fc-8c36-4f01d64d3c32` |
+| `CLIENT_SECRET` | FHIR app client secret | `(generated secret)` |
+| `SESSION_SECRET` | Session encryption key (32 bytes hex) | `(generated with openssl)` |
+| `SESSION_EXPIRY` | Session expiry duration | `90d` (90 days) |
+| `ACCESS_TYPE` | Token type: `online` or `offline` | `offline` (with refresh tokens) |
 
-**Required GitHub Secrets:**
-- `DOCKER_TOKEN`: Docker Hub access token
-- `EC2_KEY`: SSH private key for EC2 access
-- `CLIENT_SECRET`: FHIR app client secret
-- `SESSION_SECRET`: Session encryption key
+**Optional Variables:**
+- `PATIENT_SCOPE_OFFLINE` - Patient FHIR scopes (offline access)
+- `PATIENT_SCOPE_ONLINE` - Patient FHIR scopes (online access)
+- `PROVIDER_SCOPE_OFFLINE` - Provider FHIR scopes (offline access)
+- `PROVIDER_SCOPE_ONLINE` - Provider FHIR scopes (online access)
 
-**Required GitHub Variables:**
-- `DOCKER_USERNAME`: Docker Hub username
-- `EC2_HOST`: EC2 instance hostname
-- `EC2_USER`: EC2 SSH username
-- `NEXT_PUBLIC_BASE_URL`: Production URL
-- `FHIR_SERVER_URL`: FHIR server endpoint
-- `CLIENT_ID`: FHIR app client ID
-- `SESSION_EXPIRY`: Session expiry duration (e.g., `90d`)
-- `PATIENT_SCOPE_OFFLINE`, `PATIENT_SCOPE_ONLINE`: Patient permission scopes
-- `PROVIDER_SCOPE_OFFLINE`, `PROVIDER_SCOPE_ONLINE`: Provider permission scopes
-- `ACCESS_TYPE`: `online` or `offline`
+See [.env.example](.env.example) for complete configuration reference.
+
+### Cloudflare Proxy Setup
+
+If using Cloudflare as reverse proxy:
+
+**1. SSL/TLS Settings:**
+- Encryption mode: **Full (strict)**
+- Always Use HTTPS: **On**
+- Minimum TLS: **1.2**
+
+**2. Environment Configuration:**
+
+⚠️ **Critical**: Use your public HTTPS domain, not internal IPs:
+
+```bash
+# ✅ CORRECT
+BASE_URL=https://healermy.example.com
+
+# ❌ WRONG - Causes SSL errors
+BASE_URL=http://0.0.0.0:3000
+BASE_URL=http://localhost:3000
+```
+
+**3. FHIR App Registration:**
+
+Register this redirect URI in your FHIR app:
+```
+https://healermy.example.com/api/auth/callback
+```
+
+**Troubleshooting `ERR_SSL_PROTOCOL_ERROR`:**
+- Cause: OAuth redirect using internal IP instead of public HTTPS domain
+- Fix: Set `BASE_URL=https://healermy.example.com` and redeploy
+- Verify: `docker exec healermy env | grep BASE_URL`
 
 ### Health Check
 
-The application exposes a health check endpoint:
-```
-GET /api/health-check
+```bash
+curl https://your-domain.com/api/health-check
 ```
 
-Returns:
+Response:
 ```json
 {
   "status": "ok",
@@ -380,107 +412,76 @@ Returns:
 }
 ```
 
-### Cloudflare Proxy Setup
-
-If using Cloudflare as a reverse proxy:
-
-**1. Cloudflare SSL/TLS Settings:**
-- **SSL/TLS encryption mode**: Full or Full (strict)
-- **Always Use HTTPS**: On
-- **Automatic HTTPS Rewrites**: On
-- **Minimum TLS Version**: 1.2
-
-**2. Critical Environment Variables:**
-
-⚠️ **Important**: `NEXT_PUBLIC_*` variables are baked into the build at **build time**. For runtime configuration (Docker), use `BASE_URL` instead:
-
-```bash
-# ✅ CORRECT: Runtime configuration (Docker)
-BASE_URL=https://healermy.hughishere.com
-
-# ✅ ALSO CORRECT: Build-time configuration (local dev)
-NEXT_PUBLIC_BASE_URL=https://healermy.hughishere.com
-
-# ❌ WRONG: Internal addresses will cause SSL errors
-BASE_URL=http://0.0.0.0:3000
-```
-
-**Why both?**
-- `BASE_URL`: Read by server at **runtime** → Can be changed without rebuilding Docker image
-- `NEXT_PUBLIC_BASE_URL`: Embedded at **build time** → Fixed when `docker build` runs
-
-The auth config uses `BASE_URL` first (runtime), falling back to `NEXT_PUBLIC_BASE_URL` (build-time).
-
-**3. FHIR App Redirect URI Registration:**
-
-Your FHIR app must have the following redirect URI registered:
-```
-https://healermy.hughishere.com/api/auth/callback
-```
-
-**4. Verify Deployment:**
-```bash
-# Check container environment (both should be set)
-docker exec healermy env | grep BASE_URL
-
-# Should output:
-# BASE_URL=https://healermy.hughishere.com
-# NEXT_PUBLIC_BASE_URL=https://healermy.hughishere.com
-```
-
-**Common Issue**: `ERR_SSL_PROTOCOL_ERROR` on OAuth callback
-- **Cause**: Redirect URI using internal IP `0.0.0.0:3000` instead of public HTTPS domain
-- **Root Cause**: `NEXT_PUBLIC_BASE_URL` is embedded at build time; changing it at runtime doesn't work
-- **Fix**: Use `BASE_URL` environment variable (read at runtime) + rebuild/redeploy
-- **Quick Fix**: Set `-e BASE_URL=https://healermy.hughishere.com` in docker run command
-- **Result**: OAuth redirect will use correct HTTPS public URL
-
-## 📚 Documentation
-
-- **CLAUDE.md**: Comprehensive project memory and architectural decisions
-- **SLOT_MANAGEMENT.md**: Automatic slot management system documentation
-- **assets/requirement.md**: Original project requirements
-- **assets/swagger.json**: FHIR API specification
+---
 
 ## 🧪 Development Guidelines
 
-### Type Safety
+### Type Safety Rules
 
-- **Never use `as any`**: Extend types in `/src/types/fhir.ts` instead
-- **Type check before commit**: `pnpm tsc --noEmit`
-- **Strict mode enabled**: All TypeScript strict checks active
+✅ **DO:**
+- Extend types in `/src/types/fhir.ts` for missing FHIR properties
+- Run `pnpm tsc --noEmit` before committing
+- Use `@/` import alias for paths 3+ levels deep
+
+❌ **DON'T:**
+- Use `as any` (zero tolerance)
+- Use multiple `../../../` in imports
+- Import FHIR client directly in client components
 
 ### Data Flow Pattern
 
 ```typescript
 // ✅ CORRECT: Use API routes
-const response = await fetch('/api/fhir/appointments', {
-  credentials: 'include'
+const response = await fetch('/api/fhir/Appointment', {
+  credentials: 'include'  // Required for session cookies
 });
-const { appointments } = await response.json();
+const appointments = await response.json();
 
-// ❌ WRONG: Don't import FHIR client in client components
-import { FHIRService } from '@/app/api/fhir/client';
+// ❌ WRONG: Direct FHIR client import
+import { FHIRClient } from '@/app/api/fhir/client';
 ```
 
 ### Code Organization
 
-- **Extract reusable logic** to `/src/lib/`
-- **No data fetching in Layout** - pass data via props
-- **Follow existing patterns** - check similar features first
+- **Reusable utilities** → `/src/lib/`
+- **FHIR types** → `/src/types/fhir.ts`
+- **API routes** → `/src/app/api/fhir/[Resource]/`
+- **UI components** → `/src/components/` (use shadcn/ui primitives)
+
+**Extract common logic:**
+```typescript
+// Good: Reusable utility
+import { enhanceAppointmentsWithPractitionerDetails } from '@/lib/appointmentDetailInfo';
+const enhanced = await enhanceAppointmentsWithPractitionerDetails(appointments);
+
+// Bad: Duplicate code in multiple components
+```
+
+---
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-**401 Unauthorized from FHIR API**
-- Check session cookies in browser DevTools
+**401 Unauthorized**
+- Check session cookies in browser DevTools (Application → Cookies)
 - Verify FHIR app scopes match required permissions
 - Check token expiry (auto-refresh should handle this)
 
 **403 Forbidden**
 - Verify FHIR app has correct resource permissions
 - Check patient vs provider scopes
+- Ensure user role matches endpoint requirements
+
+**Patient profile shows "[Bundle object]" instead of data**
+- Fixed in latest version
+- FHIR API returned `total: 0` which was incorrectly parsed
+- Update to latest code or Docker image
+
+**Batch endpoint fails for patients**
+- Fixed in latest version
+- Now allows GET requests for all roles
+- Write operations (POST/PUT/PATCH/DELETE) require provider role
 
 **Slot not found**
 - Verify practitioner has active schedules
@@ -489,17 +490,39 @@ import { FHIRService } from '@/app/api/fhir/client';
 
 **Build fails**
 - Run `pnpm tsc --noEmit` to check type errors
-- Clear `.next` folder and rebuild
-- Check Node.js version (requires 24.x)
+- Clear cache: `pnpm clean` or `rm -rf .next`
+- Verify Node.js version: `node --version` (requires 24.x)
 
-## 📝 License
-
-This project is for educational purposes (COMP3820).
-
-## 👥 Contributors
-
-Developed as part of COMP3820 coursework.
+**Docker container exits immediately**
+- Check logs: `docker logs healermy`
+- Verify required environment variables are set
+- Ensure `BASE_URL` uses HTTPS (not HTTP)
 
 ---
 
-For detailed architectural information and development guidelines, see [CLAUDE.md](CLAUDE.md).
+## 📚 Documentation
+
+- **[CLAUDE.md](CLAUDE.md)** - Comprehensive project memory and architectural decisions
+- **[SLOT_MANAGEMENT.md](SLOT_MANAGEMENT.md)** - Automatic slot management system
+- **[.env.example](.env.example)** - Environment variable reference
+- **[assets/requirement.md](assets/requirement.md)** - Original project requirements
+- **[assets/swagger.json](assets/swagger.json)** - FHIR API specification
+
+---
+
+## 📝 License
+
+This project is for educational purposes (COMP3820 coursework).
+
+---
+
+## 🙏 Acknowledgments
+
+- Built with [Next.js](https://nextjs.org/)
+- UI components from [shadcn/ui](https://ui.shadcn.com/)
+- FHIR client by [SMART Health IT](https://github.com/smart-on-fhir/client-js)
+- Icons from [Lucide](https://lucide.dev/)
+
+---
+
+**For detailed architectural information and development guidelines, see [CLAUDE.md](CLAUDE.md).**
