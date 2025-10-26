@@ -8,7 +8,6 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { Card } from '@/components/common/Card';
 import { SlotDetailDialog } from '@/components/provider/SlotDetailDialog';
-import { createFHIRDateTime, isFutureTime } from '@/library/timezone';
 import {
   SPECIALTY_LABELS,
   SERVICE_CATEGORY_LABELS,
@@ -288,23 +287,34 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
         const ref = s.schedule?.reference || '';
         const color = getColor(ref);
 
-        // Color and title logic based on status
-        const isExpiredUnavailable = s.status === 'busy-unavailable';
-        const isExpiredBooked = s.status === 'busy' && !isFutureTime(s.end);
+        // Check if slot is in the past (expired)
+        const slotEnd = s.end ? new Date(s.end) : null;
+        const now = new Date();
+        const isExpired = slotEnd ? slotEnd < now : false;
         const busy = s.status === 'busy' || s.status?.startsWith('busy-');
 
-        let backgroundColor, borderColor, title;
-        if (isExpiredUnavailable) {
-          // Expired, not booked -> Dark gray
-          backgroundColor = borderColor = '#6B7280';
-          title = 'Expired';
-        } else if (isExpiredBooked) {
-          // Expired, booked -> Light gray
-          backgroundColor = borderColor = '#9CA3AF';
-          title = 'Booked';
+        // Determine background color based on status and expiry
+        let backgroundColor: string;
+        let borderColor: string;
+        let title: string;
+
+        if (isExpired) {
+          // Expired slots in grey
+          if (busy) {
+            // Booked expired: darker grey
+            backgroundColor = '#6B7280'; // gray-500
+            borderColor = '#6B7280';
+            title = 'Booked (Past)';
+          } else {
+            // Unbooked expired: lighter grey
+            backgroundColor = '#D1D5DB'; // gray-300
+            borderColor = '#D1D5DB';
+            title = 'Available (Past)';
+          }
         } else {
-          // Normal: busy uses dark color, free uses light color
-          backgroundColor = borderColor = busy ? color.dark : color.light;
+          // Active slots in schedule colors
+          backgroundColor = busy ? color.dark : color.light;
+          borderColor = busy ? color.dark : color.light;
           title = s.status === 'free' ? 'Available' : 'Booked';
         }
 
