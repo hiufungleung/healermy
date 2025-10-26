@@ -15,34 +15,8 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000" # Change to your desired port
-    environment:
-      # ============================================================================
-      # REQUIRED: Application URLs
-      # ============================================================================
-      BASE_URL: ${BASE_URL} # Your public HTTPS URL
-      FHIR_SERVER_URL: ${FHIR_SERVER_URL} # FHIR server endpoint (server-side only, more secure)
-
-      # ============================================================================
-      # REQUIRED: SMART on FHIR Credentials
-      # ============================================================================
-      CLIENT_ID: ${CLIENT_ID} # From your FHIR app registration
-      CLIENT_SECRET: ${CLIENT_SECRET} # From your FHIR app registration
-      SESSION_SECRET: ${SESSION_SECRET} # Generate: openssl rand -hex 32
-      SESSION_SALT: ${SESSION_SALT} # Generate: openssl rand -hex 32
-
-      # ============================================================================
-      # OPTIONAL: Override Defaults (uncomment to customize)
-      # ============================================================================
-      # NODE_ENV: production
-      # PORT: 3000
-      # HOSTNAME: 0.0.0.0
-      # ACCESS_TYPE: offline
-      # SESSION_EXPIRY: 90d
-      # PATIENT_SCOPE_OFFLINE: "launch/encounter launch/patient openid profile offline_access launch fhirUser user/*.* patient/*.*"
-      # PATIENT_SCOPE_ONLINE: "launch/encounter launch/patient openid profile online_access launch fhirUser user/*.* patient/*.*"
-      # PROVIDER_SCOPE_OFFLINE: "launch/encounter launch/patient openid profile offline_access launch fhirUser user/*.* patient/*.*"
-      # PROVIDER_SCOPE_ONLINE: "launch/encounter launch/patient openid profile online_access launch fhirUser user/*.* patient/*.*"
-
+    env_file:
+      - .env
     networks:
       - web
     healthcheck:

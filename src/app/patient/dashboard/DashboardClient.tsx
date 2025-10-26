@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/common/Button';
 import { PatientAppointmentCard } from '@/components/patient/PatientAppointmentCard';
@@ -39,20 +39,8 @@ export default function DashboardClient({
   const [isEncounterPlanned, setIsEncounterPlanned] = useState(false);
   const [isEncounterInProgress, setIsEncounterInProgress] = useState(false);
 
-  // Track if we've already fetched to prevent duplicate calls
-  const hasFetchedRef = React.useRef(false);
-  const patientIdRef = React.useRef(session.patient);
-
   // Client-side data fetching - ONLY appointments (patient data comes from AuthProvider)
   useEffect(() => {
-    // Only fetch if patient ID actually changed or first mount
-    if (hasFetchedRef.current && patientIdRef.current === session.patient) {
-      return;
-    }
-
-    hasFetchedRef.current = true;
-    patientIdRef.current = session.patient;
-
     const fetchAppointments = async () => {
       try {
         setAppointmentsError(null); // Clear previous errors
@@ -85,7 +73,32 @@ export default function DashboardClient({
       }
     };
 
+    // Initial fetch
     fetchAppointments();
+
+    // Set up polling every 10 seconds using recursive timeout pattern
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isActive = true;
+
+    const pollAppointments = async () => {
+      if (!isActive) return;
+
+      await fetchAppointments(); // Wait for response
+
+      // Wait 10 seconds after response before next fetch
+      if (isActive) {
+        timeoutId = setTimeout(pollAppointments, 10000);
+      }
+    };
+
+    // Start polling after initial fetch (10 seconds delay)
+    timeoutId = setTimeout(pollAppointments, 10000);
+
+    // Cleanup on unmount
+    return () => {
+      isActive = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [session.patient]);
 
   // Refresh appointments after update
