@@ -199,12 +199,12 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
   const palette = [
     '#FFB3BA/#E85D68',  // Light pink / Darker pink
     '#FFDAB3/#FFB366',  // Light peach / Darker peach
-    '#FFFFBA/#FFFF66',  // Light yellow / Darker yellow
-    '#BAFFC9/#66CC7A',  // Light green / Darker green
     '#BAE1FF/#66B3FF',  // Light blue / Darker blue
     '#C9C9FF/#7A7AFF',  // Light periwinkle / Darker periwinkle
     '#E0BBE4/#C77FCC',  // Light lavender / Darker lavender
     '#FFC6FF/#FF7FFF',  // Light magenta / Darker magenta
+    '#BAFFC9/#66CC7A',  // Light green / Darker green
+    '#FFFFBA/#FFFF66',  // Light yellow / Darker yellow
   ];
 
   const allRefs = Array.from(new Set([
