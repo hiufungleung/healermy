@@ -10,7 +10,7 @@ on:
 # This workflow only needs to read repository code for building Docker images
 # No write permissions are required as deployment happens via SSH to external servers
 permissions:
-  contents: read  # Required for actions/checkout to clone repository
+  contents: read # Required for actions/checkout to clone repository
 
 env:
   IMAGE_NAME: hiufungleung/healermy
@@ -48,8 +48,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64
-          # platforms: linux/amd64, linux/arm64
+          # platforms: linux/amd64
+          platforms: linux/amd64, linux/arm64
           push: true
           tags: |
             ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
