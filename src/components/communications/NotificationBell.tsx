@@ -24,7 +24,7 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
 
     if (currentPath === notificationsPath) {
       // Already on notifications page, trigger refresh
-      console.log('[BELL ICON] Dispatching refresh-notifications event');
+
       window.dispatchEvent(new CustomEvent('refresh-notifications'));
       // Then update URL and trigger filter change
       window.history.pushState({}, '', targetUrl);
@@ -35,7 +35,6 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
       router.push(targetUrl);
     }
   };
-
 
   return (
     <button

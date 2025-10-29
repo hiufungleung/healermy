@@ -63,8 +63,6 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
     const startISO = `${startStr}T00:00:00.000Z`;
     const endISO = `${endStr}T00:00:00.000Z`;
 
-    console.log('[SLOT CALENDAR] Week range:', { startStr, endStr, startISO, endISO });
-
     const params = new URLSearchParams();
     params.append('schedule.actor', `Practitioner/${practitionerId}`);
     params.append('start', `ge${startISO}`);
@@ -92,8 +90,6 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
           fetchedSchedules.push(resource);
         }
       });
-
-      console.log(`[SLOT CALENDAR] ✅ Fetched ${fetchedSlots.length} slots + ${fetchedSchedules.length} schedules in single request`);
 
       setSlots(fetchedSlots);
       setSchedules(fetchedSchedules);
@@ -189,9 +185,9 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
     }
   }, [searchParams.get('view')]);
 
-  // Auto refresh
+  // Auto refresh every 1 minute
   useEffect(() => {
-    const timer = setInterval(() => load(view, date), 10000);
+    const timer = setInterval(() => load(view, date), 60000);
     return () => clearInterval(timer);
   }, [view, date]);
 

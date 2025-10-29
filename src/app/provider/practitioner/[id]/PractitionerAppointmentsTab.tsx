@@ -58,7 +58,6 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
     try {
-      console.log('[PRACTITIONER APPOINTMENTS] 🚀 Starting SINGLE batch request with _include/_revinclude');
 
       // Build query parameters for appointments
       const appointmentParams = new URLSearchParams();
@@ -104,7 +103,7 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
       appointmentParams.append('_include', 'Appointment:actor');    // Include practitioners
       appointmentParams.append('_revinclude', 'Encounter:appointment'); // Include encounters
 
-      console.log(`[PRACTITIONER APPOINTMENTS] Query: Appointment?${appointmentParams.toString()}`);
+      
 
       // SINGLE CALL: Fetch appointments + patients + practitioners + encounters in ONE request!
       const batchBundle = {
@@ -136,7 +135,7 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
       // Extract the search result bundle from batch response
       const searchBundle = responseBundle.entry?.[0]?.resource;
       if (!searchBundle || !searchBundle.entry) {
-        console.log('[PRACTITIONER APPOINTMENTS] ✅ No appointments found');
+
         setAppointments([]);
         return;
       }
@@ -167,8 +166,6 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
           }
         }
       });
-
-      console.log(`[PRACTITIONER APPOINTMENTS] ✅ SINGLE BATCH result: ${fetchedAppointments.length} appointments, ${patientsMap.size} patients, ${practitionersMap.size} practitioners, ${encountersByAppointment.size} encounters`);
 
       // Enhance appointments with patient, practitioner, and encounter data
       const enhanced = fetchedAppointments.map(apt => {
@@ -211,7 +208,6 @@ export default function PractitionerAppointmentsTab({ practitionerId }: Practiti
         } as AppointmentRow;
       });
 
-      console.log('[PRACTITIONER APPOINTMENTS] ✅ Enhanced', enhanced.length, 'appointments with data');
       setAppointments(enhanced);
     } catch (error) {
       console.error('Error fetching appointments:', error);

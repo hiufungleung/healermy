@@ -21,7 +21,6 @@ const extractContactInfo = (patient: Patient) => {
   return { phone, email };
 };
 
-
 // Extract address according to FHIR standard
 const extractAddress = (patient: Patient): string | null => {
   if (!patient.address || patient.address.length === 0) {
@@ -101,7 +100,6 @@ export default function PatientProfileClient({ patientName }: PatientProfileClie
     setErrors({});
 
     try {
-      console.log('📋 Fetching complete profile data...');
 
       const response = await fetch('/api/fhir/Patient/profile', {
         method: 'GET',
@@ -116,7 +114,6 @@ export default function PatientProfileClient({ patientName }: PatientProfileClie
       }
 
       const data = await response.json();
-      console.log('✅ Profile data received:', data);
 
       // Set all state at once
       setPatient(data.patient);

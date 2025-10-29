@@ -62,7 +62,7 @@ export default function PreVisitSummary() {
 
   const handleSaveNotes = () => {
     // In a real app, this would save to FHIR
-    console.log('Saving clinician notes:', clinicianNotes);
+
     alert('Notes saved successfully');
   };
 

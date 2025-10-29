@@ -23,39 +23,11 @@ interface EmptyStateProps {
  *   icon={Stethoscope}
  *   message="No conditions recorded"
  *   actionLabel="Add Condition"
- *   onAction={() => console.log('Add condition')}
+ *   onAction={() => {}}
  * />
  * ```
  */
-export function EmptyState({
-  icon: Icon,
-  title,
-  message,
-  actionLabel,
-  onAction,
-  variant = 'default'
-}: EmptyStateProps) {
-  if (variant === 'compact') {
-    return (
-      <div className="py-6 text-center">
-        {Icon && (
-          <Icon className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-        )}
-        <p className="text-sm text-gray-500">{message}</p>
-        {actionLabel && onAction && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onAction}
-            className="mt-2 text-xs"
-          >
-            {actionLabel}
-          </Button>
-        )}
-      </div>
-    );
-  }
-
+export function EmptyState({ icon: Icon, title, message, actionLabel, onAction }: EmptyStateProps) {
   return (
     <div className="bg-gray-50 rounded-lg p-8 text-center">
       {Icon && (

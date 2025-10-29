@@ -186,30 +186,16 @@ export default function DashboardClient({
     return true;
   }) || [];
 
-  console.log('[DASHBOARD] Active appointments (today or future, booked/arrived/fulfilled):', activeAppointments.length);
+  
   if (activeAppointments.length > 0) {
-    console.log('[DASHBOARD] Active appointments:', activeAppointments.map(apt => ({
-      id: apt.id,
-      status: apt.status,
-      start: apt.start,
-      lastUpdated: apt.meta?.lastUpdated,
-      isPast: new Date(apt.start!) < now,
-      isToday: new Date(apt.start!) >= today && new Date(apt.start!) < new Date(today.getTime() + 24 * 60 * 60 * 1000)
-    })));
+    
   }
 
   // Find the next appointment (sorted by time, earliest first) - only take the first one
   const nextTodayAppointment = activeAppointments
     .sort((a, b) => new Date(a.start!).getTime() - new Date(b.start!).getTime())[0];
 
-  console.log('[DASHBOARD] Next appointment:', nextTodayAppointment ? {
-    id: nextTodayAppointment.id,
-    status: nextTodayAppointment.status,
-    start: nextTodayAppointment.start,
-    lastUpdated: nextTodayAppointment.meta?.lastUpdated,
-    isPast: new Date(nextTodayAppointment.start!) < now,
-    isToday: new Date(nextTodayAppointment.start!) >= today && new Date(nextTodayAppointment.start!) < new Date(today.getTime() + 24 * 60 * 60 * 1000)
-  } : 'None');
+  
 
   const todayStatus = {
     nextAppointment: nextTodayAppointment ?
@@ -291,7 +277,6 @@ export default function DashboardClient({
         startOfDay.setHours(0, 0, 0, 0);
 
         // OPTIMIZED: Single batch request for both encounter and practitioner appointments
-        console.log('[QUEUE] 🚀 Fetching encounter + appointments in SINGLE batch request');
 
         const batchBundle = {
           resourceType: 'Bundle',
@@ -347,8 +332,6 @@ export default function DashboardClient({
           const appointmentsBundle = appointmentsEntry.resource;
           allAppointments = appointmentsBundle?.entry?.map((e: any) => e.resource) || [];
         }
-
-        console.log(`[QUEUE] ✅ Batch result: encounter status=${encounterStatus}, ${allAppointments.length} appointments`);
 
         // Update encounter status states
         setIsEncounterPlanned(encounterStatus === 'planned');

@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     if (!clientSecret) {
       console.warn(`⚠️ No CLIENT_SECRET found. Treating as public client.`);
     } else {
-      console.log('🔐 Using server-side CLIENT_SECRET for role:', role);
+
     }
 
     // Prepare token exchange request
@@ -56,8 +56,6 @@ export async function POST(request: NextRequest) {
       tokenParams.set('client_id', clientId);
     }
 
-    console.log('🔄 Server-side token exchange to:', tokenUrl);
-
     // Perform token exchange on server-side to avoid CORS issues
     const tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
@@ -75,7 +73,6 @@ export async function POST(request: NextRequest) {
     }
 
     const tokenData = await tokenResponse.json();
-    console.log('✅ Server-side token exchange successful');
 
     // Return token data to client
     return NextResponse.json(tokenData);

@@ -73,8 +73,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`[FHIR BATCH] Processing ${bundle.type} bundle with ${bundle.entry.length} entries`);
-
     const token = prepareToken(session.accessToken);
     const fhirBaseUrl = session.fhirBaseUrl;
 
@@ -109,8 +107,6 @@ export async function POST(request: NextRequest) {
     }
 
     const responseBundle = await response.json();
-
-    console.log(`[FHIR BATCH] Successfully processed ${bundle.type} bundle`);
 
     return NextResponse.json(responseBundle, { status: 200 });
   } catch (error) {

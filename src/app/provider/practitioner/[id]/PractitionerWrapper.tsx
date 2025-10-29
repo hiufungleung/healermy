@@ -64,7 +64,6 @@ export default function PractitionerWrapper({
           </div>
         </div>
 
-
         {/* Data content loads with skeleton then real data */}
         <PractitionerDetailClient
           practitionerId={practitionerId}

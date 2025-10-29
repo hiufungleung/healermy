@@ -34,12 +34,10 @@ export async function searchSchedules(
   }
 
   const url = `${fhirBaseUrl}/Schedule?${queryParams.toString()}`;
-  console.log('Schedule query URL:', url);
 
   const response = await FHIRClient.fetchWithAuth(url, token);
   const result = await response.json();
 
-  console.log('Schedule query result:', result);
   return result;
 }
 
@@ -124,8 +122,6 @@ export async function deleteSchedule(
     const slotsBundle = await slotsResponse.json();
     const slots = slotsBundle.entry?.map((entry: any) => entry.resource) || [];
 
-    console.log(`Found ${slots.length} slots to delete for schedule ${scheduleId}`);
-
     // Step 2: Find all appointments referencing these slots
     let allAppointments: any[] = [];
     if (slots.length > 0) {
@@ -154,8 +150,6 @@ export async function deleteSchedule(
       allAppointments = uniqueAppointments;
     }
 
-    console.log(`Found ${allAppointments.length} appointments to delete for schedule ${scheduleId}`);
-
     // Step 3: Delete all appointments first
     const deleteAppointmentPromises = allAppointments.map(async (appointment: any) => {
       try {
@@ -176,8 +170,6 @@ export async function deleteSchedule(
       result.status === 'fulfilled' && result.value.success
     ).length;
 
-    console.log(`Successfully deleted ${successfulAppointmentDeletions}/${allAppointments.length} appointments`);
-
     // Step 4: Delete all associated slots
     const deleteSlotPromises = slots.map(async (slot: any) => {
       try {
@@ -197,8 +189,6 @@ export async function deleteSchedule(
     const successfulSlotDeletions = slotResults.filter(result =>
       result.status === 'fulfilled' && result.value.success
     ).length;
-
-    console.log(`Successfully deleted ${successfulSlotDeletions}/${slots.length} slots`);
 
     // Step 5: Finally delete the schedule
     const scheduleResponse = await FHIRClient.fetchWithAuth(

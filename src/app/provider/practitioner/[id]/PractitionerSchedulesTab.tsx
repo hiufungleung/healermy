@@ -165,7 +165,7 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
         params.append('specialty', selectedSpecialty);
       }
 
-      console.log('[SCHEDULES] Fetching with filters:', params.toString());
+      
 
       const response = await fetch(`/api/fhir/Schedule?${params.toString()}`, {
         method: 'GET',
@@ -178,8 +178,6 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
 
       const bundle = await response.json();
       const fetchedSchedules: Schedule[] = bundle.entry?.map((e: any) => e.resource) || [];
-
-      console.log('[SCHEDULES] Fetched', fetchedSchedules.length, 'schedules');
 
       // Sort by newest first (by planning horizon start date)
       const sorted = [...fetchedSchedules].sort((a, b) => {
@@ -262,7 +260,7 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
       }
 
       if (response.ok) {
-        console.log('[SCHEDULES] Activated schedule:', scheduleId);
+
         // Update local state
         setSchedules(prev => prev.map(s =>
           s.id === scheduleId ? { ...s, active: true } : s
@@ -306,7 +304,7 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
       }
 
       if (response.ok) {
-        console.log('[SCHEDULES] Deactivated schedule:', scheduleId);
+
         // Update local state
         setSchedules(prev => prev.map(s =>
           s.id === scheduleId ? { ...s, active: false } : s
@@ -356,7 +354,6 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
     setClearingScheduleSlots(prev => new Set([...prev, scheduleId]));
 
     try {
-      console.log(`[CLEAR SLOTS] 🔍 Fetching free slots for schedule ${scheduleId}...`);
 
       // Fetch all FREE slots for this schedule (only free slots can be deleted)
       const response = await fetch(
@@ -370,12 +367,10 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
       const slots = bundle.entry?.map((e: any) => e.resource) || [];
 
       if (slots.length === 0) {
-        console.log('[CLEAR SLOTS] ℹ️ No free slots to delete');
+
         if (onScheduleUpdate) onScheduleUpdate();
         return;
       }
-
-      console.log(`[CLEAR SLOTS] 🚀 Deleting ${slots.length} free slots with SINGLE batch request`);
 
       // OPTIMIZED: Use FHIR batch bundle to delete all slots in single request
       const deleteBatchBundle = {
@@ -422,7 +417,6 @@ export default function PractitionerSchedulesTab({ practitionerId, onScheduleUpd
         });
       }
 
-      console.log(`[CLEAR SLOTS] ✅ Deleted ${successCount} slots successfully`);
       if (failCount > 0) {
         console.warn(`[CLEAR SLOTS] ⚠️ Failed to delete ${failCount} slots`);
       }

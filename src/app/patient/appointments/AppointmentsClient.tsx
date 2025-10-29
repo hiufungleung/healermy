@@ -44,7 +44,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
   // Fetch appointments
   useEffect(() => {
     const fetchAppointments = async () => {
-      console.log('[PATIENT APPOINTMENTS] 🚀 Fetching with SINGLE batch request (appointments + practitioners)');
+      
       setLoading(true);
 
       try {
@@ -76,7 +76,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
         // Extract the search result bundle from batch response
         const searchBundle = responseBundle.entry?.[0]?.resource;
         if (!searchBundle || !searchBundle.entry) {
-          console.log('[PATIENT APPOINTMENTS] ✅ No appointments found');
+
           setAppointments([]);
           return;
         }
@@ -95,8 +95,6 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
             practitionersMap.set(resource.id, resource);
           }
         });
-
-        console.log(`[PATIENT APPOINTMENTS] ✅ SINGLE BATCH result: ${fetchedAppointments.length} appointments, ${practitionersMap.size} practitioners`);
 
         // Enhance appointments with practitioner details
         const enhanced = fetchedAppointments.map(apt => {
@@ -200,24 +198,22 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
 
   // Log filtering results for debugging
   useEffect(() => {
-    console.log('[APPOINTMENTS] Filter status:', filterStatus);
-    console.log('[APPOINTMENTS] Total appointments:', appointments.length);
-    console.log('[APPOINTMENTS] Filtered appointments:', filteredAppointments.length);
+
     if (filteredAppointments.length > 0) {
-      console.log('[APPOINTMENTS] Sample filtered appointment:', filteredAppointments[0]);
+
     }
     if (filterStatus === 'pending' && appointments.length > 0) {
       const pendingAppts = appointments.filter(a => a.status === 'pending');
-      console.log('[APPOINTMENTS] Appointments with "pending" status:', pendingAppts.length);
+
       if (pendingAppts.length > 0) {
-        console.log('[APPOINTMENTS] Sample pending appointment:', pendingAppts[0]);
+
       }
     }
     if (filterStatus === 'arrived' && appointments.length > 0) {
       const arrivedAppts = appointments.filter(a => a.status === 'arrived');
-      console.log('[APPOINTMENTS] Appointments with "arrived" status:', arrivedAppts.length);
+
       if (arrivedAppts.length > 0) {
-        console.log('[APPOINTMENTS] Sample arrived appointment:', arrivedAppts[0]);
+
       }
     }
   }, [filteredAppointments, filterStatus, appointments]);

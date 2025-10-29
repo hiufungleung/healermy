@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const token = prepareToken(session.accessToken);
     const fhirBaseUrl = session.fhirBaseUrl;
 
-    console.log('📋 Fetching complete profile for patient:', patientId, '(using FHIR bundle)');
+    
 
     // Create a FHIR batch bundle to fetch all patient data in a single request
     const batchBundle = {
@@ -212,16 +212,7 @@ export async function GET(request: NextRequest) {
       explanationOfBenefit: extractResources(entries[12])
     };
 
-    console.log('✅ Profile data compiled successfully (bundle method)');
-    console.log('📊 Data summary:', {
-      hasPatient: !!profileData.patient,
-      conditionsCount: profileData.conditions.length,
-      medicationsCount: profileData.medications.length,
-      observationsCount: profileData.observations.length,
-      encountersCount: profileData.encounters.encounters.length,
-      allergiesCount: profileData.allergies.length,
-      proceduresCount: profileData.procedures.length
-    });
+    
 
     return NextResponse.json(profileData);
 

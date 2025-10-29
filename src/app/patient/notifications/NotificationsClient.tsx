@@ -78,7 +78,6 @@ export default function NotificationsClient({
   // Fetch initial data on mount
   useEffect(() => {
     const fetchInitialData = async () => {
-      console.log('[PATIENT NOTIFICATIONS] 🔄 Fetching initial data...');
 
       try {
         const response = await fetch('/api/fhir/Communication', {
@@ -89,7 +88,6 @@ export default function NotificationsClient({
           const bundle = await response.json();
           const communications = (bundle.entry || []).map((entry: any) => entry.resource);
 
-          console.log('[PATIENT NOTIFICATIONS] ✅ Loaded', communications.length, 'communications');
           setLocalCommunications(communications);
         }
       } catch (error) {
@@ -180,14 +178,14 @@ export default function NotificationsClient({
             .filter(comm => !isMessageRead(comm))
             .map(comm => comm.id)
         );
-        console.log('[Unread Tab] Capturing snapshot:', Array.from(unreadIds));
+        
         setUnreadTabSnapshot(unreadIds);
         snapshotCapturedRef.current = true;
       }
     } else {
       // Clear snapshot and reset flag when leaving unread tab
       if (snapshotCapturedRef.current) {
-        console.log('[Unread Tab] Clearing snapshot');
+
         setUnreadTabSnapshot(new Set());
         snapshotCapturedRef.current = false;
       }
@@ -196,7 +194,7 @@ export default function NotificationsClient({
 
   // Refresh function for bell icon click
   const refreshNotifications = async () => {
-    console.log('[PATIENT NOTIFICATIONS] 🔄 Refreshing from bell icon click...');
+
     setLoading(true);
 
     try {
@@ -207,8 +205,6 @@ export default function NotificationsClient({
       if (response.ok) {
         const bundle = await response.json();
         const freshCommunications = (bundle.entry || []).map((entry: any) => entry.resource);
-
-        console.log('[PATIENT NOTIFICATIONS] ✅ Refreshed', freshCommunications.length, 'communications');
 
         // Update communications
         setLocalCommunications(freshCommunications);
@@ -223,7 +219,7 @@ export default function NotificationsClient({
   // Listen for bell icon click events
   useEffect(() => {
     const handleBellClick = () => {
-      console.log('[PATIENT NOTIFICATIONS] Bell icon clicked, refreshing...');
+
       refreshNotifications();
     };
 
@@ -286,16 +282,13 @@ export default function NotificationsClient({
     }
   };
 
-
   const markAllAsRead = async () => {
     const unreadMessages = localCommunications.filter(comm => !isMessageRead(comm));
 
     if (unreadMessages.length === 0) {
-      console.log('[PATIENT NOTIFICATIONS] No unread messages to mark');
+
       return;
     }
-
-    console.log(`[PATIENT NOTIFICATIONS] 🚀 Marking ${unreadMessages.length} messages as read with SINGLE batch`);
 
     // Optimistic UI update
     setLocalCommunications(prev =>
@@ -343,7 +336,7 @@ export default function NotificationsClient({
       if (!batchResponse.ok) {
         console.error('[PATIENT NOTIFICATIONS] ❌ Failed to mark all as read on server');
       } else {
-        console.log(`[PATIENT NOTIFICATIONS] ✅ Marked ${unreadMessages.length} messages as read in single batch`);
+
       }
 
       // Dispatch event to update notification bell
@@ -364,7 +357,6 @@ export default function NotificationsClient({
       setIsDetailDialogOpen(true);
 
       try {
-        console.log('[PATIENT NOTIFICATIONS] 🚀 Fetching appointment details with FHIR batch');
 
         // OPTIMIZED: Fetch appointment first, then batch-fetch practitioner if needed
         const appointmentResponse = await fetch(`/api/fhir/Appointment/${appointmentId}`, {
@@ -425,7 +417,6 @@ export default function NotificationsClient({
                   ].filter(Boolean).join(', ') : 'TBD'
               };
 
-              console.log('[PATIENT NOTIFICATIONS] ✅ Fetched appointment + practitioner in batch');
             }
           }
         }
@@ -499,8 +490,6 @@ export default function NotificationsClient({
         return;
       }
 
-      console.log('Communication deleted successfully from server');
-
       // Dispatch event to update notification bell
       window.dispatchEvent(new CustomEvent('messageUpdate'));
     } catch (error) {
@@ -513,8 +502,6 @@ export default function NotificationsClient({
       alert('Failed to delete message. Please check your connection and try again.');
     }
   };
-
-
 
   const getNotificationIcon = (comm: Communication) => {
     const category = comm.category?.[0]?.text;
@@ -678,7 +665,6 @@ export default function NotificationsClient({
   const appointmentCount = localCommunications.filter(comm => comm.category?.[0]?.text === 'appointment-update').length;
   const systemCount = localCommunications.filter(comm => comm.category?.[0]?.text === 'system-notification').length;
   const totalCount = localCommunications.length;
-
 
   // Reusable NotificationCard component
   const NotificationCard = ({ comm }: { comm: Communication }) => {

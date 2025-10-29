@@ -25,25 +25,17 @@ export async function GET(request: NextRequest) {
     // Build the FHIR URL with all query parameters (including ge/lt prefixes and _id)
     const fhirUrl = `${session.fhirBaseUrl}/Slot?${request.nextUrl.searchParams.toString()}`;
 
-    console.log('🔍 [SLOT API] Requesting from FHIR:', fhirUrl);
-
     // Log ALL parameters (including duplicate keys like multiple 'schedule' params)
     const allParams: Record<string, string[]> = {};
     request.nextUrl.searchParams.forEach((value, key) => {
       if (!allParams[key]) allParams[key] = [];
       allParams[key].push(value);
     });
-    console.log('🔍 [SLOT API] Query parameters:', allParams);
 
     // Use centralized FHIRClient for consistent error handling and logging
     const response = await FHIRClient.fetchWithAuth(fhirUrl, token);
 
     const fhirBundle = await response.json();
-
-    console.log('🔍 [SLOT API] FHIR response status:', response.status);
-    console.log('🔍 [SLOT API] FHIR bundle type:', fhirBundle.resourceType);
-    console.log('🔍 [SLOT API] FHIR total:', fhirBundle.total);
-    console.log('🔍 [SLOT API] FHIR entry count:', fhirBundle.entry?.length || 0);
 
     // Return the complete FHIR Bundle with all metadata (link, total, entry, etc.)
     // Frontend components will extract what they need from the Bundle structure

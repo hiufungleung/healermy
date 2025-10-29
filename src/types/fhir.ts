@@ -470,7 +470,6 @@ export interface MedicationDispense {
   }>;
 }
 
-
 export interface AllergyIntolerance {
   resourceType: 'AllergyIntolerance';
   id: string;

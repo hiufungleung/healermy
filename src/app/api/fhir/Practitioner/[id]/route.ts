@@ -25,7 +25,7 @@ export async function GET(
     );
     
     // Debug: Log the actual practitioner data structure
-    console.log(`[DEBUG] Practitioner ${id} data:`, JSON.stringify(result, null, 2));
+    
 
     return NextResponse.json(result);
   } catch (error) {

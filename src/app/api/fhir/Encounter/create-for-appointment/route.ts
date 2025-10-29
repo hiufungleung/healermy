@@ -167,7 +167,6 @@ export async function POST(request: NextRequest) {
     }
 
     const createdEncounter = await encounterResponse.json();
-    console.log(`✅ Created encounter ${createdEncounter.id} for appointment ${appointmentId} with status '${initialStatus}'`);
 
     return NextResponse.json(createdEncounter, { status: 201 });
   } catch (error) {

@@ -277,7 +277,7 @@ export function useBookingState() {
         setIsInitialized(true);
       } else {
         // URL params invalid - clear URL and check localStorage
-        console.log('Invalid URL params:', validation.missingFields);
+
         router.replace('/patient/book-appointment');
 
         const storedDraft = loadDraftFromStorage();

@@ -40,7 +40,7 @@ export async function getPatient(
       return response.json();
     }
   } catch (error) {
-    console.log(`Direct ID lookup failed for ${patientId}, trying identifier search`);
+
   }
 
   // If direct access fails, try identifier search

@@ -72,7 +72,6 @@ export default function ProviderAppointmentsClient() {
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
     try {
-      console.log('[APPOINTMENTS] 🚀 Starting SINGLE batch request with _include/_revinclude');
 
       // Build query parameters for appointments
       const appointmentParams = new URLSearchParams();
@@ -121,7 +120,7 @@ export default function ProviderAppointmentsClient() {
       appointmentParams.append('_include', 'Appointment:actor');    // Include practitioners
       appointmentParams.append('_revinclude', 'Encounter:appointment'); // Include encounters
 
-      console.log(`[APPOINTMENTS] Query: Appointment?${appointmentParams.toString()}`);
+      
 
       // SINGLE CALL: Fetch appointments + patients + practitioners + encounters in ONE request!
       const batchBundle = {
@@ -159,7 +158,7 @@ export default function ProviderAppointmentsClient() {
       // Extract the search result bundle from batch response
       const searchBundle = responseBundle.entry?.[0]?.resource;
       if (!searchBundle || !searchBundle.entry) {
-        console.log('[APPOINTMENTS] ✅ No appointments found');
+
         setAppointments([]);
         return;
       }
@@ -190,8 +189,6 @@ export default function ProviderAppointmentsClient() {
           }
         }
       });
-
-      console.log(`[APPOINTMENTS] ✅ SINGLE BATCH result: ${fetchedAppointments.length} appointments, ${patientsMap.size} patients, ${practitionersMap.size} practitioners, ${encountersByAppointment.size} encounters`);
 
       // Enhance appointments with patient, practitioner, and encounter data
       const enhanced = fetchedAppointments.map(apt => {
@@ -234,7 +231,6 @@ export default function ProviderAppointmentsClient() {
         } as AppointmentRow;
       });
 
-      console.log('[APPOINTMENTS] ✅ Enhanced', enhanced.length, 'appointments with data');
       setAppointments(enhanced);
     } catch (error) {
       console.error('Error fetching appointments:', error);
@@ -278,7 +274,6 @@ export default function ProviderAppointmentsClient() {
     updatedAppointment?: Appointment,
     updatedEncounter?: Encounter
   ) => {
-    console.log('[APPOINTMENTS] Optimistic update for appointment:', appointmentId);
 
     // Update the appointment in the list with data from PATCH response
     setAppointments(prev => prev.map(apt => {
@@ -293,7 +288,6 @@ export default function ProviderAppointmentsClient() {
       return apt;
     }));
 
-    console.log('[APPOINTMENTS] ✅ Optimistic update completed for:', appointmentId);
   }, []);
 
   // Listen for refresh events from actions (event listener only registered once)

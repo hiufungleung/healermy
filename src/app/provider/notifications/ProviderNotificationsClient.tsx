@@ -89,12 +89,10 @@ export default function ProviderNotificationsClient({
   // Loading state for better UX
   const [isLoading, setIsLoading] = useState(true); // Start with true to show loader on page load
 
-
-
   // Function to fetch patient name from FHIR API
   const fetchPatientName = async (patientId: string): Promise<string> => {
     try {
-      console.log(`[fetchPatientName] Client-side: Fetching patient ${patientId}`);
+
       const response = await fetch(`/api/fhir/Patient/${patientId}`, {
         method: 'GET',
         credentials: 'include',
@@ -102,7 +100,6 @@ export default function ProviderNotificationsClient({
 
       if (response.ok) {
         const patient = await response.json();
-        console.log(`[fetchPatientName] Client-side: Got response for ${patientId}:`, patient);
 
         // Extract name from FHIR Patient resource
         if (patient.name && patient.name[0]) {
@@ -110,10 +107,10 @@ export default function ProviderNotificationsClient({
           const given = Array.isArray(name.given) ? name.given.join(' ') : name.given || '';
           const family = name.family || '';
           const fullName = `${given} ${family}`.trim() || `Patient ${patientId}`;
-          console.log(`[fetchPatientName] Client-side: Extracted name "${fullName}" for ${patientId}`);
+
           return fullName;
         } else {
-          console.log(`[fetchPatientName] Client-side: No name found for ${patientId}, using default`);
+
         }
       } else {
         console.error(`[fetchPatientName] Client-side: Failed to fetch patient ${patientId}, status: ${response.status}`);
@@ -170,7 +167,6 @@ export default function ProviderNotificationsClient({
   // Fetch initial data on mount
   useEffect(() => {
     const fetchInitialData = async () => {
-      console.log('[PROVIDER NOTIFICATIONS] 🔄 Fetching initial data...');
 
       try {
         const response = await fetch('/api/fhir/Communication', {
@@ -181,7 +177,6 @@ export default function ProviderNotificationsClient({
           const bundle = await response.json();
           const communications = (bundle.entry || []).map((entry: any) => entry.resource);
 
-          console.log('[PROVIDER NOTIFICATIONS] ✅ Loaded', communications.length, 'communications');
           setLocalCommunications(communications);
         }
       } catch (error) {
@@ -225,8 +220,6 @@ export default function ProviderNotificationsClient({
       if (appointmentIds.size > 0 || patientIds.size > 0) {
         setLoadingStatuses(true);
         const newDeletedAppointments = new Set(deletedAppointments);
-
-        console.log(`[NOTIFICATIONS] 🚀 Fetching ${appointmentIds.size} appointments + ${patientIds.size} patients in SINGLE batch`);
 
         try {
           // Build batch bundle with all GET requests
@@ -286,14 +279,14 @@ export default function ProviderNotificationsClient({
               // Check if this was an appointment request that failed
               if (index < appointmentIdsArray.length) {
                 const appointmentId = appointmentIdsArray[index];
-                console.log(`Appointment ${appointmentId} was not found, marking as cancelled`);
+
                 newDeletedAppointments.add(appointmentId);
                 newStatuses[appointmentId] = 'cancelled';
               }
             }
           });
 
-          console.log(`[NOTIFICATIONS] ✅ Batch result: ${Object.keys(newStatuses).length} appointments, ${Object.keys(newPatientNames).length} patients`);
+          
 
           // Update state
           setAppointmentStatuses(prev => ({ ...prev, ...newStatuses }));
@@ -321,8 +314,6 @@ export default function ProviderNotificationsClient({
   useEffect(() => {
     if (initialCommunications.length === 0) return;
 
-    console.log('[ProviderNotifications] Updating communications from prop:', initialCommunications.length, 'items');
-
     setLocalCommunications(prevLocal => {
       const incomingMap = new Map(initialCommunications.map(comm => [comm.id, comm]));
 
@@ -330,7 +321,7 @@ export default function ProviderNotificationsClient({
       const merged = initialCommunications.map(comm => {
         const localMod = locallyModifiedIds.get(comm.id);
         if (localMod) {
-          console.log('[ProviderNotifications] Using locally modified version for:', comm.id);
+
           return localMod;
         }
         return comm;
@@ -347,7 +338,7 @@ export default function ProviderNotificationsClient({
           )?.valueDateTime;
 
           if (hasReadExtension) {
-            console.log('[ProviderNotifications] API confirmed read status for:', id);
+
             cleanedModified.delete(id);
           }
         }
@@ -385,7 +376,7 @@ export default function ProviderNotificationsClient({
 
   // Refresh function for bell icon click
   const refreshNotifications = async () => {
-    console.log('[NOTIFICATIONS] 🔄 Refreshing from bell icon click...');
+
     setIsLoading(true);
 
     try {
@@ -396,8 +387,6 @@ export default function ProviderNotificationsClient({
       if (response.ok) {
         const bundle = await response.json();
         const freshCommunications = (bundle.entry || []).map((entry: any) => entry.resource);
-
-        console.log('[NOTIFICATIONS] ✅ Refreshed', freshCommunications.length, 'communications');
 
         // Clear caches to force re-fetch of appointments/patients
         setAppointmentStatuses({});
@@ -418,7 +407,7 @@ export default function ProviderNotificationsClient({
   // Listen for bell icon click events
   useEffect(() => {
     const handleBellClick = () => {
-      console.log('[NOTIFICATIONS] Bell icon clicked, refreshing...');
+
       refreshNotifications();
     };
 
@@ -445,14 +434,14 @@ export default function ProviderNotificationsClient({
             .filter(comm => !isMessageRead(comm))
             .map(comm => comm.id)
         );
-        console.log('[Provider Unread Tab] Capturing snapshot:', Array.from(unreadIds));
+        
         setUnreadTabSnapshot(unreadIds);
         snapshotCapturedRef.current = true;
       }
     } else {
       // Clear snapshot and reset flag when leaving unread tab
       if (snapshotCapturedRef.current) {
-        console.log('[Provider Unread Tab] Clearing snapshot');
+
         setUnreadTabSnapshot(new Set());
         snapshotCapturedRef.current = false;
       }
@@ -582,8 +571,6 @@ export default function ProviderNotificationsClient({
         setSelectedMessage(null);
       }
 
-      console.log(`Communication ${id} marked as deleted for provider`);
-
       // Dispatch event to update notification bell
       window.dispatchEvent(new CustomEvent('messageUpdate'));
 
@@ -600,7 +587,6 @@ export default function ProviderNotificationsClient({
       const appointmentId = aboutRef.replace('Appointment/', '');
 
       try {
-        console.log('[PROVIDER NOTIFICATIONS] 🚀 Fetching appointment + patient details');
 
         // Fetch appointment details
         const appointmentResponse = await fetch(`/api/fhir/Appointment/${appointmentId}`, {
@@ -636,7 +622,7 @@ export default function ProviderNotificationsClient({
                 'Unknown Patient';
 
               appointment.patientName = patientName;
-              console.log('[PROVIDER NOTIFICATIONS] ✅ Patient name:', patientName);
+
             }
           } catch (patientError) {
             console.error('[PROVIDER NOTIFICATIONS] ⚠️ Failed to fetch patient details:', patientError);
@@ -647,7 +633,6 @@ export default function ProviderNotificationsClient({
         setSelectedAppointment(appointment);
         setIsDialogOpen(true);
 
-        console.log('[PROVIDER NOTIFICATIONS] ✅ Appointment loaded, opening dialog');
       } catch (error) {
         console.error('Error fetching appointment details:', error);
         alert('Failed to load appointment details');
@@ -866,12 +851,7 @@ export default function ProviderNotificationsClient({
 
   // Debug logging - only when unreadCount changes
   useEffect(() => {
-    console.log('🔔 Unread Count Debug:', {
-      totalCommunications: visibleCommunications.length,
-      unreadCount: unreadCount,
-      readNotificationsSize: readNotifications.size,
-      deduplicatedCount: deduplicatedCommunications.length,
-    });
+
   }, [unreadCount]);
 
   const markAllAsRead = async () => {
@@ -880,11 +860,9 @@ export default function ProviderNotificationsClient({
       const unreadMessages = localCommunications.filter(comm => !isMessageRead(comm));
 
       if (unreadMessages.length === 0) {
-        console.log('[PROVIDER NOTIFICATIONS] No unread messages to mark');
+
         return;
       }
-
-      console.log(`[PROVIDER NOTIFICATIONS] 🚀 Marking ${unreadMessages.length} messages as read with SINGLE batch`);
 
       // Optimistic UI update
       setLocalCommunications(prev =>
@@ -941,7 +919,7 @@ export default function ProviderNotificationsClient({
       if (!batchResponse.ok) {
         console.error('[PROVIDER NOTIFICATIONS] ❌ Failed to mark all as read on server');
       } else {
-        console.log(`[PROVIDER NOTIFICATIONS] ✅ Marked ${unreadMessages.length} messages as read in single batch`);
+
       }
 
       // Dispatch event to update notification bell
@@ -1022,7 +1000,6 @@ export default function ProviderNotificationsClient({
           </Button>
         )}
       </div>
-
 
       {/* Filter Tabs */}
       <Tabs

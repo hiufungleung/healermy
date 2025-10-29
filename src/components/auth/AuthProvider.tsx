@@ -53,7 +53,7 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
   useEffect(() => {
     if (initialSession) {
       setSession(initialSession);
-      console.log('✅ Session loaded from server:', initialSession.role);
+
     }
   }, [initialSession]);
 
@@ -86,7 +86,7 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
               const fullName = `${given} ${family}`.trim();
               if (fullName) {
                 setUserName(fullName);
-                console.log('✅ Patient name loaded:', fullName);
+
               }
             }
           }
@@ -108,7 +108,7 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
               const fullName = `${prefix} ${given} ${family}`.trim();
               if (fullName) {
                 setUserName(fullName);
-                console.log(`✅ ${session.role} name loaded:`, fullName);
+
               }
             }
           }
@@ -232,7 +232,7 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
         // Pending appointments are shown on the appointments page, not notifications page
         let count = filteredCommunications.filter((comm: any) => !isMessageRead(comm)).length;
 
-        console.log('🔔 [AuthProvider] Provider unread count (communications only):', count);
+        
 
         setUnreadCount(count);
       }
@@ -245,7 +245,7 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
   // Note: This is triggered by login callback to refresh the page
   useEffect(() => {
     const handleSessionUpdate = () => {
-      console.log('🔄 Session update detected, reloading page...');
+
       window.location.reload();
     };
 
@@ -266,15 +266,15 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
     let timeoutId: NodeJS.Timeout | null = null;
     let isActive = true;
 
-    // Polling function that waits 10 seconds after each response
+    // Polling function that waits 2 minutes after each response
     const pollNotifications = async () => {
       if (!isActive) return;
 
       await fetchNotificationCount();
 
-      // Wait 10 seconds after response before next fetch
+      // Wait 2 minutes after response before next fetch
       if (isActive) {
-        timeoutId = setTimeout(pollNotifications, 60000);
+        timeoutId = setTimeout(pollNotifications, 120000);
       }
     };
 

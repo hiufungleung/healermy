@@ -49,9 +49,7 @@ export async function refreshAccessToken(refreshToken: string, tokenUrl: string,
     'Authorization': `Basic ${credentials}`,
   };
 
-  console.log('🔄 [TOKEN REFRESH] Sending token refresh request to:', tokenUrl);
-  console.log('🔄 [TOKEN REFRESH] Request headers:', headers);
-  console.log('🔄 [TOKEN REFRESH] Request body:', tokenParams.toString());
+  
 
   try {
     const response = await fetch(tokenUrl, {

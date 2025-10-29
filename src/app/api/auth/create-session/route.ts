@@ -7,8 +7,6 @@ export async function POST(request: NextRequest) {
   try {
     const fullSessionData: any = await request.json();
 
-    console.log('📝 Creating session for role:', fullSessionData.role);
-
     // Create simplified session data with only required fields
     const sessionData: SessionData = {
       accessToken: fullSessionData.accessToken,
@@ -55,15 +53,13 @@ export async function POST(request: NextRequest) {
 
     // Log session data size
     const sessionDataString = JSON.stringify(sessionData);
-    console.log('📊 Session cookie size:');
-    console.log('- Unencrypted JSON length:', sessionDataString.length);
-    console.log('- Encrypted length:', encryptedSessionData.length);
+
     Object.entries(sessionData).forEach(([key, value]) => {
       const valueStr = typeof value === 'string' ? value : JSON.stringify(value);
       if (valueStr && valueStr.length > 100) {
-        console.log(`  - ${key}:`, valueStr.length, 'chars', valueStr.substring(0, 50) + '...');
+        
       } else {
-        console.log(`  - ${key}:`, valueStr ? valueStr.length : 0, 'chars');
+
       }
     });
 
@@ -78,7 +74,6 @@ export async function POST(request: NextRequest) {
 
     response.cookies.set(TOKEN_COOKIE_NAME, encryptedSessionData, cookieOptions);
 
-    console.log('✅ Session created successfully with encrypted data in single cookie:', TOKEN_COOKIE_NAME);
     return response;
 
   } catch (error) {

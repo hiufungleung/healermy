@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       path: '/'
     });
 
-    console.log('OAuth state stored successfully for state:', state.substring(0, 8) + '...');
+    
 
     return response;
   } catch (error) {

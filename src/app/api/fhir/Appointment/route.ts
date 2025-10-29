@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     // Send notification message after successful creation
     if (result.id) {
-      console.log(`[APPOINTMENT] Created appointment ${result.id}, attempting to send notification...`);
+
       try {
         // Extract patient and practitioner references from participants
         const patientParticipant = appointmentData.participant?.find((p) =>
@@ -106,14 +106,11 @@ export async function POST(request: NextRequest) {
           p.actor?.reference?.startsWith('Practitioner/')
         );
 
-        console.log(`[APPOINTMENT] Found participants - Patient: ${patientParticipant?.actor?.reference}, Practitioner: ${practitionerParticipant?.actor?.reference}`);
-
         if (patientParticipant && practitionerParticipant) {
           // Send notification based on who created the appointment
           if (session.role === 'patient') {
             // Patient creates appointment → notify provider ONLY (don't notify patient)
             const statusMessage = `New appointment request from ${patientParticipant.actor!.display || 'patient'} - pending approval.`;
-            console.log(`[APPOINTMENT] Creating notification message for provider: "${statusMessage}"`);
 
             // Create status update message for provider
             const notificationResult = await createStatusUpdateMessage(
@@ -126,19 +123,18 @@ export async function POST(request: NextRequest) {
               'practitioner'
             );
 
-            console.log(`[APPOINTMENT] Provider notification created successfully:`, notificationResult.id);
           }
           // Note: Provider creating appointments don't send automatic notifications
           // Notifications are sent when appointment status changes (approve/reject)
         } else {
-          console.log(`[APPOINTMENT] Missing participants - cannot send notification`);
+
         }
       } catch (messageError) {
         // Don't fail the appointment creation if messaging fails
         console.warn('Failed to send appointment notification:', messageError);
       }
     } else {
-      console.log(`[APPOINTMENT] No appointment ID returned, cannot send notification`);
+
     }
 
     return NextResponse.json(result, { status: 201 });

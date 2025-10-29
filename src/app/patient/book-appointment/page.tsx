@@ -222,9 +222,9 @@ function NewBookingFlow() {
   // Auto-proceed when both dialog selections are made
   useEffect(() => {
     if (dialogSpecialty && dialogServiceCategory && pendingPractitioner && showSelectionDialog) {
-      console.log('[DIALOG] Both selections made in useEffect, auto-proceeding...');
+
       const timer = setTimeout(() => {
-        console.log('[DIALOG] Timer fired, checking conditions again');
+
         // Verify conditions still met before proceeding
         if (dialogSpecialty && dialogServiceCategory && pendingPractitioner && showSelectionDialog) {
           // Apply dialog selections to main state
@@ -238,8 +238,6 @@ function NewBookingFlow() {
           // Update draft and navigate to step 2
           const practitionerName = pendingPractitioner.name?.[0]?.text ||
             `${pendingPractitioner.name?.[0]?.given?.join(' ') || ''} ${pendingPractitioner.name?.[0]?.family || ''}`.trim();
-
-          console.log('[DIALOG] Updating draft and navigating to step 2');
 
           // updateDraft now handles URL update automatically when step changes
           updateDraft({
@@ -296,7 +294,7 @@ function NewBookingFlow() {
       });
 
       const filteredCats = Array.from(categories.values());
-      console.log('[DIALOG] Filtered service categories for specialty', dialogSpecialty, ':', filteredCats);
+
       setAvailableServiceCategories(filteredCats);
     } else {
       // No specialty selected - show all service categories
@@ -352,7 +350,7 @@ function NewBookingFlow() {
       });
 
       const filteredSpecs = Array.from(specialties);
-      console.log('[DIALOG] Filtered specialties for category', dialogServiceCategory, ':', filteredSpecs);
+
       setAvailableSpecialties(filteredSpecs);
     } else {
       // No category selected - show all specialties
@@ -386,7 +384,7 @@ function NewBookingFlow() {
     const isStillValid = availableServiceCategories.some(cat => cat.id === dialogServiceCategory);
 
     if (!isStillValid) {
-      console.log('[DIALOG] Service category', dialogServiceCategory, 'is no longer valid for specialty', dialogSpecialty, '- clearing');
+
       setDialogServiceCategory('');
     }
   }, [dialogSpecialty, availableServiceCategories, dialogServiceCategory]);
@@ -399,7 +397,7 @@ function NewBookingFlow() {
     const isStillValid = availableSpecialties.includes(dialogSpecialty);
 
     if (!isStillValid) {
-      console.log('[DIALOG] Specialty', dialogSpecialty, 'is no longer valid for category', dialogServiceCategory, '- clearing');
+
       setDialogSpecialty('');
     }
   }, [dialogServiceCategory, availableSpecialties, dialogSpecialty]);
@@ -407,8 +405,6 @@ function NewBookingFlow() {
   // Sync state with bookingDraft when it changes (from URL or localStorage)
   useEffect(() => {
     if (!isInitialized) return;
-
-    console.log('[SYNC] Syncing with bookingDraft:', bookingDraft);
 
     setCurrentStep(bookingDraft.step || 1);
     setSelectedSpecialty(bookingDraft.specialty || '');
@@ -440,7 +436,6 @@ function NewBookingFlow() {
 
     // Handle practitioner data
     if (bookingDraft.practitionerId && (!selectedPractitioner || selectedPractitioner.id !== bookingDraft.practitionerId)) {
-      console.log('[SYNC] Restoring practitioner from draft:', bookingDraft.practitionerId);
 
       // Create practitioner object from bookingDraft (no API call needed)
       // Step 1 already passed the practitioner name, so we don't need to fetch full details
@@ -456,7 +451,7 @@ function NewBookingFlow() {
           active: true
         };
         setSelectedPractitioner(practitioner);
-        console.log('[SYNC] Set practitioner from draft:', practitioner);
+
       }
     }
   }, [bookingDraft, isInitialized]);
@@ -490,10 +485,7 @@ function NewBookingFlow() {
 
       // Check if month changed
       if (selectedMonthStart.getTime() !== currentMonthStart.getTime()) {
-        console.log('[MONTH CHANGE] Detected month change, fetching new month:', {
-          from: currentMonthStart.toISOString().split('T')[0],
-          to: selectedMonthStart.toISOString().split('T')[0]
-        });
+        
         setCurrentMonth(selectedMonthStart);
         fetchMonthSlots(selectedMonthStart);
       }
@@ -503,13 +495,7 @@ function NewBookingFlow() {
   // Fetch month slots when entering Step 2 or practitioner is set
   useEffect(() => {
     if (currentStep === 2 && selectedPractitioner) {
-      console.log('[MONTH FETCH] Triggering month fetch:', {
-        currentStep,
-        practitionerId: selectedPractitioner.id,
-        currentMonth: currentMonth.toISOString(),
-        specialty: selectedSpecialty,
-        serviceCategory: selectedServiceCategory
-      });
+      
       fetchMonthSlots(currentMonth);
     }
   }, [currentStep, selectedPractitioner]);
@@ -553,8 +539,6 @@ function NewBookingFlow() {
       if ((currentStep !== 3 && currentStep !== 4) || !selectedSlotId || !selectedDate || !selectedTime) {
         return;
       }
-
-      console.log(`[VALIDATION] Validating slot ${selectedSlotId}, date ${selectedDate}, time ${selectedTime} on Step ${currentStep}`);
 
       try {
         const response = await fetch(`/api/fhir/Slot/${selectedSlotId}`, {
@@ -625,7 +609,7 @@ function NewBookingFlow() {
           //   variant: 'default',
           // });
         } else {
-          console.log('[VALIDATION] Slot is available and date/time match');
+
         }
       } catch (error) {
         console.error('[VALIDATION] Error validating slot:', error);
@@ -646,12 +630,6 @@ function NewBookingFlow() {
     if (cachedPractitionersWithSchedules.length === 0) {
       return [];
     }
-
-    console.log('🔍 [CLIENT FILTER] Filtering cached results with:', {
-      specialty: selectedSpecialty,
-      serviceCategory: selectedServiceCategory,
-      serviceType: selectedServiceType
-    });
 
     // Convert UI labels to FHIR codes using centralized helper
     const specialtyCode = selectedSpecialty ? getSpecialtyCode(selectedSpecialty) : undefined;
@@ -712,7 +690,6 @@ function NewBookingFlow() {
       });
     });
 
-    console.log('🔍 [CLIENT FILTER] Filtered from', cachedPractitionersWithSchedules.length, 'to', filtered.length, 'practitioners');
     return filtered;
   };
 
@@ -732,7 +709,7 @@ function NewBookingFlow() {
   useEffect(() => {
     // Only apply filters in Step 1
     if (currentStep !== 1) {
-      console.log('🔍 [SKIP] Not in Step 1, skipping filter application');
+
       return;
     }
 
@@ -745,7 +722,7 @@ function NewBookingFlow() {
 
       if (cachedPractitionersWithSchedules.length > 0 && filterIncreased) {
         // Adding more filters - use client-side filtering on cached results
-        console.log('🔍 [OPTIMIZATION] Filter added, using cached results for client-side filtering');
+
         setLoading(true);
         const filtered = filterCachedResults();
         setAllPractitioners(filtered);
@@ -753,13 +730,13 @@ function NewBookingFlow() {
         setLoading(false);
       } else {
         // First filter OR filter was removed/changed - fetch from API
-        console.log('🔍 [API CALL] First filter or filter changed, fetching from API');
+
         setCurrentPage(1);
         applyServiceFilters();
       }
     } else {
       // No filters active, clear cache and fetch all practitioners
-      console.log('🔍 [RESET] No filters active, clearing cache');
+
       setCachedPractitionersWithSchedules([]);
       setCurrentPage(1);
       fetchAllPractitioners();
@@ -801,11 +778,6 @@ function NewBookingFlow() {
     setCurrentPage(1); // Reset to first page when filtering
 
     try {
-      console.log('🔍 [FILTER] Starting server-side filter with:', {
-        specialty: selectedSpecialty,
-        serviceCategory: selectedServiceCategory,
-        serviceType: selectedServiceType
-      });
 
       // Convert UI labels to FHIR codes using centralized helper
       const specialtyCodeForFilter = selectedSpecialty ? getSpecialtyCode(selectedSpecialty) : undefined;
@@ -851,7 +823,6 @@ function NewBookingFlow() {
       }
 
       const scheduleUrl = `/api/fhir/Schedule?${params.toString()}`;
-      console.log('🔍 [FILTER] Server-side query URL:', scheduleUrl);
 
       const schedulesResponse = await fetch(scheduleUrl, { credentials: 'include' });
 
@@ -864,10 +835,8 @@ function NewBookingFlow() {
       const schedulesBundle = await schedulesResponse.json();
       const matchingSchedules = schedulesBundle.entry?.map((e: any) => e.resource) || [];
 
-      console.log('🔍 [FILTER] Server returned', matchingSchedules.length, 'matching schedules');
-
       if (matchingSchedules.length === 0) {
-        console.log('🔍 [FILTER] No schedules match the selected filters');
+
         setAllPractitioners([]);
         return;
       }
@@ -894,8 +863,6 @@ function NewBookingFlow() {
         });
       });
 
-      console.log('🔍 [FILTER] Found', practitionerIds.size, 'unique practitioners');
-
       // Fetch practitioner details using batch request (much more efficient!)
       try {
         const idsParam = Array.from(practitionerIds).join(',');
@@ -918,8 +885,6 @@ function NewBookingFlow() {
           matchingSchedules: schedulesByPractitioner.get(practitioner.id) || []
         }));
 
-        console.log('🔍 [FILTER] Returning', practitionersWithSchedules.length, 'practitioners with matching schedules');
-
         // Cache the full results for future client-side filtering
         setCachedPractitionersWithSchedules(practitionersWithSchedules);
         setAllPractitioners(practitionersWithSchedules);
@@ -936,7 +901,6 @@ function NewBookingFlow() {
     }
   };
 
-
   // Fetch slots for entire month in two halves (1-15 and 16-end) with caching
   const fetchMonthSlots = async (monthStart: Date, skipCache: boolean = false) => {
     if (!selectedPractitioner || currentStep !== 2) return;
@@ -947,14 +911,12 @@ function NewBookingFlow() {
     // Check cache first (unless skipCache is true for auto-updates)
     if (!skipCache && monthSlotCache.current.has(monthKey)) {
       const cachedSlots = monthSlotCache.current.get(monthKey)!;
-      console.log(`[MONTH SLOTS] Using cached ${cachedSlots.length} slots for ${monthKey}`);
+
       setMonthSlots(cachedSlots);
       updateDatesWithSlots(cachedSlots);
       filterSlotsForSelectedDate(cachedSlots);
       return;
     }
-
-    console.log(`[MONTH SLOTS] ${skipCache ? 'Auto-update:' : 'Initial fetch:'} Fetching fresh data for ${monthKey}`);
 
     try {
       // Calculate month boundaries
@@ -973,9 +935,8 @@ function NewBookingFlow() {
       const nextMonthFirst = new Date(year, month + 1, 1);
       nextMonthFirst.setHours(0, 0, 0, 0);
 
-      console.log(`[MONTH SLOTS] Fetching for ${year}-${month + 1}:`);
-      console.log(`[MONTH SLOTS]   First half: ${firstDay.toISOString().split('T')[0]} to ${sixteenthDay.toISOString().split('T')[0]}`);
-      console.log(`[MONTH SLOTS]   Second half: ${sixteenthDay.toISOString().split('T')[0]} to ${nextMonthFirst.toISOString().split('T')[0]}`);
+      
+      
 
       // Prepare slot API parameters for first half (1-15)
       const firstHalfParams = new URLSearchParams({
@@ -1012,7 +973,7 @@ function NewBookingFlow() {
       secondHalfParams.append('start', `lt${nextMonthFirst.toISOString()}`);
 
       // Fetch both halves in parallel
-      console.log('[MONTH SLOTS] Fetching both halves in parallel...');
+
       const [firstHalfResponse, secondHalfResponse] = await Promise.all([
         fetch(`/api/fhir/Slot?${firstHalfParams.toString()}`, { credentials: 'include' }),
         fetch(`/api/fhir/Slot?${secondHalfParams.toString()}`, { credentials: 'include' })
@@ -1036,9 +997,9 @@ function NewBookingFlow() {
       // Combine both halves
       const allSlots = [...firstHalfSlots, ...secondHalfSlots];
 
-      console.log(`[MONTH SLOTS] Fetched ${allSlots.length} total slots (first half: ${firstHalfSlots.length}, second half: ${secondHalfSlots.length})`);
+      
       if (allSlots.length > 0) {
-        console.log(`[MONTH SLOTS] First slot sample:`, allSlots[0]);
+
       }
 
       // Cache the combined results
@@ -1050,10 +1011,9 @@ function NewBookingFlow() {
         scrollY = window.scrollY;
       }
 
-      console.log(`[MONTH SLOTS] Setting monthSlots state to ${allSlots.length} slots`);
       setMonthSlots(allSlots);
       updateDatesWithSlots(allSlots);
-      console.log(`[MONTH SLOTS] Calling filterSlotsForSelectedDate for date:`, selectedDate);
+
       filterSlotsForSelectedDate(allSlots);
 
       // Restore scroll position after state update (on next tick)
@@ -1079,16 +1039,15 @@ function NewBookingFlow() {
         dates.add(dateStr);
       }
     });
-    console.log('[UPDATE DATES] Found slots on', dates.size, 'unique dates:', Array.from(dates).sort());
+    
     setDatesWithSlots(dates);
   };
 
   // Filter month slots to selected date and extract unique service types
   const filterSlotsForSelectedDate = (slots: Slot[]) => {
-    console.log('[FILTER SLOTS] Filtering for date:', selectedDate, 'from', slots.length, 'slots');
 
     if (!selectedDate) {
-      console.log('[FILTER SLOTS] No date selected, clearing slots');
+
       setAvailableSlots([]);
       return;
     }
@@ -1118,7 +1077,7 @@ function NewBookingFlow() {
 
         if (slots.indexOf(slot) < 3) {
           // Log first 3 slots for debugging
-          console.log('[FILTER SLOTS] Sample slot:', slot.id, 'start:', slot.start, 'extracted date:', slotDateStr, 'is past:', isPastSlot);
+
         }
 
         return !isPastSlot;
@@ -1133,8 +1092,8 @@ function NewBookingFlow() {
       return new Date(a.start).getTime() - new Date(b.start).getTime();
     });
 
-    console.log('[FILTER SLOTS] Filtered to', sorted.length, 'slots for', selectedDate, isToday ? '(today - past slots excluded)' : '');
-    console.log('[FILTER SLOTS] Setting availableSlots to', sorted.length, 'sorted slots');
+    
+
     setAvailableSlots(sorted);
   };
 
@@ -1203,7 +1162,7 @@ function NewBookingFlow() {
 
           // OPTIMIZED: Use _include to fetch practitioners with schedules in single request
           const scheduleUrl = `/api/fhir/Schedule?${scheduleParams.toString()}&${nameParams}&_include=Schedule:actor:Practitioner`;
-          console.log('[SEARCH] 🚀 Searching schedules with _include (single request):', scheduleUrl);
+          
 
           const schedulesResponse = await fetch(scheduleUrl, { credentials: 'include' });
 
@@ -1231,8 +1190,6 @@ function NewBookingFlow() {
               }
             });
           }
-
-          console.log(`[SEARCH] ✅ Single request result: ${matchingSchedules.length} schedules, ${practitionersMap.size} practitioners`);
 
           // Set practitioners from the included resources
           if (practitionersMap.size > 0) {
@@ -1314,8 +1271,6 @@ function NewBookingFlow() {
           const bundle = await response.json();
           const schedules = bundle.entry?.map((e: any) => e.resource) || [];
 
-          console.log('[DIALOG] Fetched schedules for practitioner:', schedules);
-
           // Store raw schedules for dynamic filtering
           setPractitionerSchedules(schedules);
 
@@ -1361,9 +1316,6 @@ function NewBookingFlow() {
           const availableSpecs = Array.from(specialties);
           const availableCats = Array.from(categories.values());
 
-          console.log('[DIALOG] Extracted ALL specialties:', availableSpecs);
-          console.log('[DIALOG] Extracted ALL categories:', availableCats);
-
           setAvailableSpecialties(availableSpecs);
           setAvailableServiceCategories(availableCats);
           setIsLoadingSchedules(false);
@@ -1389,7 +1341,6 @@ function NewBookingFlow() {
     }
   };
 
-
   // Can proceed if practitioner selected (service details are optional)
   const canProceedStep1 = selectedPractitioner !== null;
   const canProceedStep2 = selectedDate && selectedTime && selectedSlotId && selectedServiceType;
@@ -1397,12 +1348,7 @@ function NewBookingFlow() {
 
   // Debug logging for Step 2 validation
   if (currentStep === 2) {
-    console.log('[VALIDATION] Step 2 can proceed:', canProceedStep2, {
-      selectedDate: selectedDate || 'MISSING',
-      selectedTime: selectedTime || 'MISSING',
-      selectedSlotId: selectedSlotId || 'MISSING',
-      selectedServiceType: selectedServiceType || 'MISSING'
-    });
+
   }
 
   const handleNext = () => {
@@ -1550,15 +1496,11 @@ function NewBookingFlow() {
         description: symptoms || reasonForVisit
       };
 
-      console.log('[BOOKING] Creating appointment with data:', appointmentRequestData);
-
       const response = await fetch('/api/fhir/Appointment', {
         method: 'POST',
         credentials: 'include',
         body: JSON.stringify(appointmentRequestData),
       });
-
-      console.log('[BOOKING] Response status:', response.status);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -1567,7 +1509,6 @@ function NewBookingFlow() {
       }
 
       const result = await response.json();
-      console.log('Appointment created successfully:', result);
 
       // Show success toast
       toast.success("✅ Appointment Booked Successfully!", {
@@ -2067,13 +2008,6 @@ function NewBookingFlow() {
                       // Use default service type since we no longer fetch schedules
                       const serviceType = 'general';
 
-                      console.log('[SLOT SELECT]', {
-                        time,
-                        slotId,
-                        date: slotDate,
-                        serviceType
-                      });
-
                       // Update state
                       setSelectedTime(time);
                       setSelectedSlotId(slotId);
@@ -2334,7 +2268,7 @@ function NewBookingFlow() {
                           <button
                             key={specialty}
                             onClick={() => {
-                              console.log('[DIALOG] Specialty clicked:', specialty);
+
                               setDialogSpecialty(specialty);
                               // Auto-expand service category section if not selected
                               if (!dialogServiceCategory) {
@@ -2390,7 +2324,7 @@ function NewBookingFlow() {
                           <button
                             key={category.id}
                             onClick={() => {
-                              console.log('[DIALOG] Service category clicked:', category.id);
+
                               setDialogServiceCategory(category.id);
                               // Auto-expand specialty section if not selected
                               if (!dialogSpecialty) {

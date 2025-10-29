@@ -141,12 +141,12 @@ export default function PractitionerManagement() {
 
       if (linkUrl) {
         // PAGINATION: Use the link URL from FHIR response
-        console.log('[Pagination] Using link URL:', linkUrl);
+
         const url = new URL(linkUrl);
         apiUrl = `/api/fhir/data?${url.searchParams.toString()}`;
       } else {
         // SEARCH: Build URL with filters
-        console.log('[Search] Building search URL with filters:', filters, 'sort:', sort);
+
         const params = new URLSearchParams();
         params.append('_count', '50');
 
@@ -191,18 +191,13 @@ export default function PractitionerManagement() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          console.log('Authentication required, middleware will redirect');
+
           return;
         }
         throw new Error(`Failed to fetch practitioners: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log('[Fetch] Result:', {
-        count: result.practitioners?.length || result.entry?.length,
-        total: result.total,
-        hasNext: !!result.links?.next
-      });
 
       // Handle both API response formats (/practitioners vs /data)
       const practitioners = result.practitioners || result.entry?.map((e: any) => e.resource) || [];
@@ -220,7 +215,6 @@ export default function PractitionerManagement() {
       // STAGE 2: Fetch total count if there's more data (next link exists)
       // Only do this on initial search, not on pagination
       if (!linkUrl && links.next) {
-        console.log('[Total Count] Fetching total count by jumping to end...');
 
         // IMPORTANT: Use the 'next' link from FIRST API response
         // This preserves the _getpages session ID and all search params from the first API
@@ -231,7 +225,7 @@ export default function PractitionerManagement() {
         // The last page will have no entries but will include the total count
         params.set('_getpagesoffset', '1000000');
 
-        console.log('[Total Count] Fetching with offset=1000000 to get total:', params.toString());
+        
 
         const totalResponse = await fetch(`/api/fhir/data?${params.toString()}`, {
           method: 'GET',
@@ -240,7 +234,7 @@ export default function PractitionerManagement() {
 
         if (totalResponse.ok) {
           const totalResult = await totalResponse.json();
-          console.log('[Total Count] Received total:', totalResult.total);
+
           // Only update total count, don't update practitioners (we already have first page rendered)
           setTotalCount(totalResult.total || 0);
         }
@@ -367,8 +361,6 @@ export default function PractitionerManagement() {
       if (!response.ok) {
         throw new Error(`Failed to delete practitioner: ${response.status}`);
       }
-
-      console.log('Practitioner deleted successfully');
 
       // Refresh the list
       fetchPractitioners();

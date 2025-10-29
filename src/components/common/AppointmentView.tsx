@@ -192,7 +192,6 @@ export default function AppointmentView(props: AppointmentViewProps) {
         appointmentStartTime = fallbackDate.toISOString();
         appointmentEndTime = new Date(fallbackDate.getTime() + (30 * 60 * 1000)).toISOString();
 
-        console.log('Parsed time:', { selectedTime, hours, minutes, appointmentStartTime });
       }
 
       const appointmentRequestData = {
@@ -227,7 +226,6 @@ export default function AppointmentView(props: AppointmentViewProps) {
       }
 
       const result = await response.json();
-      console.log('Appointment created successfully:', result);
 
       router.push('/patient/dashboard?booking=success');
 

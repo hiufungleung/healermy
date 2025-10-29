@@ -26,15 +26,7 @@ function LaunchContent() {
       const isStandaloneLaunch = !launchToken;
 
       // Log launch parameters for debugging
-      console.log('🔍 Launch parameters:', {
-        iss,
-        launchToken,
-        requestedRole,
-        isStandaloneLaunch,
-        currentUrl: window.location.href,
-        referrer: document.referrer,
-        allSearchParams: Object.fromEntries(searchParams.entries())
-      });
+      
 
       if (!iss) {
         setError('Missing ISS parameter (FHIR server URL). Please provide the FHIR server URL.');
@@ -49,17 +41,17 @@ function LaunchContent() {
       if (!selectedRole) {
         // Check if role was already selected (stored from previous selection)
         if (storedRole) {
-          console.log('🔐 Using stored role from sessionStorage:', storedRole);
+
           setSelectedRole(storedRole);
           currentRole = storedRole;
         } else if (requestedRole) {
           // Support old URL format with role parameter
-          console.log('🔐 Using role from URL parameter:', requestedRole);
+
           setSelectedRole(requestedRole);
           currentRole = requestedRole;
         } else {
           // No role selected - show selection screen
-          console.log('🔐 No role selected, showing role selection screen');
+
           setShowRoleSelection(true);
           return;
         }
@@ -68,18 +60,16 @@ function LaunchContent() {
       }
 
       // Discover SMART endpoints from the provided ISS
-      console.log('🔍 Discovering SMART endpoints for:', iss);
-      
+
       const wellKnownUrl = `${iss}/.well-known/smart-configuration`;
-      console.log('🔍 Fetching well-known config from:', wellKnownUrl);
-      
+
       const response = await fetch(wellKnownUrl);
       if (!response.ok) {
         throw new Error(`Failed to fetch SMART configuration: ${response.status}`);
       }
       
       const smartConfig = await response.json();
-      console.log('✅ SMART configuration discovered:', smartConfig);
+
       const authorizeUrl = smartConfig.authorization_endpoint;
       const tokenUrl = smartConfig.token_endpoint;
       const revokeUrl = smartConfig.revocation_endpoint; // Store revoke endpoint
@@ -97,7 +87,7 @@ function LaunchContent() {
       }
 
       const config = await configResponse.json();
-      console.log(`Smart config for role ${currentRole}:`, config);
+
       if (!config) {
         setError('Invalid auth configuration received.');
         return;
@@ -127,14 +117,7 @@ function LaunchContent() {
           sessionStorage.setItem('auth_launch', launchToken);
         }
         sessionStorage.setItem('auth_role', currentRole);
-        
-        console.log('🚀 Starting SMART authorization with:', {
-          clientId: config.clientId,
-          scope: config.scope,
-          redirectUri: config.redirectUri,
-          iss
-        });
-        
+
         // Generate random state for CSRF protection
         const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
@@ -186,8 +169,6 @@ function LaunchContent() {
           throw new Error('Failed to store OAuth state');
         }
 
-        console.log('✅ OAuth state stored securely on server');
-
         // Construct authorization URL
         const params = new URLSearchParams({
           response_type: 'code',
@@ -210,13 +191,7 @@ function LaunchContent() {
         }
         
         const fullAuthorizeUrl = `${authorizeUrl}?${params.toString()}`;
-        
-        console.log('🔧 Using discovered SMART endpoints:', {
-          authorizeUrl,
-          tokenUrl,
-          fullUrl: fullAuthorizeUrl
-        });
-        
+
         // Direct redirect using discovered authorization endpoint
         window.location.href = fullAuthorizeUrl;
           

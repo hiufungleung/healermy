@@ -22,9 +22,6 @@ export async function GET(request: NextRequest) {
     const fhirUrl = `${baseUrl}/data?${searchParams.toString()}`;
     const token = prepareToken(session.accessToken);
 
-    console.log('[/api/fhir/data] Base URL:', baseUrl);
-    console.log('[/api/fhir/data] Full URL:', fhirUrl);
-
     const response = await FHIRClient.fetchWithAuth(fhirUrl, token);
     const fhirBundle = await response.json();
 

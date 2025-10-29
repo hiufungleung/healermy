@@ -226,7 +226,6 @@ export function CreateScheduleForm({
               </Select>
             </div>
 
-
             {/* Service Category */}
             <div className="space-y-2">
               <Label htmlFor="serviceCategory">Service Category <span className="text-destructive">*</span></Label>

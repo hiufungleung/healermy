@@ -186,7 +186,7 @@ export async function manageSlotStatusForAppointment(
     for (const slotId of slotIds) {
       try {
         await updateSlotStatus(token, fhirBaseUrl, slotId, targetSlotStatus);
-        console.log(`Updated slot ${slotId} from ${oldSlotStatus} to ${targetSlotStatus} (appointment ${appointment.id}: ${oldStatus} -> ${currentStatus})`);
+        
       } catch (error) {
         console.error(`Failed to update slot ${slotId} status:`, error);
         // Continue with other slots even if one fails

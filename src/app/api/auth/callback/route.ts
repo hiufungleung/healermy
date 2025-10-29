@@ -12,7 +12,6 @@ export async function GET(request: NextRequest) {
 
     // Get the correct base URL (handles reverse proxy)
     const baseUrl = getPublicBaseUrl(request);
-    console.log('[CALLBACK] Using base URL:', baseUrl);
 
     // Check for OAuth errors first
     if (error) {
@@ -53,7 +52,7 @@ export async function GET(request: NextRequest) {
       callbackUrl.searchParams.set('state', state);
     }
 
-    console.log('[CALLBACK] Redirecting to:', callbackUrl.toString());
+    
     return NextResponse.redirect(callbackUrl);
   } catch (error) {
     console.error('Callback error:', error);

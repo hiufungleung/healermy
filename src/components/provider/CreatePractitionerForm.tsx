@@ -56,7 +56,6 @@ interface PractitionerFormData {
   active: boolean;
 }
 
-
 export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePractitionerFormProps) {
   const [formData, setFormData] = useState<PractitionerFormData>({
     prefix: '',
@@ -85,7 +84,6 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
-
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -198,8 +196,6 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
         ],
       };
 
-      console.log('Creating practitioner with data:', practitionerResource);
-
       const response = await fetch('/api/fhir/Practitioner', {
         method: 'POST',
         headers: {
@@ -215,7 +211,6 @@ export function CreatePractitionerForm({ isOpen, onClose, onSuccess }: CreatePra
       }
 
       const result = await response.json();
-      console.log('Practitioner created successfully:', result);
 
       onSuccess();
       onClose();

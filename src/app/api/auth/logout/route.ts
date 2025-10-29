@@ -42,7 +42,7 @@ export async function POST() {
             if (!revokeResponse.ok) {
               console.warn(`Token revocation failed: ${revokeResponse.status}`);
             } else {
-              console.log('✅ Token revoked successfully');
+
             }
           } else {
             console.warn('⚠️  Client credentials not found in environment - skipping token revocation');

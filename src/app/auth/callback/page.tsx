@@ -11,21 +11,17 @@ export default function CallbackPage() {
   const executedRef = useRef(false);
 
   useEffect(() => {
-    console.log('[CALLBACK] useEffect triggered, executedRef.current:', executedRef.current);
 
     // Prevent double execution
     if (executedRef.current) {
-      console.log('[CALLBACK] ⏭️  Already executed, skipping');
+
       return;
     }
 
-    console.log('[CALLBACK] ✅ Setting executedRef to true');
     executedRef.current = true;
 
     const completeAuth = async () => {
       try {
-        console.log('[CALLBACK] 🎯 Starting callback authentication');
-        console.log('[CALLBACK] 🔍 Current URL:', window.location.href);
 
         // Check for OAuth parameters
         const urlParams = new URLSearchParams(window.location.search);
@@ -35,16 +31,13 @@ export default function CallbackPage() {
 
         // If no OAuth parameters, this is likely a page reload/navigation after auth completed
         if (!code && !state && !error) {
-          console.log('[CALLBACK] ⚠️  No OAuth parameters found in URL');
-          console.log('[CALLBACK] 🔄 This is likely a page reload or navigation back to callback');
-          console.log('[CALLBACK] ⏭️  Redirecting to home (middleware will handle dashboard redirect)');
+
+          
 
           // Redirect to home page - middleware will redirect to appropriate dashboard
           router.push('/');
           return;
         }
-
-        console.log('[CALLBACK] ✅ OAuth parameters found, proceeding with authentication flow');
 
         // Get additional OAuth parameters
         const errorUri = urlParams.get('error_uri');
@@ -72,7 +65,7 @@ export default function CallbackPage() {
               if (stateResponse.ok) {
                 const stateData = await stateResponse.json();
                 trustedIssuer = stateData.iss || null;
-                console.log('✅ Retrieved trusted issuer for error validation:', trustedIssuer);
+
               }
             } catch (err) {
               console.warn('⚠️  Could not retrieve issuer for error_uri validation, will reject error_uri');
@@ -128,14 +121,11 @@ export default function CallbackPage() {
         }
         
         // Retrieve OAuth state from server (secure, encrypted cookie)
-        console.log('[CALLBACK] 🔍 Retrieving OAuth state from server for state:', receivedState?.substring(0, 8) + '...');
-        console.log('[CALLBACK] 📡 Calling /api/auth/retrieve-state?state=' + receivedState);
+        
 
         const retrieveStateResponse = await fetch(`/api/auth/retrieve-state?state=${receivedState}`, {
           credentials: 'include'
         });
-
-        console.log('[CALLBACK] 📥 retrieve-state response status:', retrieveStateResponse.status);
 
         if (!retrieveStateResponse.ok) {
           const errorData = await retrieveStateResponse.json().catch(() => ({ error: 'Unknown error' }));
@@ -144,7 +134,7 @@ export default function CallbackPage() {
         }
 
         const stateData = await retrieveStateResponse.json();
-        console.log('[CALLBACK] ✅ OAuth state retrieved from server:', Object.keys(stateData));
+        
 
         const { iss, role: storedRole, codeVerifier, tokenUrl, revokeUrl, launchToken } = stateData;
 
@@ -161,13 +151,6 @@ export default function CallbackPage() {
         const config = await configResponse.json();
         const clientId = config.clientId;
         const redirectUri = config.redirectUri;
-        
-        console.log('🔄 Server-side token exchange:', {
-          tokenUrl,
-          clientId,
-          iss,
-          hasPKCE: !!codeVerifier
-        });
 
         // Use server-side token exchange to avoid CORS issues
         // Note: clientSecret is retrieved server-side, never exposed to browser
@@ -192,17 +175,8 @@ export default function CallbackPage() {
         }
         
         const tokenData = await tokenExchangeResponse.json();
-        console.log('✅ Token exchange successful');
-        console.log('📋 Available token data fields:', Object.keys(tokenData));
-        console.log('📋 Token context:', {
-          patient: tokenData.patient,
-          user: tokenData.user,
-          fhirUser: tokenData.fhirUser,
-          encounter: tokenData.encounter,
-          username: tokenData.username,
-          scope: tokenData.scope,
-          id_token: tokenData.id_token ? 'present' : 'missing'
-        });
+
+        
 
         // Decode ID token to extract user identity claims (profile, fhirUser)
         let idTokenClaims: any = {};
@@ -215,13 +189,7 @@ export default function CallbackPage() {
               // Base64 decode (handle URL-safe base64)
               const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
               idTokenClaims = JSON.parse(decodedPayload);
-              console.log('🔐 ID Token claims decoded:', {
-                profile: idTokenClaims.profile,
-                fhirUser: idTokenClaims.fhirUser,
-                displayName: idTokenClaims.displayName,
-                email: idTokenClaims.email,
-                sub: idTokenClaims.sub
-              });
+
             }
           } catch (error) {
             console.error('❌ Failed to decode ID token:', error);
@@ -233,7 +201,6 @@ export default function CallbackPage() {
         if (!role || !['patient', 'provider'].includes(role)) {
           throw new Error('Invalid or missing role selection from launch');
         }
-        console.log(`🎯 Using selected role: ${role}`);
 
         // Validate role selection against token data
         if (role === 'patient' && !tokenData.patient) {
@@ -243,24 +210,18 @@ export default function CallbackPage() {
 
         // Log context information
         if (tokenData.user) {
-          console.log('👨‍⚕️ User context available, user ID:', tokenData.user);
+
         }
         if (tokenData.patient) {
-          console.log('🏥 Patient context available, patient ID:', tokenData.patient);
+
         }
         if (tokenData.fhirUser) {
-          console.log('👤 fhirUser context available:', tokenData.fhirUser);
+
         }
 
         // Create complete session data - URLs stored in session cookie
         // Note: clientSecret is NOT included here - it's only used server-side for token refresh
-        console.log('⏰ Token expiry calculation:', {
-          expires_in_from_token: tokenData.expires_in,
-          expires_in_used: tokenData.expires_in || 3600,
-          current_time: new Date().toISOString(),
-          expires_at: new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString(),
-          expires_at_timestamp: Date.now() + (tokenData.expires_in || 3600) * 1000
-        });
+        
 
         const sessionData = {
           role,
@@ -282,8 +243,6 @@ export default function CallbackPage() {
           tenant: tokenData.tenant,
         };
 
-        console.log('📝 Storing session data');
-        
         // Store session in a secure cookie via API
         const sessionResponse = await fetch('/api/auth/create-session', {
           method: 'POST',
@@ -301,14 +260,12 @@ export default function CallbackPage() {
         sessionStorage.removeItem('auth_launch');
         sessionStorage.removeItem('auth_role');
 
-        console.log('[CALLBACK] ✅ OAuth state cleaned up (server-side cookie deleted)');
-        console.log('[CALLBACK] 🚀 Authentication successful, redirecting...');
+        
 
         // Use window.location.href for full page redirect to prevent re-renders
         // This ensures the callback page doesn't run again with the same OAuth params
         const dashboardPath = role === 'provider' ? '/provider/dashboard' : '/patient/dashboard';
 
-        console.log('[CALLBACK] 🔄 Full page redirect to:', dashboardPath);
         window.location.href = dashboardPath;
         
       } catch (err) {

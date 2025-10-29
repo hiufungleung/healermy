@@ -404,16 +404,12 @@ export function GenerateSlotsForm({
         }
       }
 
-      console.log(`Generated ${slotsToCreate.length} potential slots...`);
-
       // Check if we have any slots to create
       if (slotsToCreate.length === 0) {
         throw new Error('No slots were generated. Please check your date range and time settings.');
       }
 
       // CONFLICT DETECTION: Check for existing slots in the date/time range
-      console.log('\n========== CONFLICT DETECTION START ==========');
-      console.log('[CONFLICT CHECK] 🔍 Checking for existing slots...');
 
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = endDate.toISOString().split('T')[0];
@@ -425,15 +421,6 @@ export function GenerateSlotsForm({
 
       const slotCheckStart = createFHIRDateTime(startDateStr, '00:00');
       const slotCheckEnd = createFHIRDateTime(endCheckStr, '00:00');
-
-      console.log('[CONFLICT CHECK] 📅 Date Range:', {
-        startDateStr,
-        endDateStr,
-        endCheckStr,
-        slotCheckStart,
-        slotCheckEnd,
-        scheduleId: formData.scheduleId
-      });
 
       try {
         // Fetch existing slots using FHIR API with pagination support
@@ -492,13 +479,11 @@ export function GenerateSlotsForm({
           apiUrl = nextLink?.url || '';
         }
 
-        console.log(`[CONFLICT CHECK] Fetched ${allSlots.length} slots from ${pageCount} page(s)`);
+        
 
         // Use ALL slots from ALL schedules for conflict detection
         // A practitioner cannot have overlapping slots across different schedules
         const existingSlots = allSlots;
-
-        console.log(`[CONFLICT CHECK] ✅ Checking ${slotsToCreate.length} new slots against ${existingSlots.length} existing slots across ALL practitioner schedules`);
 
         // Find conflicts - check for TIME OVERLAPS across ALL schedules
         // Two slots overlap if: newStart < existingEnd AND newEnd > existingStart
@@ -531,15 +516,9 @@ export function GenerateSlotsForm({
           }
         });
 
-        console.log(`\n[CONFLICT CHECK] 📊 Final Results:`);
-        console.log(`  Total new slots: ${slotsToCreate.length}`);
-        console.log(`  Existing slots in range: ${existingSlots.length}`);
-        console.log(`  Conflicts found: ${conflicts.length}`);
-        console.log(`  Non-conflicting: ${nonConflicting.length}`);
-
         if (conflicts.length > 0) {
           console.warn(`[CONFLICT CHECK] ⚠️ Found ${conflicts.length} conflicting slots`);
-          console.log('========== CONFLICT DETECTION END (CONFLICTS FOUND) ==========\n');
+          
 
           // Show AlertDialog for user to decide
           setConflictInfo({
@@ -551,12 +530,12 @@ export function GenerateSlotsForm({
           setLoading(false);
           return; // Wait for user decision
         } else {
-          console.log('[CONFLICT CHECK] ✅ No conflicts found');
-          console.log('========== CONFLICT DETECTION END (NO CONFLICTS) ==========\n');
+
+          
         }
       } catch (error) {
         console.error('[CONFLICT CHECK] Error checking for conflicts:', error);
-        console.log('========== CONFLICT DETECTION END (ERROR) ==========\n');
+        
         // Continue anyway - better to create slots than fail completely
       }
 
@@ -581,8 +560,6 @@ export function GenerateSlotsForm({
           }
         }))
       };
-
-      console.log(`[BATCH] Sending batch request with ${bundle.entry.length} slots`);
 
       // Send single batch request to FHIR server
       const createdSlots: any[] = [];
@@ -656,7 +633,6 @@ export function GenerateSlotsForm({
       const createdCount = createdSlots.length;
       const failedCount = failedSlots.length;
 
-      console.log(`✅ Created ${createdCount} slots`);
       if (failedCount > 0) {
         console.warn(`❌ Failed to create ${failedCount} slots`);
         failedSlots.forEach((failure, index) => {
@@ -726,7 +702,6 @@ export function GenerateSlotsForm({
     setLoading(true);
 
     try {
-      console.log(`[CONFLICT CHECK] ✅ User confirmed: Proceeding with ${conflictInfo.nonConflictingCount} non-conflicting slots`);
 
       // Re-submit the form using only non-conflicting slots
       // We need to manually execute the slot creation logic
@@ -816,7 +791,7 @@ export function GenerateSlotsForm({
       const createdCount = createdSlots.length;
       const failedCount = failedSlots.length;
 
-      console.log(`✅ Created ${createdCount} slots (skipped ${conflictInfo.conflictCount} conflicts)`);
+      
       if (failedCount > 0) {
         console.warn(`❌ Failed to create ${failedCount} slots`);
       }

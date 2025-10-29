@@ -119,8 +119,6 @@ export default function PractitionerDetailClient({
       return; // No past free slots to update
     }
 
-    console.log(`🔄 Marking ${pastFreeSlots.length} past free slots as busy-unavailable...`);
-
     // Update slots in parallel
     const updatePromises = pastFreeSlots.map(async (slot) => {
       if (!slot.id) return;
@@ -151,14 +149,14 @@ export default function PractitionerDetailClient({
     });
 
     await Promise.all(updatePromises);
-    console.log(`✅ Marked ${pastFreeSlots.length} past slots as busy-unavailable`);
+
   };
 
   // Load practitioner name in background
   useEffect(() => {
     const fetchPractitionerName = async () => {
       try {
-        console.log('🔄 Loading practitioner name...');
+
         const response = await fetch(`/api/fhir/Practitioner/${practitionerId}`, {
           method: 'GET',
           credentials: 'include',
@@ -173,7 +171,7 @@ export default function PractitionerDetailClient({
             const fullName = `${prefix} ${given} ${family}`.trim();
             if (fullName) {
               onPractitionerNameUpdate(fullName);
-              console.log('✅ Updated practitioner name:', fullName);
+
             }
           }
         }
@@ -192,7 +190,7 @@ export default function PractitionerDetailClient({
       if (activeTab !== 'calendar') return;
 
       try {
-        console.log('🔄 Loading schedules for Generate Slots form...');
+
         const params = new URLSearchParams();
         params.append('actor', `Practitioner/${practitionerId}`);
 
@@ -205,7 +203,7 @@ export default function PractitionerDetailClient({
           const bundle = await response.json();
           const fetchedSchedules: Schedule[] = bundle.entry?.map((e: any) => e.resource) || [];
           setSchedules(fetchedSchedules);
-          console.log('✅ Loaded schedules for slots tab:', fetchedSchedules.length);
+
         }
       } catch (error) {
         console.error('Error fetching schedules:', error);
@@ -239,7 +237,7 @@ export default function PractitionerDetailClient({
 
     setLoadingSlotsForStats(true);
     try {
-      console.log('🔄 Loading slots for stats display...');
+
       const scheduleIds = schedules.map(s => s.id).filter(Boolean);
       if (scheduleIds.length === 0) {
         setLoadingSlotsForStats(false);
@@ -266,7 +264,6 @@ export default function PractitionerDetailClient({
       const allSlots = slotArrays.flat();
       setSlots(allSlots);
       setSlotsLoaded(true);
-      console.log('✅ Loaded slots for stats:', allSlots.length);
 
       // Mark past free slots as busy-unavailable
       await markPastSlotsAsBusy(allSlots);

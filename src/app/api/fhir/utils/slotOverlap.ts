@@ -139,7 +139,6 @@ export async function fetchSlotsInRangeForPractitioner(
 
   // Step 2: Get ALL schedules for this practitioner
   const allScheduleIds = await fetchPractitionerSchedules(token, fhirBaseUrl, practitionerId);
-  console.log(`Found ${allScheduleIds.length} schedules for practitioner ${practitionerId}`);
 
   // Step 3: Fetch all slots for ALL practitioner's schedules
   return fetchSlotsForSchedules(token, fhirBaseUrl, startTime, endTime, allScheduleIds);
@@ -214,8 +213,7 @@ export async function createSlotsWithOverlapValidation(
   const maxEnd = new Date(Math.max(...intervals.map(i => i.end.getTime())));
   const firstScheduleId = intervals[0].scheduleId; // Use first schedule to get practitioner
 
-  console.log(`Checking ${slotsToCreate.length} slots for overlaps in range ${minStart.toISOString()} to ${maxEnd.toISOString()}`);
-  console.log(`Using schedule ${firstScheduleId} to determine practitioner`);
+  
 
   // Step 2: Fetch existing slots for ALL practitioner's schedules in time range
   const existingSlots = await fetchSlotsInRangeForPractitioner(
@@ -225,8 +223,6 @@ export async function createSlotsWithOverlapValidation(
     maxEnd,
     firstScheduleId
   );
-
-  console.log(`Found ${existingSlots.length} existing slots across all practitioner schedules`);
 
   // Step 3: Validate each slot for overlaps
   const validSlots: SlotCreationRequest[] = [];
@@ -260,8 +256,6 @@ export async function createSlotsWithOverlapValidation(
     
     validSlots.push(slot);
   }
-  
-  console.log(`Validation complete: ${validSlots.length} valid, ${rejectedSlots.length} rejected`);
 
   // Step 4: Batch create all valid slots using Promise.allSettled
   const creationPromises = validSlots.map(slot => 
@@ -285,8 +279,6 @@ export async function createSlotsWithOverlapValidation(
       });
     }
   });
-  
-  console.log(`Creation complete: ${created.length} created, ${rejectedSlots.length} total rejected`);
 
   return { created, rejected: rejectedSlots };
 }
