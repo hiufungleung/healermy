@@ -52,6 +52,7 @@ import {
 import { formatTimeForDisplay, formatDateForDisplay, formatDateTimeForDisplay, APP_TIMEZONE, getDateInputValue } from '@/library/timezone';
 import type { Practitioner, Slot, Schedule } from '@/types/fhir';
 import { X } from 'lucide-react';
+import { POLLING_INTERVALS } from '@/config/polling';
 import {
   SERVICE_CATEGORIES as FHIR_SERVICE_CATEGORIES,
   SERVICE_CATEGORY_LABELS,
@@ -522,7 +523,7 @@ function NewBookingFlow() {
     slotUpdateInterval.current = setInterval(() => {
       // Silently refetch without showing loader, bypass cache to get fresh data
       fetchMonthSlots(currentMonth, true); // true = skip cache
-    }, 5000); // 5 seconds
+    }, POLLING_INTERVALS.BOOKING_SLOTS);
 
     return () => {
       if (slotUpdateInterval.current) {

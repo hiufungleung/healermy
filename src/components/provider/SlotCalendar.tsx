@@ -17,6 +17,7 @@ import {
   type SpecialtyCode,
 } from '@/constants/fhir';
 import type { Slot, Schedule } from '@/types/fhir';
+import { POLLING_INTERVALS } from '@/config/polling';
 
 interface Props {
   slots: Slot[];
@@ -185,9 +186,9 @@ export function SlotCalendar({ practitionerId, onSlotUpdate }: Props) {
     }
   }, [searchParams.get('view')]);
 
-  // Auto refresh every 1 minute
+  // Auto refresh with configured interval
   useEffect(() => {
-    const timer = setInterval(() => load(view, date), 60000);
+    const timer = setInterval(() => load(view, date), POLLING_INTERVALS.SLOT_CALENDAR);
     return () => clearInterval(timer);
   }, [view, date]);
 

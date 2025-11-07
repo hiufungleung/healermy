@@ -344,14 +344,15 @@ export const createColumns = (context?: ColumnsContext, options?: ColumnsOptions
       };
 
       return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+        <div onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
             <DropdownMenuLabel className='text-[13px]'>Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {/* Always show "View Detail" first */}
@@ -376,6 +377,7 @@ export const createColumns = (context?: ColumnsContext, options?: ColumnsOptions
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       );
     },
     size: 60,

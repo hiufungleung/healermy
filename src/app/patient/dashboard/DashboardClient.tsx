@@ -9,6 +9,7 @@ import { FancyLoader } from '@/components/common/FancyLoader';
 import { getNowInAppTimezone, formatAppointmentDateTime } from '@/library/timezone';
 import type { SessionData } from '@/types/auth';
 import type { AppointmentWithPractitionerDetails } from '@/library/appointmentDetailInfo';
+import { POLLING_INTERVALS } from '@/config/polling';
 
 interface DashboardClientProps {
   patientName: string | undefined;
@@ -85,14 +86,14 @@ export default function DashboardClient({
 
       await fetchAppointments(); // Wait for response
 
-      // Wait 10 seconds after response before next fetch
+      // Wait for configured interval after response before next fetch
       if (isActive) {
-        timeoutId = setTimeout(pollAppointments, 10000);
+        timeoutId = setTimeout(pollAppointments, POLLING_INTERVALS.APPOINTMENTS);
       }
     };
 
-    // Start polling after initial fetch (10 seconds delay)
-    timeoutId = setTimeout(pollAppointments, 10000);
+    // Start polling after initial fetch
+    timeoutId = setTimeout(pollAppointments, POLLING_INTERVALS.APPOINTMENTS);
 
     // Cleanup on unmount
     return () => {
@@ -400,8 +401,8 @@ export default function DashboardClient({
     // Initial calculation
     calculateQueuePosition();
 
-    // Set up polling every 5 seconds
-    const intervalId = setInterval(calculateQueuePosition, 5000);
+    // Set up polling with configured interval
+    const intervalId = setInterval(calculateQueuePosition, POLLING_INTERVALS.QUEUE_POSITION);
 
     // Cleanup interval on unmount
     return () => clearInterval(intervalId);

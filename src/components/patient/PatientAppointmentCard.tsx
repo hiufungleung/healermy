@@ -39,7 +39,27 @@ export function PatientAppointmentCard({ appointment, onAppointmentUpdated }: Pa
   const appointmentDate = appointment.start;
   const doctorName = appointment.practitionerDetails?.name || 'Provider';
   const appointmentDateDisplay = appointmentDate ? formatAppointmentDateTime(appointmentDate) : 'TBD';
-  const location = appointment.practitionerDetails?.address || 'TBD';
+
+  // Format address - it's returned as an array of strings or an object
+  const formatAddress = (address: any): string => {
+    if (!address) return 'TBD';
+    if (typeof address === 'string') return address;
+    if (Array.isArray(address)) return address.filter(Boolean).join(', ');
+    // If it's an object with FHIR address structure
+    if (typeof address === 'object') {
+      const parts = [
+        ...(address.line || []),
+        address.city || address.district,
+        address.state,
+        address.postalCode,
+        address.country
+      ].filter(Boolean);
+      return parts.join(', ') || 'TBD';
+    }
+    return 'TBD';
+  };
+
+  const location = formatAddress(appointment.practitionerDetails?.address);
   const phoneNumber = appointment.practitionerDetails?.phone || 'N/A';
 
   // Extract reason and description from appointment

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { SessionData } from '@/types/auth';
+import { POLLING_INTERVALS } from '@/config/polling';
 
 interface Communication {
   id: string;
@@ -266,15 +267,15 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
     let timeoutId: NodeJS.Timeout | null = null;
     let isActive = true;
 
-    // Polling function that waits 2 minutes after each response
+    // Polling function that waits after each response
     const pollNotifications = async () => {
       if (!isActive) return;
 
       await fetchNotificationCount();
 
-      // Wait 2 minutes after response before next fetch
+      // Wait for configured interval after response before next fetch
       if (isActive) {
-        timeoutId = setTimeout(pollNotifications, 120000);
+        timeoutId = setTimeout(pollNotifications, POLLING_INTERVALS.NOTIFICATIONS);
       }
     };
 

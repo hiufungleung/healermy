@@ -32,6 +32,7 @@ import {
   getAllSpecialties,
   type ServiceCategoryCode,
 } from '@/constants/fhir';
+import { checkScheduleConflict } from '@/lib/scheduleValidation';
 
 interface CreateScheduleFormProps {
   practitionerId: string;
@@ -100,7 +101,38 @@ export function CreateScheduleForm({
     setError(null);
 
     try {
-      // Build FHIR Schedule resource
+      // ✅ Step 1: Fetch existing schedules for this practitioner
+      const schedulesResponse = await fetch(`/api/fhir/Schedule?actor=Practitioner/${practitionerId}`, {
+        credentials: 'include',
+      });
+
+      if (!schedulesResponse.ok) {
+        throw new Error('Failed to fetch existing schedules');
+      }
+
+      const schedulesBundle = await schedulesResponse.json();
+      const existingSchedules: Schedule[] = schedulesBundle.entry?.map((e: any) => e.resource) || [];
+
+      // ✅ Step 2: Check for conflicts
+      const conflictCheck = checkScheduleConflict(
+        {
+          specialty: formData.specialty,
+          serviceCategory: formData.serviceCategory,
+          serviceType: formData.serviceType,
+          planningHorizonStart: formData.planningHorizonStart,
+          planningHorizonEnd: formData.planningHorizonEnd,
+        },
+        existingSchedules,
+        practitionerId
+      );
+
+      if (conflictCheck.hasConflict) {
+        setError(conflictCheck.message || 'Schedule conflict detected');
+        setLoading(false);
+        return;
+      }
+
+      // ✅ Step 3: Build FHIR Schedule resource (no conflicts)
       const scheduleData: Schedule = {
         resourceType: 'Schedule',
         id: '', // Will be assigned by server

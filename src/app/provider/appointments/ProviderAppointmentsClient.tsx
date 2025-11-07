@@ -532,7 +532,11 @@ export default function ProviderAppointmentsClient() {
               ))
             ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={row.id}
+                  onClick={() => setSelectedAppointment(row.original)}
+                  className="cursor-pointer hover:bg-gray-50"
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(
