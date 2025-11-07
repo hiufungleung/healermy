@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { cn } from '@/library/shadcn-utils';
+import { cn } from '@/lib/shadcn-utils';
 
 export interface ProfileSection {
   id: string;

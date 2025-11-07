@@ -22,7 +22,7 @@ import {
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { FancyLoader } from '@/components/common/FancyLoader';
-import { formatDateForDisplay } from '@/library/timezone';
+import { formatDateForDisplay } from '@/lib/timezone';
 import type { Slot, Appointment } from '@/types/fhir';
 
 interface SlotDetailDialogProps {

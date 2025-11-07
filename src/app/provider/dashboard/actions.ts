@@ -1,8 +1,8 @@
 'use server';
 
 import { cookies } from 'next/headers';
-import { decrypt } from '@/library/auth/encryption';
-import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
+import { decrypt } from '@/lib/auth/encryption';
+import { TOKEN_COOKIE_NAME } from '@/lib/auth/config';
 import type { SessionData } from '@/types/auth';
 import type { Practitioner } from '@/types/fhir';
 

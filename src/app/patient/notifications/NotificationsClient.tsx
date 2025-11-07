@@ -26,7 +26,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import type { SessionData } from '@/types/auth';
-import { formatAppointmentDateTime } from '@/library/timezone';
+import { formatAppointmentDateTime } from '@/lib/timezone';
 import { toast } from 'sonner';
 
 interface Communication {

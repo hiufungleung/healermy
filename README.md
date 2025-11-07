@@ -1,5 +1,11 @@
 # HealerMy - FHIR Healthcare Appointment System
 
+> ### Degraded FHIR MELD Sandbox after AWS outage on 20 Oct 2025
+> The app is using MELD sandbox as the FHIR service. Since the AWS outage on 20/10/2025, the service has been keeping degraded. When the app is performing a lot of actions and request in a short time, the FHIR service will be stuck and return 500 error. It is not the app's fault, we are trying to migrate to a more reliable service provider in the future.
+
+> ### COMP3820 Blackboard submission (not for GitHub)
+> The entire `env.local` is provided in the blackboard submission. Ensure the app is running at the port 3000, otherwise the authentication process cannot be completed as the callback url is `http://localhost:3000/api/auth/callback`. The dev server is running at port 3000 by default; in order to specify the port just in case, use `pnpm run dev -p 3000` to pass the port argument.
+
 A Next.js healthcare appointment management system using **SMART on FHIR** authentication and **pure FHIR R4** as the database. Built as a proof-of-concept demonstrating FHIR interoperability standards.
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](https://www.typescriptlang.org/)
@@ -416,14 +422,22 @@ src/
 │       ├── calendar.tsx       # Date picker
 │       ├── time-picker.tsx    # Custom inline time picker (HH:MM)
 │       └── [other ui components]
-├── lib/                       # Utility functions
-│   ├── queueCalculation.ts    # Encounter-based queue logic
+├── lib/                       # Utility functions and shared logic
+│   ├── auth/                  # Authentication utilities
+│   │   ├── config.ts          # Auth configuration
+│   │   ├── encryption.ts      # Session encryption (AES-GCM)
+│   │   ├── session.ts         # Session management
+│   │   └── tokenRefresh.ts    # Token refresh logic
 │   ├── appointmentDetailInfo.ts  # Appointment enhancement utilities
-│   └── [other utilities]
-├── library/                   # Legacy utilities (being phased out)
-│   ├── fhir/                  # FHIR types and constants
-│   │   └── timezone.ts        # Timezone conversion utilities
-│   └── [legacy utilities]
+│   ├── appointmentFlowUtils.ts   # Appointment status flow logic
+│   ├── breakpoints.ts         # Responsive breakpoint utilities
+│   ├── fhirBatch.ts           # FHIR batch request utilities
+│   ├── fhirNameResolver.ts    # FHIR name formatting utilities
+│   ├── queueCalculation.ts    # Encounter-based queue calculation
+│   ├── request-utils.ts       # HTTP request utilities
+│   ├── scheduleValidation.ts  # Schedule overlap validation
+│   ├── shadcn-utils.ts        # shadcn/ui utility functions (cn, etc.)
+│   └── timezone.ts            # Timezone conversion utilities
 ├── types/                     # TypeScript definitions
 │   ├── auth.ts                # Authentication types
 │   └── fhir.ts                # FHIR R4 resource types

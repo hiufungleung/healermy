@@ -13,8 +13,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/common/Badge';
 import { FancyLoader } from '@/components/common/FancyLoader';
-import { formatAppointmentDateTime } from '@/library/timezone';
-import { getAvailableActions, getActionLabel, executeAction } from '@/library/appointmentFlowUtils';
+import { formatAppointmentDateTime } from '@/lib/timezone';
+import { getAvailableActions, getActionLabel, executeAction } from '@/lib/appointmentFlowUtils';
 import type { Appointment, Encounter } from '@/types/fhir';
 
 // Extended appointment type with patient and encounter details

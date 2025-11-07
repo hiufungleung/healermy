@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible"
-import { cn } from "@/library/shadcn-utils"
+import { cn } from "@/lib/shadcn-utils"
 
 const Collapsible = CollapsiblePrimitive.Root
 

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { cn } from "@/library/shadcn-utils"
+import { cn } from "@/lib/shadcn-utils"
 import { Input } from "@/components/ui/input"
 
 interface TimePickerProps {

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SessionData } from '@/types/auth';
-import { decrypt, encrypt } from '@/library/auth/encryption';
-import { refreshAccessToken, TokenRefreshError } from '@/library/auth/tokenRefresh';
-import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
-import { getPublicBaseUrl } from '@/library/request-utils';
+import { decrypt, encrypt } from '@/lib/auth/encryption';
+import { refreshAccessToken, TokenRefreshError } from '@/lib/auth/tokenRefresh';
+import { TOKEN_COOKIE_NAME } from '@/lib/auth/config';
+import { getPublicBaseUrl } from '@/lib/request-utils';
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;

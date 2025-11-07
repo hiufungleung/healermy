@@ -12,7 +12,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Spinner } from '@/components/ui/spinner';
-import { cn } from '@/library/shadcn-utils';
+import { cn } from '@/lib/shadcn-utils';
 
 interface PopupConfirmationProps {
   isOpen: boolean;

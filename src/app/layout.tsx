@@ -4,8 +4,8 @@ import "./globals.css";
 import { ClientProviders } from "@/components/providers/ClientProviders";
 import { Toaster } from "sonner";
 import { cookies } from "next/headers";
-import { decrypt } from "@/library/auth/encryption";
-import { TOKEN_COOKIE_NAME } from "@/library/auth/config";
+import { decrypt } from "@/lib/auth/encryption";
+import { TOKEN_COOKIE_NAME } from "@/lib/auth/config";
 import type { SessionData } from "@/types/auth";
 
 const geistSans = Geist({

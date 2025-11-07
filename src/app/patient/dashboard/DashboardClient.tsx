@@ -6,9 +6,9 @@ import { Button } from '@/components/common/Button';
 import { PatientAppointmentCard } from '@/components/patient/PatientAppointmentCard';
 import { AppointmentSkeleton } from '@/components/common/ContentSkeleton';
 import { FancyLoader } from '@/components/common/FancyLoader';
-import { getNowInAppTimezone, formatAppointmentDateTime } from '@/library/timezone';
+import { getNowInAppTimezone, formatAppointmentDateTime } from '@/lib/timezone';
 import type { SessionData } from '@/types/auth';
-import type { AppointmentWithPractitionerDetails } from '@/library/appointmentDetailInfo';
+import type { AppointmentWithPractitionerDetails } from '@/lib/appointmentDetailInfo';
 import { POLLING_INTERVALS } from '@/config/polling';
 
 interface DashboardClientProps {
@@ -62,7 +62,7 @@ export default function DashboardClient({
         const appointments = bundle.entry?.map((e: any) => e.resource) || [];
 
         // Use the reusable appointment enhancement utility
-        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');
+        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/lib/appointmentDetailInfo');
         const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
         setAppointments(enhancedAppointments);
       } catch (error) {
@@ -116,7 +116,7 @@ export default function DashboardClient({
         const appointments = bundle.entry?.map((e: any) => e.resource) || [];
 
         // Use the reusable appointment enhancement utility
-        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');
+        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/lib/appointmentDetailInfo');
         const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
         setAppointments(enhancedAppointments);
       }

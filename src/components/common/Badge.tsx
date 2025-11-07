@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge as ShadcnBadge, BadgeProps as ShadcnBadgeProps } from '@/components/ui/badge';
-import { cn } from '@/library/shadcn-utils';
+import { cn } from '@/lib/shadcn-utils';
 
 interface BadgeProps extends Omit<ShadcnBadgeProps, 'variant'> {
   children: React.ReactNode;

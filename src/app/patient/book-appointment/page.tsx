@@ -49,7 +49,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { formatTimeForDisplay, formatDateForDisplay, formatDateTimeForDisplay, APP_TIMEZONE, getDateInputValue } from '@/library/timezone';
+import { formatTimeForDisplay, formatDateForDisplay, formatDateTimeForDisplay, APP_TIMEZONE, getDateInputValue } from '@/lib/timezone';
 import type { Practitioner, Slot, Schedule } from '@/types/fhir';
 import { X } from 'lucide-react';
 import { POLLING_INTERVALS } from '@/config/polling';

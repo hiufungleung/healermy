@@ -28,7 +28,7 @@ import { Search } from 'lucide-react';
 import { createColumns, AppointmentRow } from './columns';
 import { ProviderAppointmentDialog } from '@/components/provider/ProviderAppointmentDialog';
 import type { Appointment, Encounter } from '@/types/fhir';
-import { getNowInAppTimezone } from '@/library/timezone';
+import { getNowInAppTimezone } from '@/lib/timezone';
 
 type TimeFilter = 'all' | 'today' | 'upcoming-7' | 'upcoming' | 'past';
 type StatusFilter = 'pending' | 'booked' | 'fulfilled' | 'cancelled';

@@ -17,7 +17,7 @@ import type {
   ExplanationOfBenefit,
 } from '@/types/fhir';
 import { Badge } from '@/components/common/Badge';
-import { formatDateForDisplay } from '@/library/timezone';
+import { formatDateForDisplay } from '@/lib/timezone';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Collapsible,

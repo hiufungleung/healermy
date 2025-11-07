@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { cn } from '@/library/shadcn-utils';
+import { cn } from '@/lib/shadcn-utils';
 
 interface ModalProps {
   isOpen: boolean;

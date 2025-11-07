@@ -6,7 +6,7 @@ import { Button } from '@/components/common/Button';
 import { AppointmentSkeleton } from '@/components/common/ContentSkeleton';
 import { PatientAppointmentCard } from '@/components/patient/PatientAppointmentCard';
 import type { SessionData } from '@/types/auth';
-import type { AppointmentWithPractitionerDetails } from '@/library/appointmentDetailInfo';
+import type { AppointmentWithPractitionerDetails } from '@/lib/appointmentDetailInfo';
 
 interface AppointmentsClientProps {
   session: SessionData;
@@ -229,7 +229,7 @@ export default function AppointmentsClient({ session }: AppointmentsClientProps)
         const appointments = data.appointments || [];
 
         // Use the reusable appointment enhancement utility
-        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/library/appointmentDetailInfo');
+        const { enhanceAppointmentsWithPractitionerDetails } = await import('@/lib/appointmentDetailInfo');
         const enhancedAppointments = await enhanceAppointmentsWithPractitionerDetails(appointments);
         setAppointments(enhancedAppointments);
       }

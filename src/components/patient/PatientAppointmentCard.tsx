@@ -21,9 +21,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { formatAppointmentDateTime } from '@/library/timezone';
+import { formatAppointmentDateTime } from '@/lib/timezone';
 import { toast } from 'sonner';
-import type { AppointmentWithPractitionerDetails } from '@/library/appointmentDetailInfo';
+import type { AppointmentWithPractitionerDetails } from '@/lib/appointmentDetailInfo';
 
 interface PatientAppointmentCardProps {
   appointment: AppointmentWithPractitionerDetails;

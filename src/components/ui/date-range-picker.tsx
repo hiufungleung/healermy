@@ -4,7 +4,7 @@ import * as React from "react"
 import { Calendar as CalendarIcon } from "lucide-react"
 import { DateRange } from "react-day-picker"
 
-import { cn } from "@/library/shadcn-utils"
+import { cn } from "@/lib/shadcn-utils"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -12,7 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { formatDate } from "@/library/timezone"
+import { formatDate } from "@/lib/timezone"
 
 interface DateRangePickerProps {
   dateRange?: { from: Date | undefined; to: Date | undefined }

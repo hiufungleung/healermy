@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/table';
 import type { SessionData } from '@/types/auth';
 import type { Practitioner, Appointment, Encounter, Patient } from '@/types/fhir';
-import { getNowInAppTimezone } from '@/library/timezone';
+import { getNowInAppTimezone } from '@/lib/timezone';
 import { createColumns, AppointmentRow } from '@/app/provider/appointments/columns';
 
 interface ProviderDashboardClientProps {

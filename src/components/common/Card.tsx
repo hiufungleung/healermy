@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card as ShadcnCard } from '@/components/ui/card';
-import { cn } from '@/library/shadcn-utils';
+import { cn } from '@/lib/shadcn-utils';
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;

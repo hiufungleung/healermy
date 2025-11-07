@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/common/Badge';
-import { formatDateForDisplay } from '@/library/timezone';
+import { formatDateForDisplay } from '@/lib/timezone';
 import type { Schedule } from '@/types/fhir';
 import {
   SERVICE_CATEGORY_LABELS,

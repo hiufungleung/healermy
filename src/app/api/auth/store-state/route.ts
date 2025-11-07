@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { encrypt } from '@/library/auth/encryption';
+import { encrypt } from '@/lib/auth/encryption';
 
 // Temporary OAuth state storage (5 minutes expiry)
 const STATE_COOKIE_PREFIX = 'oauth_state_';

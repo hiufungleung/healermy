@@ -5,7 +5,7 @@ import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { FancyLoader } from '@/components/common/FancyLoader';
-import { formatDateForDisplay } from '@/library/timezone';
+import { formatDateForDisplay } from '@/lib/timezone';
 import type { Appointment, Practitioner } from '@/types/fhir';
 
 interface AppointmentDetailModalProps {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { decrypt } from '@/library/auth/encryption';
+import { decrypt } from '@/lib/auth/encryption';
 
 const STATE_COOKIE_PREFIX = 'oauth_state_';
 const STATE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes

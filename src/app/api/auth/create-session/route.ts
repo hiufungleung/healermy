@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SessionData } from '@/types/auth';
-import { encrypt } from '@/library/auth/encryption';
-import { TOKEN_COOKIE_NAME } from '@/library/auth/config';
+import { encrypt } from '@/lib/auth/encryption';
+import { TOKEN_COOKIE_NAME } from '@/lib/auth/config';
 
 export async function POST(request: NextRequest) {
   try {

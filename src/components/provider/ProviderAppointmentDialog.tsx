@@ -23,7 +23,7 @@ import { Badge } from '@/components/common/Badge';
 import { Button } from '@/components/common/Button';
 import { Separator } from '@/components/ui/separator';
 import { Loader2 } from 'lucide-react';
-import { formatAppointmentDateTime } from '@/library/timezone';
+import { formatAppointmentDateTime } from '@/lib/timezone';
 import type { Appointment } from '@/types/fhir';
 
 // Extended appointment type with enhanced data from table

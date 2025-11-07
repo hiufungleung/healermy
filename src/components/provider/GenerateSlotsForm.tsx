@@ -36,7 +36,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { TimePicker } from '@/components/ui/time-picker';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { createFHIRDateTime, getDateInputValue, formatDate } from '@/library/timezone';
+import { createFHIRDateTime, getDateInputValue, formatDate } from '@/lib/timezone';
 import type { Schedule, Slot } from '@/types/fhir';
 import { getAllDaysOfWeek, FHIR_DAY_NAME_TO_CODE } from '@/constants/fhir';
 

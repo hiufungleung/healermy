@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button as ShadcnButton, ButtonProps as ShadcnButtonProps } from '@/components/ui/button';
-import { cn } from '@/library/shadcn-utils';
+import { cn } from '@/lib/shadcn-utils';
 import { Loader2 } from 'lucide-react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
