@@ -4,7 +4,11 @@
 > The app is using MELD sandbox as the FHIR service. Since the AWS outage on 20/10/2025, the service has been keeping degraded. When the app is performing a lot of actions and request in a short time, the FHIR service will be stuck and return 500 error. It is not the app's fault, we are trying to migrate to a more reliable service provider in the future.
 
 > ### COMP3820 Blackboard submission (not for GitHub)
-> The entire `env.local` is provided in the blackboard submission. Ensure the app is running at the port 3000, otherwise the authentication process cannot be completed as the callback url is `http://localhost:3000/api/auth/callback`. The dev server is running at port 3000 by default; in order to specify the port just in case, use `pnpm run dev -p 3000` to pass the port argument.
+> The entire `env.local` is provided in the blackboard submission. Ensure the app is running at the port 3000, otherwise the authentication process cannot be completed as the callback url is `http://localhost:3000/api/auth/callback`. The dev server is running at port 3000 by default; in order to specify the port just in case, use `pnpm run dev -p 3000` to pass the port argument. Refer to Method 3 below for how to enable `pnpm`.
+>```bash
+> pnpm install
+> pnpm run dev -p 3000
+> ```
 
 A Next.js healthcare appointment management system using **SMART on FHIR** authentication and **pure FHIR R4** as the database. Built as a proof-of-concept demonstrating FHIR interoperability standards.
 
@@ -433,7 +437,6 @@ src/
 │   ├── breakpoints.ts         # Responsive breakpoint utilities
 │   ├── fhirBatch.ts           # FHIR batch request utilities
 │   ├── fhirNameResolver.ts    # FHIR name formatting utilities
-│   ├── queueCalculation.ts    # Encounter-based queue calculation
 │   ├── request-utils.ts       # HTTP request utilities
 │   ├── scheduleValidation.ts  # Schedule overlap validation
 │   ├── shadcn-utils.ts        # shadcn/ui utility functions (cn, etc.)
@@ -518,7 +521,7 @@ src/
   │                 ▼ Patient arrives
   │             [arrived] ────────────► Slot: busy
   │                 │
-  │                 ▼ Practitioner: "Will finish in 10 min"
+  │                 ▼ Practitioner: "Start in 10 Minutes"
   │             [arrived] ────────────► Encounter: planned (✨ patient notified)
   │                 │
   │                 ▼ Start encounter
@@ -558,7 +561,7 @@ pending → [Approve] → booked (NO auto-encounter)
   ↓
   [Patient Arrived] → arrived
   ↓
-  [Practitioner: "Will finish in 10 min"] → encounter: planned ✨
+  [Practitioner: "Start in 10 Minutes"] → encounter: planned ✨
   ↓
   [Start Encounter] → encounter: in-progress
   ↓
@@ -567,9 +570,31 @@ pending → [Approve] → booked (NO auto-encounter)
 
 **Key Encounter Status Values:**
 
-- `planned` - Created when practitioner clicks "Will be finished in 10 minutes"
+- `planned` - Created when practitioner clicks "Start in 10 Minutes"
 - `in-progress` - Encounter currently happening (auto-sets period.start)
 - `finished` - Encounter completed (auto-sets period.end)
+
+### Queue Position Calculation
+
+**Patient Dashboard Queue Logic** (only for arrived patients):
+
+**Counts in queue:**
+
+- ✅ `booked` - Confirmed appointments (even if patient hasn't arrived)
+- ✅ `arrived` - Patient has checked in
+
+**Excludes from queue:**
+
+- ❌ `pending` - Not yet approved by provider
+- ❌ `cancelled` - Cancelled appointments
+- ❌ `fulfilled` - Completed appointments
+
+**Wait time estimation:**
+
+- **Encounter in-progress:** 0 minutes (seeing doctor now)
+- **Encounter planned:** < 10 minutes (practitioner ready soon)
+- **No encounter + next in queue:** < 10 minutes
+- **N patients ahead:** Sum of appointment durations
 
 **Troubleshooting `ERR_SSL_PROTOCOL_ERROR`:**
 - Cause: OAuth redirect using internal IP instead of public HTTPS domain

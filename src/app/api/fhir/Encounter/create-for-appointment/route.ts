@@ -6,7 +6,7 @@ import { getSessionFromCookies, prepareToken } from '../../utils/auth';
  * POST /api/fhir/Encounter/create-for-appointment
  * Create an encounter for an appointment
  *
- * This endpoint is called by practitioners when they click "Will be finished in 10 minutes"
+ * This endpoint is called by practitioners when they click "Start in 10 Minutes"
  * to create an encounter for the next patient with status='planned'
  *
  * Body: { appointmentId: string, initialStatus?: 'planned' | 'in-progress' }

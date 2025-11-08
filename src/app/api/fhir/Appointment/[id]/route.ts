@@ -280,7 +280,7 @@ export async function PATCH(
     }
 
     // Note: Encounters are no longer auto-created on approval
-    // They are created manually by practitioner when clicking "Will be finished in 10 minutes"
+    // They are created manually by practitioner when clicking "Start in 10 Minutes"
     // This follows FHIR standards more closely
 
     return NextResponse.json(result);

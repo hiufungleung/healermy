@@ -353,12 +353,14 @@ export default function DashboardClient({
         }
 
         // Filter eligible appointments:
-        // - Status NOT cancelled or fulfilled
+        // - Status: booked, arrived (NOT pending, cancelled, fulfilled)
         // - Start time < patient's appointment start time
         // - Not patient's own appointment
         const eligibleAppointments = allAppointments.filter((apt: any) => {
           if (apt.id === nextTodayAppointment.id) return false;
-          if (apt.status === 'cancelled' || apt.status === 'fulfilled') return false;
+          // Only count confirmed appointments (booked or arrived)
+          // Exclude: pending (not yet approved), cancelled, fulfilled
+          if (apt.status === 'pending' || apt.status === 'cancelled' || apt.status === 'fulfilled') return false;
 
           const aptTime = new Date(apt.start).getTime();
           const myTime = appointmentDate.getTime();
