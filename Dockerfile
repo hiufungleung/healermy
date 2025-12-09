@@ -35,9 +35,11 @@ ENV NODE_ENV=production \
     SESSION_EXPIRY=90d
 # (Other environment variables like CLIENT_ID, CLIENT_SECRET, SESSION_SECRET, SESSION_SALT, FHIR_SERVER_URL should be provided at runtime)
 
-# Install curl for health checks and create non-root user
-RUN apk add --no-cache curl && \
-    addgroup -g 10001 -S nextjs && \
+# FIX: Install curl and create user in separate steps to avoid QEMU/busybox trigger issues
+# This is a workaround for cross-platform builds with QEMU emulation
+RUN apk add --no-cache curl
+
+RUN addgroup -g 10001 -S nextjs && \
     adduser -S nextjs -u 10001 -G nextjs
 
 # Enable corepack for pnpm

@@ -7,10 +7,8 @@ on:
       - main
 
 # Security: Explicit permissions following principle of least privilege
-# This workflow only needs to read repository code for building Docker images
-# No write permissions are required as deployment happens via SSH to external servers
 permissions:
-  contents: read # Required for actions/checkout to clone repository
+  contents: read
 
 env:
   IMAGE_NAME: hiufungleung/healermy
@@ -30,6 +28,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -48,12 +49,13 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          # platforms: linux/amd64
-          platforms: linux/amd64, linux/arm64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
 
   deploy:
     runs-on: ubuntu-latest
@@ -113,13 +115,25 @@ jobs:
               "$IMAGE_REF"
 
             # Health check: wait for app to be ready
+            echo "Waiting for container to be healthy..."
             for i in {1..30}; do
               if docker run --rm --network web curlimages/curl:8.8.0 \
-                   -fsS "http://$CONTAINER:$PORT/api/health-check" >/dev/null; then
-                echo "UP"; break
+                   -fsS "http://$CONTAINER:$PORT/api/health-check" >/dev/null 2>&1; then
+                echo "✓ Container is healthy and responding"
+                break
               fi
+              echo "Attempt $i/30: Container not ready yet..."
               sleep 2
             done
 
+            # Verify container is running
+            if docker ps | grep -q "$CONTAINER"; then
+              echo "✓ Container $CONTAINER is running"
+            else
+              echo "✗ Container $CONTAINER failed to start"
+              docker logs "$CONTAINER" --tail 50
+              exit 1
+            fi
+
             # Delete old images to save space
-            docker image prune -f
+            docker image prune -af --filter "until=24h"
