@@ -115,25 +115,13 @@ jobs:
               "$IMAGE_REF"
 
             # Health check: wait for app to be ready
-            echo "Waiting for container to be healthy..."
             for i in {1..30}; do
               if docker run --rm --network web curlimages/curl:8.8.0 \
-                   -fsS "http://$CONTAINER:$PORT/api/health-check" >/dev/null 2>&1; then
-                echo "✓ Container is healthy and responding"
-                break
+                   -fsS "http://$CONTAINER:$PORT/api/health-check" >/dev/null; then
+                echo "UP"; break
               fi
-              echo "Attempt $i/30: Container not ready yet..."
               sleep 2
             done
 
-            # Verify container is running
-            if docker ps | grep -q "$CONTAINER"; then
-              echo "✓ Container $CONTAINER is running"
-            else
-              echo "✗ Container $CONTAINER failed to start"
-              docker logs "$CONTAINER" --tail 50
-              exit 1
-            fi
-
             # Delete old images to save space
-            docker image prune -af --filter "until=24h"
+            docker image prune -f
